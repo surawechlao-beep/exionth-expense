@@ -61,7 +61,61 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
-// Register service worker (PWA)
+/**
+ * Render bottom navigation. Pass `active` = home / new / status / inbox
+ * Shows Inbox tab only if user is GM.
+ */
+async function renderBottomNav(active) {
+  const session = getSession();
+  if (!session) return;
+
+  let isGM = !!session.isGM;
+  if (typeof session.isGM === 'undefined') {
+    try {
+      const r = await checkIsGM(session.Email);
+      isGM = !!(r && r.isGM);
+      session.isGM = isGM;
+      setSession(session);
+    } catch { isGM = false; }
+  }
+
+  document.body.classList.add('has-bottom-nav');
+  const nav = document.createElement('nav');
+  nav.className = 'bottom-nav';
+
+  const items = [
+    { key: 'home',   href: 'index.html',  label: 'Home',    icon: 'home' },
+    { key: 'new',    href: 'submit.html', label: 'ขอเบิก',  icon: 'plus' },
+    { key: 'status', href: 'status.html', label: 'คำขอ',   icon: 'list' }
+  ];
+  if (isGM) {
+    items.push({ key: 'inbox', href: 'inbox.html', label: 'Inbox', icon: 'bell' });
+  } else {
+    items.push({ key: 'profile', href: '#', label: 'Profile', icon: 'user' });
+  }
+
+  nav.innerHTML = items.map(it => `
+    <a href="${it.href}" class="nav-item ${it.key === active ? 'active' : ''}">
+      ${icon(it.icon)}
+      <span>${it.label}</span>
+    </a>`).join('');
+  document.body.appendChild(nav);
+
+  if (isGM && active !== 'inbox') {
+    try {
+      const pending = await fetchPendingApprovals(session.Email);
+      const count = Array.isArray(pending) ? pending.length : 0;
+      if (count > 0) {
+        const inboxLink = nav.querySelector('a[href="inbox.html"]');
+        if (inboxLink) {
+          inboxLink.classList.add('has-badge');
+          inboxLink.dataset.badge = count > 99 ? '99+' : count;
+        }
+      }
+    } catch {}
+  }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').catch(err =>
