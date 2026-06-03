@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Inbox — Exionth Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F172A">
+</head>
+<body>
+  <div class="header">
+    <h1><span class="logo">EX</span> Inbox</h1>
+  </div>
+
+  <div class="container">
+    <div id="list" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Detail/action modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="modalTitle">รายละเอียดคำขอ</h3>
+        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    let pending = [];
+
+    async function load() {
+      document.getElementById('closeBtn').innerHTML = icon('x');
+
+      try {
+        const result = await fetchPendingApprovals(session.Email);
+        if (result && result.error) throw new Error(result.error);
+        pending = result || [];
+
+        const list = document.getElementById('list');
+        list.classList.remove('loading');
+
+        if (pending.length === 0) {
+          list.innerHTML = `
+            <div class="empty">
+              <div class="icon-wrap">${icon('check')}</div>
+              <div class="title">ไม่มีคำขอรออนุมัติ</div>
+              <div class="sub">เคลียร์หมดแล้ว! 🎉</div>
+            </div>`;
+          renderBottomNav('inbox');
+          return;
+        }
+
+        let html = `<div class="card" style="text-align:center; padding:16px;">
+          <div style="font-size:13px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">รออนุมัติ</div>
+          <div style="font-size:36px; font-weight:800; color:var(--warning); letter-spacing:-0.03em; margin-top:4px;">${pending.length}</div>
+        </div>`;
+
+        pending.forEach((r, idx) => {
+          html += `
+            <div class="request-item" onclick="showDetail(${idx})">
+              <div class="cat-icon" style="background:#FEF3C7; color:#92400E;">${categoryIcon(r.Category)}</div>
+              <div class="info">
+                <div class="title">${r.StaffName} — ${r.Category}</div>
+                <div class="meta">${formatDate(r.ExpenseDate || r.Timestamp)}${r.Venue ? ' • ' + r.Venue : ''}</div>
+              </div>
+              <div class="right">
+                <div class="amount">${formatCurrency(r.Amount)}</div>
+                ${statusBadge(r.Status)}
+              </div>
+            </div>`;
+        });
+        list.innerHTML = html;
+        renderBottomNav('inbox');
+      } catch (err) {
+        document.getElementById('list').innerHTML =
+          `<div class="empty"><div class="title">${err.message}</div></div>`;
+        renderBottomNav('inbox');
+      }
+    }
+
+    function showDetail(idx) {
+      const r = pending[idx];
+      document.getElementById('modalTitle').textContent = r.StaffName;
+      const rows = [
+        ['ประเภท', r.Category],
+        ['แผนก', r.Department],
+        ['วันที่', formatDate(r.ExpenseDate)],
+        ['สถานที่', r.Venue || '-'],
+        ['โอกาส', r.Occasion || '-'],
+        ['ผู้ร่วม', r.Attendees || '-']
+      ];
+
+      let html = `
+        <div class="detail-row">
+          <div class="key">จำนวนเงิน</div>
+          <div class="val big">${formatCurrency(r.Amount)} <span style="font-size:13px; color:var(--gray-500); font-weight:600;">THB</span></div>
+        </div>` + rows.map(([k, v]) =>
+          `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`
+        ).join('');
+
+      if (r.ReceiptURL) {
+        html += `<div style="margin-top:16px;">
+          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ใบเสร็จ</div>
+          <div class="locked-box" id="rcptLocked">
+            <div class="lock-icon">${icon('lock')}</div>
+            <button class="btn btn-secondary" onclick="loadReceipt('${r.ID}')" id="rcptBtn">${icon('lock')} ดูใบเสร็จ</button>
+          </div>
+          <img id="rcptImg" class="preview-img" style="display:none;">
+        </div>`;
+      }
+
+      html += `
+        <div class="field" style="margin-top:20px;">
+          <label>หมายเหตุ <span style="color:var(--gray-400); font-weight:400;">(optional)</span></label>
+          <textarea id="remark" placeholder="เช่น Approved ภายในงบ Q2"></textarea>
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-success" onclick="decide('${r.ID}', 'Approved')">${icon('check')} Approve</button>
+          <button class="btn btn-danger" onclick="decide('${r.ID}', 'Rejected')">${icon('x')} Reject</button>
+        </div>`;
+
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('modal').classList.add('show');
+    }
+
+    async function loadReceipt(id) {
+      const btn = document.getElementById('rcptBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
+      try {
+        const r = await fetchReceiptImage(id, session.Email);
+        if (r.error) throw new Error(r.error);
+        document.getElementById('rcptImg').src = r.dataUrl;
+        document.getElementById('rcptImg').style.display = 'block';
+        document.getElementById('rcptLocked').style.display = 'none';
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
+      }
+    }
+
+    async function decide(id, decision) {
+      const remarkEl = document.getElementById('remark');
+      const remark = remarkEl ? remarkEl.value.trim() : '';
+      if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
+
+      try {
+        const result = await approveRequest({
+          id, decision, remark,
+          approverEmail: session.Email
+        });
+        if (result && result.error) throw new Error(result.error);
+        showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว' : '❌ ปฏิเสธแล้ว', 'success');
+        closeModal();
+        load();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target.id === 'modal') closeModal();
+    });
+
+    if (session) load();
+  </script>
+</body>
+</html>
