@@ -133,6 +133,7 @@
     async function showMenu(session) {
       document.getElementById('loginView').style.display = 'none';
       document.getElementById('menuView').style.display = 'block';
+      renderBottomNav('home');
       document.getElementById('avatar').textContent = initials(session.Name);
       document.getElementById('userName').textContent = session.Name;
       document.getElementById('userDept').textContent =
