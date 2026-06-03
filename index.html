@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <title>Exionth Expense</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F172A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Exionth Expense">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="header">
+    <h1><span class="logo">EX</span> Expense</h1>
+  </div>
+
+  <div class="container">
+    <!-- LOGIN VIEW -->
+    <div id="loginView" style="display:none;">
+      <div class="card card-elev">
+        <h2>Welcome</h2>
+        <h3>เข้าสู่ระบบ</h3>
+        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">ใส่ email บริษัทของคุณ ระบบจะจำไว้ — ไม่ต้อง login ครั้งต่อไป</p>
+
+        <div class="field">
+          <label>Email ของคุณ <span class="required">*</span></label>
+          <input type="email" id="emailInput" placeholder="yourname@exionth.com" autocomplete="email" inputmode="email">
+          <div class="hint">ใช้ email บริษัทเท่านั้น — ต้องอยู่ในระบบที่ได้รับสิทธิ์ใช้งาน</div>
+        </div>
+        <button class="btn btn-primary" id="loginBtn">
+          เข้าสู่ระบบ
+        </button>
+      </div>
+    </div>
+
+    <!-- MENU VIEW -->
+    <div id="menuView" style="display:none;">
+      <!-- Greeting hero -->
+      <div class="card card-hero">
+        <div class="user-greet">
+          <div class="avatar" id="avatar">?</div>
+          <div class="who">
+            <div class="greet">สวัสดี 👋</div>
+            <div class="name" id="userName">—</div>
+            <div class="meta" id="userDept">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menu tiles -->
+      <div class="menu-grid">
+        <a href="submit.html" class="menu-tile">
+          <div class="icon-box icon-blue" id="iconNew"></div>
+          <div class="label">ขอเบิกใหม่</div>
+          <div class="sub">สร้างคำขอ</div>
+        </a>
+        <a href="status.html" class="menu-tile">
+          <div class="icon-box icon-green" id="iconList"></div>
+          <div class="label">คำขอของฉัน</div>
+          <div class="sub">ดูสถานะ</div>
+        </a>
+      </div>
+
+      <!-- Stats card -->
+      <div class="card" style="margin-top:16px;">
+        <h2>เดือนนี้</h2>
+        <h3 id="monthLabel" style="margin-bottom:14px;">—</h3>
+        <div id="monthStats" class="loading"><div class="spinner"></div></div>
+      </div>
+
+      <button class="btn btn-ghost" id="logoutBtn" style="width:100%; margin-top:8px;" >
+        <span id="iconLogout"></span> ออกจากระบบ
+      </button>
+    </div>
+
+    <div id="initialLoading" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    async function init() {
+      document.getElementById('iconNew').innerHTML = icon('plus');
+      document.getElementById('iconList').innerHTML = icon('list');
+      document.getElementById('iconLogout').innerHTML = icon('logout');
+
+      const session = getSession();
+      document.getElementById('initialLoading').style.display = 'none';
+      if (session) showMenu(session);
+      else showLogin();
+    }
+
+    async function showLogin() {
+      document.getElementById('loginView').style.display = 'block';
+
+      const handleLogin = async () => {
+        const emailInput = document.getElementById('emailInput');
+        const email = emailInput.value.trim().toLowerCase();
+        if (!email || email.indexOf('@') < 0) {
+          return showToast('กรุณาใส่ email ให้ถูกต้อง', 'error');
+        }
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังตรวจสอบ...';
+
+        try {
+          const staff = await verifyStaff(email);
+          if (staff && staff.error) throw new Error(staff.error);
+          if (!staff) {
+            throw new Error('Email นี้ไม่มีสิทธิ์ใช้งาน — ติดต่อ Admin');
+          }
+          setSession(staff);
+          showMenu(staff);
+        } catch (err) {
+          showToast(err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = 'เข้าสู่ระบบ';
+        }
+      };
+
+      document.getElementById('loginBtn').addEventListener('click', handleLogin);
+      document.getElementById('emailInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleLogin();
+      });
+    }
+
+    async function showMenu(session) {
+      document.getElementById('loginView').style.display = 'none';
+      document.getElementById('menuView').style.display = 'block';
+      document.getElementById('avatar').textContent = initials(session.Name);
+      document.getElementById('userName').textContent = session.Name;
+      document.getElementById('userDept').textContent =
+        session.Department + (session.Position ? ' • ' + session.Position : '');
+
+      const monthLabel = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
+      document.getElementById('monthLabel').textContent = monthLabel;
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        if (confirm('ออกจากระบบ?')) {
+          clearSession();
+          location.reload();
+        }
+      });
+
+      try {
+        const requests = await fetchMyRequests(session.Email);
+        const now = new Date();
+        const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        const monthReqs = requests.filter(r => {
+          const d = r.ExpenseDate || r.Timestamp;
+          return d && String(d).startsWith(thisMonth);
+        });
+        const pending = monthReqs.filter(r => r.Status === 'Pending').length;
+        const approved = monthReqs.filter(r => r.Status === 'Approved').length;
+        const total = monthReqs.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+
+        document.getElementById('monthStats').classList.remove('loading');
+        document.getElementById('monthStats').innerHTML = `
+          <div class="stats-grid">
+            <div class="stat warning"><div class="value">${pending}</div><div class="label">รออนุมัติ</div></div>
+            <div class="stat success"><div class="value">${approved}</div><div class="label">อนุมัติ</div></div>
+            <div class="stat accent"><div class="value">${formatCurrency(total)}</div><div class="label">รวม THB</div></div>
+          </div>`;
+      } catch {
+        document.getElementById('monthStats').innerHTML =
+          '<div class="empty" style="padding:20px;"><div class="sub">ยังไม่มีคำขอเดือนนี้</div></div>';
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

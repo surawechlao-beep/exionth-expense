@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ขอเบิกใหม่ — Exionth Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F172A">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>ขอเบิกใหม่</h1>
+  </div>
+
+  <div class="container">
+    <div class="card card-elev">
+      <div class="field">
+        <label>ประเภทค่าใช้จ่าย <span class="required">*</span></label>
+        <select id="category" required>
+          <option value="">— เลือก —</option>
+        </select>
+        <div class="hint" id="categoryHint"></div>
+      </div>
+
+      <div class="field">
+        <label>วันที่เกิดค่าใช้จ่าย <span class="required">*</span></label>
+        <input type="date" id="expenseDate" required>
+      </div>
+
+      <div class="field" id="mileageField" style="display:none;">
+        <label>กิโลเมตรที่ใช้ <span class="required">*</span></label>
+        <input type="number" id="mileageKm" step="0.1" min="0" placeholder="เช่น 45.5">
+        <div class="hint">คำนวณอัตโนมัติ: <b id="fuelPreview">0 THB</b></div>
+      </div>
+
+      <div id="entFields" style="display:none;">
+        <div class="field">
+          <label>สถานที่ <span class="required">*</span></label>
+          <input type="text" id="venue" placeholder="ชื่อร้าน / สถานที่">
+        </div>
+        <div class="field">
+          <label>โอกาส / วัตถุประสงค์ <span class="required">*</span></label>
+          <textarea id="occasion" placeholder="เช่น Meeting กับ ABC Co. หารือเรื่องโครงการ XYZ"></textarea>
+        </div>
+        <div class="field">
+          <label>ผู้ร่วมรับประทาน <span class="required">*</span></label>
+          <textarea id="attendees" placeholder="ระบุชื่อ + บริษัท เช่น&#10;Mr. Smith (ABC Co.)&#10;Mr. Lee (ABC Co.)&#10;Somchai (Exionth)"></textarea>
+        </div>
+      </div>
+
+      <div class="field" id="venueField">
+        <label>รายละเอียด</label>
+        <input type="text" id="venueGeneric" placeholder="เช่น ค่าทางด่วนทางพิเศษศรีรัช">
+      </div>
+
+      <div class="field" id="amountField">
+        <label>จำนวนเงิน (THB) <span class="required">*</span></label>
+        <input type="number" id="amount" step="0.01" min="0" placeholder="0.00">
+      </div>
+
+      <div class="field" id="receiptField">
+        <label>ใบเสร็จ <span class="required" id="receiptRequired">*</span></label>
+        <label for="receiptInput" class="upload-area">
+          <input type="file" id="receiptInput" accept="image/*" capture="environment">
+          <div class="icon-wrap" id="iconCamera"></div>
+          <div class="text">แตะเพื่อถ่ายรูป</div>
+          <div class="sub">หรือเลือกจากแกลเลอรี่ (สูงสุด 5 MB)</div>
+        </label>
+        <img id="receiptPreview" class="preview-img" style="display:none;">
+      </div>
+
+      <button class="btn btn-primary" id="submitBtn" style="margin-top:8px;">
+        <span id="iconCheck"></span> ส่งคำขอ
+      </button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    let categories = [];
+    let receiptBase64 = '';
+    let receiptName = '';
+    let currentFuelRate = null;  // { rate, gasPrice, getsDepreciation }
+
+    async function init() {
+      document.getElementById('backBtn').innerHTML = icon('back');
+      document.getElementById('iconCamera').innerHTML = icon('camera');
+      document.getElementById('iconCheck').innerHTML = icon('check');
+
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('expenseDate').value = today;
+
+      categories = await fetchCategories();
+      const select = document.getElementById('category');
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.Code;
+        opt.textContent = c.NameTH + ' — ' + c.NameEN;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener('change', onCategoryChange);
+      document.getElementById('mileageKm').addEventListener('input', updateFuelPreview);
+      document.getElementById('receiptInput').addEventListener('change', onReceiptSelected);
+      document.getElementById('submitBtn').addEventListener('click', onSubmit);
+    }
+
+    async function onCategoryChange() {
+      const code = document.getElementById('category').value;
+      const cat = categories.find(c => c.Code === code);
+      if (!cat) return;
+
+      const isFuel = code === 'FUEL';
+      const isEnt = cat.NeedClaimForm === 'YES';
+      const needReceipt = cat.NeedReceipt === 'YES';
+
+      document.getElementById('mileageField').style.display = isFuel ? 'block' : 'none';
+      document.getElementById('amountField').style.display = isFuel ? 'none' : 'block';
+      document.getElementById('entFields').style.display = isEnt ? 'block' : 'none';
+      document.getElementById('venueField').style.display = (isEnt || isFuel) ? 'none' : 'block';
+      document.getElementById('receiptField').style.display = needReceipt ? 'block' : 'none';
+      document.getElementById('categoryHint').textContent = cat.Notes || '';
+
+      // Fetch current fuel rate for this staff (only when FUEL chosen)
+      if (isFuel && !currentFuelRate) {
+        document.getElementById('fuelPreview').textContent = 'กำลังโหลดอัตรา...';
+        try {
+          currentFuelRate = await fetchFuelRate(session.Email);
+          if (currentFuelRate.error) throw new Error(currentFuelRate.error);
+          updateFuelPreview();
+        } catch (err) {
+          document.getElementById('fuelPreview').textContent = 'ไม่สามารถโหลดอัตรา: ' + err.message;
+        }
+      } else if (isFuel) {
+        updateFuelPreview();
+      }
+    }
+
+    function updateFuelPreview() {
+      if (!currentFuelRate) return;
+      const km = parseFloat(document.getElementById('mileageKm').value) || 0;
+      const rate = currentFuelRate.rate;
+      const amount = km * rate;
+      const depText = currentFuelRate.getsDepreciation ? 'ได้ค่าเสื่อม' : 'ไม่ได้ค่าเสื่อม';
+      document.getElementById('fuelPreview').innerHTML =
+        formatCurrency(amount) + ' THB' +
+        '<div style="font-size:11px; color:var(--gray-500); margin-top:4px;">' +
+        km + ' กม. × ' + rate + ' บาท/กม. (' + depText + ', น้ำมัน ' + currentFuelRate.gasPrice + ' บาท/ลิตร)</div>';
+    }
+
+    async function onReceiptSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) return showToast('ไฟล์ใหญ่เกิน 5 MB', 'error');
+      receiptName = file.name;
+      receiptBase64 = await fileToBase64(file);
+      const img = document.getElementById('receiptPreview');
+      img.src = receiptBase64;
+      img.style.display = 'block';
+    }
+
+    async function onSubmit() {
+      const code = document.getElementById('category').value;
+      if (!code) return showToast('เลือกประเภทค่าใช้จ่าย', 'error');
+      const cat = categories.find(c => c.Code === code);
+
+      const expenseDate = document.getElementById('expenseDate').value;
+      if (!expenseDate) return showToast('ใส่วันที่', 'error');
+
+      const isFuel = code === 'FUEL';
+      const isEnt = cat.NeedClaimForm === 'YES';
+
+      let amount = 0, mileageKm = 0, venue = '', occasion = '', attendees = '';
+
+      if (isFuel) {
+        mileageKm = parseFloat(document.getElementById('mileageKm').value) || 0;
+        if (mileageKm <= 0) return showToast('ใส่กิโลเมตร', 'error');
+        if (!currentFuelRate) return showToast('ยังไม่ได้โหลดอัตราน้ำมัน', 'error');
+        amount = mileageKm * currentFuelRate.rate;
+      } else {
+        amount = parseFloat(document.getElementById('amount').value) || 0;
+        if (amount <= 0) return showToast('ใส่จำนวนเงิน', 'error');
+      }
+
+      if (isEnt) {
+        venue = document.getElementById('venue').value.trim();
+        occasion = document.getElementById('occasion').value.trim();
+        attendees = document.getElementById('attendees').value.trim();
+        if (!venue || !occasion || !attendees) return showToast('กรอกข้อมูลรับรองให้ครบ', 'error');
+      } else {
+        venue = document.getElementById('venueGeneric').value.trim();
+      }
+
+      if (cat.NeedReceipt === 'YES' && !receiptBase64) return showToast('แนบใบเสร็จ', 'error');
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังส่ง...';
+
+      try {
+        const result = await submitExpense({
+          staffEmail: session.Email, category: code, expenseDate,
+          venue, occasion, attendees, amount, mileageKm, receiptBase64, receiptName
+        });
+        if (result.error) throw new Error(result.error);
+        showToast('ส่งสำเร็จ! สถานะ: ' + result.status, 'success');
+        setTimeout(() => location.href = 'status.html', 1200);
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = icon('check') + ' ส่งคำขอ';
+      }
+    }
+
+    if (session) init();
+  </script>
+</body>
+</html>

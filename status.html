@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>คำขอของฉัน — Exionth Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F172A">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>คำขอของฉัน</h1>
+  </div>
+
+  <div class="container">
+    <div id="list" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Detail modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="modalTitle">รายละเอียดคำขอ</h3>
+        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    let cache = [];
+
+    async function load() {
+      document.getElementById('backBtn').innerHTML = icon('back');
+      document.getElementById('closeBtn').innerHTML = icon('x');
+
+      try {
+        cache = await fetchMyRequests(session.Email);
+        const list = document.getElementById('list');
+        list.classList.remove('loading');
+
+        if (!cache || cache.length === 0) {
+          list.innerHTML = `
+            <div class="empty">
+              <div class="icon-wrap">${icon('inbox')}</div>
+              <div class="title">ยังไม่มีคำขอ</div>
+              <div class="sub">กดด้านล่างเพื่อสร้างคำขอแรก</div>
+              <div style="margin-top:16px;"><a href="submit.html">+ ขอเบิกใหม่</a></div>
+            </div>`;
+          return;
+        }
+
+        // Group by month
+        const byMonth = {};
+        cache.forEach((r, idx) => {
+          const d = new Date(r.ExpenseDate || r.Timestamp);
+          const key = d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
+          if (!byMonth[key]) byMonth[key] = [];
+          byMonth[key].push({...r, _idx: idx});
+        });
+
+        let html = '';
+        Object.entries(byMonth).forEach(([month, reqs]) => {
+          html += `<h2 style="font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">${month}</h2>`;
+          reqs.forEach(r => {
+            html += `
+              <div class="request-item" onclick="showDetail(${r._idx})">
+                <div class="cat-icon">${categoryIcon(r.Category)}</div>
+                <div class="info">
+                  <div class="title">${r.Category}</div>
+                  <div class="meta">${formatDate(r.ExpenseDate || r.Timestamp)}${r.Venue ? ' • ' + r.Venue : ''}</div>
+                </div>
+                <div class="right">
+                  <div class="amount">${formatCurrency(r.Amount)}</div>
+                  ${statusBadge(r.Status)}
+                </div>
+              </div>`;
+          });
+        });
+        list.innerHTML = html;
+      } catch (err) {
+        document.getElementById('list').innerHTML =
+          `<div class="empty"><div class="title">เกิดข้อผิดพลาด</div><div class="sub">${err.message}</div></div>`;
+      }
+    }
+
+    function showDetail(idx) {
+      const r = cache[idx];
+      document.getElementById('modalTitle').textContent = r.Category;
+      const rows = [
+        ['Request ID', r.ID],
+        ['วันที่', formatDate(r.ExpenseDate)],
+        ['สถานที่', r.Venue || '-'],
+        ['โอกาส', r.Occasion || '-'],
+        ['ผู้ร่วม', r.Attendees || '-']
+      ];
+      let html = `
+        <div class="detail-row">
+          <div class="key">จำนวนเงิน</div>
+          <div class="val big">${formatCurrency(r.Amount)} <span style="font-size:13px; color:var(--gray-500); font-weight:600;">THB</span></div>
+        </div>
+        <div class="detail-row">
+          <div class="key">สถานะ</div>
+          <div class="val">${statusBadge(r.Status)}</div>
+        </div>` + rows.map(([k, v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
+
+      if (r.ApprovedBy || r.Remark) {
+        if (r.ApprovedBy) html += `<div class="detail-row"><div class="key">ผู้อนุมัติ</div><div class="val">${r.ApprovedBy}</div></div>`;
+        if (r.Remark) html += `<div class="detail-row"><div class="key">หมายเหตุ</div><div class="val">${r.Remark}</div></div>`;
+      }
+
+      if (r.ReceiptURL) {
+        html += `<div style="margin-top:18px;">
+          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ใบเสร็จ</div>
+          <div class="locked-box" id="rcptLocked">
+            <div class="lock-icon">${icon('lock')}</div>
+            <div class="text">ใบเสร็จเก็บแบบ Private</div>
+            <button class="btn btn-secondary" onclick="loadReceipt('${r.ID}')" id="rcptBtn">${icon('lock')} ดูใบเสร็จ</button>
+          </div>
+          <img id="rcptImg" class="preview-img" style="display:none;">
+        </div>`;
+      }
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('modal').classList.add('show');
+    }
+
+    async function loadReceipt(id) {
+      const btn = document.getElementById('rcptBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
+      try {
+        const r = await fetchReceiptImage(id, session.Email);
+        if (r.error) throw new Error(r.error);
+        document.getElementById('rcptImg').src = r.dataUrl;
+        document.getElementById('rcptImg').style.display = 'block';
+        document.getElementById('rcptLocked').style.display = 'none';
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target.id === 'modal') closeModal();
+    });
+
+    if (session) load();
+  </script>
+</body>
+</html>
