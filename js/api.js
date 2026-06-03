@@ -17,8 +17,6 @@ async function apiGet(action, params = {}) {
 }
 
 async function apiPost(action, body = {}) {
-  // Note: Apps Script doesn't support custom CORS preflight
-  // → use text/plain to avoid preflight, parse JSON on backend
   const response = await fetch(CONFIG.API_URL, {
     method: 'POST',
     redirect: 'follow',
@@ -28,8 +26,6 @@ async function apiPost(action, body = {}) {
   return await response.json();
 }
 
-// --- Specific endpoints ---
-// ⚠️ fetchStaff() removed for security — use verifyStaff(email) instead
 async function verifyStaff(email) { return apiGet('verifyStaff', { email }); }
 async function fetchCategories() { return apiGet('getCategories'); }
 async function fetchMyRequests(email) { return apiGet('getMyRequests', { email }); }
@@ -42,8 +38,13 @@ async function fetchReceiptImage(id, viewerEmail) {
 async function fetchFuelRate(email) {
   return apiGet('getFuelRate', { email });
 }
+async function fetchPendingApprovals(email) {
+  return apiGet('getPendingApprovals', { email });
+}
+async function checkIsGM(email) {
+  return apiGet('isGM', { email });
+}
 
-// --- File helpers ---
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
