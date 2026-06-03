@@ -1,14 +1,14 @@
 /**
  * Service Worker for PWA offline cache
- * Strategy: Cache First for static assets, Network First for API calls
  */
-const CACHE_NAME = 'exionth-expense-v2';
+const CACHE_NAME = 'exionth-expense-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './submit.html',
   './status.html',
   './approve.html',
+  './inbox.html',
   './manifest.json',
   './css/style.css',
   './js/config.js',
@@ -39,13 +39,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Always go to network for API calls (Apps Script)
   if (url.hostname.includes('script.google.com')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // Cache First for static assets
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
