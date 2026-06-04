@@ -41,6 +41,11 @@ async function fetchFuelRate(email) {
 async function fetchPendingApprovals(email) {
   return apiGet('getPendingApprovals', { email });
 }
+async function fetchAllRequests(email) {
+  return apiGet('getAllRequests', { email });
+}
+
+}
 async function checkIsGM(email) {
   return apiGet('isGM', { email });
 }
