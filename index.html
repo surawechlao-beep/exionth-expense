@@ -51,15 +51,20 @@
       </div>
 
       <div class="menu-grid">
-        <a href="submit.html" class="menu-tile">
-          <div class="icon-box icon-blue" id="iconNew"></div>
-          <div class="label">ขอเบิกใหม่</div>
-          <div class="sub">สร้างคำขอ</div>
+        <a href="inbox.html" class="menu-tile">
+          <div class="icon-box icon-orange" id="iconInbox"></div>
+          <div class="label">Inbox</div>
+          <div class="sub">อนุมัติคำขอ</div>
+        </a>
+        <a href="all-requests.html" class="menu-tile">
+          <div class="icon-box icon-blue" id="iconAllReqs"></div>
+          <div class="label">All Requests</div>
+          <div class="sub">ดูทุกคำขอ</div>
         </a>
         <a href="status.html" class="menu-tile">
-          <div class="icon-box icon-green" id="iconList"></div>
+          <div class="icon-box icon-green" id="iconAllRequests"></div>
           <div class="label">คำขอของฉัน</div>
-          <div class="sub">ดูสถานะ</div>
+          <div class="sub">ของตัวเอง</div>
         </a>
       </div>
 
@@ -270,7 +275,8 @@
       document.getElementById('iconAmount').innerHTML = icon('receipt');
       document.getElementById('iconStaff').innerHTML = icon('user');
       document.getElementById('iconInbox').innerHTML = icon('bell');
-      document.getElementById('iconAllRequests').innerHTML = icon('list');
+      document.getElementById('iconAllReqs').innerHTML = icon('list');
+      document.getElementById('iconAllRequests').innerHTML = icon('user');
       document.getElementById('iconLogout2').innerHTML = icon('logout');
 
       document.getElementById('gmLogoutBtn').addEventListener('click', () => {
