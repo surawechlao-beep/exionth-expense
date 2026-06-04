@@ -3,23 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-  <title>Exionth Expense</title>
+  <title>EXION Expense</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0F172A">
+  <meta name="theme-color" content="#B7081D">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Exionth Expense">
+  <meta name="apple-mobile-web-app-title" content="EXION Expense">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="header">
-    <h1><span class="logo">EX</span> Expense</h1>
+    <h1>
+      <img src="icons/logo.png" alt="EXION THAILAND" class="logo">
+      <span style="font-size:13px; color:var(--gray-500); font-weight:600; margin-left:4px;">EXPENSE</span>
+    </h1>
   </div>
 
   <div class="container">
-    <!-- LOGIN VIEW -->
     <div id="loginView" style="display:none;">
       <div class="card card-elev">
         <h2>Welcome</h2>
@@ -31,16 +33,13 @@
           <input type="email" id="emailInput" placeholder="yourname@exionth.com" autocomplete="email" inputmode="email">
           <div class="hint">ใช้ email บริษัทเท่านั้น — ต้องอยู่ในระบบที่ได้รับสิทธิ์ใช้งาน</div>
         </div>
-        <button class="btn btn-primary" id="loginBtn">
-          เข้าสู่ระบบ
-        </button>
+        <button class="btn btn-primary" id="loginBtn">เข้าสู่ระบบ</button>
       </div>
     </div>
 
-    <!-- MENU VIEW -->
+    <!-- STAFF MENU -->
     <div id="menuView" style="display:none;">
-      <!-- Greeting hero -->
-      <div class="card card-hero">
+      <div class="card card-hero card-hero-red">
         <div class="user-greet">
           <div class="avatar" id="avatar">?</div>
           <div class="who">
@@ -51,7 +50,6 @@
         </div>
       </div>
 
-      <!-- Menu tiles -->
       <div class="menu-grid">
         <a href="submit.html" class="menu-tile">
           <div class="icon-box icon-blue" id="iconNew"></div>
@@ -65,15 +63,84 @@
         </a>
       </div>
 
-      <!-- Stats card -->
       <div class="card" style="margin-top:16px;">
         <h2>เดือนนี้</h2>
         <h3 id="monthLabel" style="margin-bottom:14px;">—</h3>
         <div id="monthStats" class="loading"><div class="spinner"></div></div>
       </div>
 
-      <button class="btn btn-ghost" id="logoutBtn" style="width:100%; margin-top:8px;" >
+      <button class="btn btn-ghost" id="logoutBtn" style="width:100%; margin-top:8px;">
         <span id="iconLogout"></span> ออกจากระบบ
+      </button>
+    </div>
+
+    <!-- GM DASHBOARD -->
+    <div id="gmView" style="display:none;">
+      <div class="card card-hero card-hero-red">
+        <div class="user-greet">
+          <div class="avatar" id="gmAvatar">?</div>
+          <div class="who">
+            <div class="greet">สวัสดี GM 👔</div>
+            <div class="name" id="gmName">—</div>
+            <div class="meta" id="gmDept">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gm-stat-grid">
+        <div class="gm-stat warn" onclick="location.href='inbox.html'" style="cursor:pointer;">
+          <div class="icon-corner" id="iconPending"></div>
+          <div class="label">รออนุมัติ</div>
+          <div class="value" id="kpiPending">—</div>
+          <div class="delta">แตะเพื่อดู →</div>
+        </div>
+        <div class="gm-stat red">
+          <div class="icon-corner" id="iconAmount"></div>
+          <div class="label">มูลค่ารอ</div>
+          <div class="value" id="kpiAmount">—</div>
+          <div class="delta">THB</div>
+        </div>
+        <div class="gm-stat">
+          <div class="icon-corner" id="iconStaff"></div>
+          <div class="label">พนักงาน</div>
+          <div class="value" id="kpiStaff">—</div>
+          <div class="delta">คนรออนุมัติ</div>
+        </div>
+        <div class="gm-stat success">
+          <div class="icon-corner" id="iconApproved"></div>
+          <div class="label">ของฉันเดือนนี้</div>
+          <div class="value" id="kpiMyApproved">—</div>
+          <div class="delta">อนุมัติแล้ว</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2>Top Spenders</h2>
+        <h3 style="margin-bottom:12px;">รออนุมัติเรียงตามมูลค่า</h3>
+        <div id="topSpenders" class="loading"><div class="spinner"></div></div>
+      </div>
+
+      <div class="card">
+        <h2>แยกตามประเภท</h2>
+        <h3 style="margin-bottom:12px;">รออนุมัติ</h3>
+        <div id="byCategory" class="loading"><div class="spinner"></div></div>
+      </div>
+
+      <div class="menu-grid">
+        <a href="inbox.html" class="menu-tile">
+          <div class="icon-box icon-orange" id="iconInbox"></div>
+          <div class="label">Inbox</div>
+          <div class="sub">อนุมัติคำขอ</div>
+        </a>
+        <a href="status.html" class="menu-tile">
+          <div class="icon-box icon-green" id="iconAllRequests"></div>
+          <div class="label">คำขอของฉัน</div>
+          <div class="sub">ดูประวัติ</div>
+        </a>
+      </div>
+
+      <button class="btn btn-ghost" id="gmLogoutBtn" style="width:100%; margin-top:8px;">
+        <span id="iconLogout2"></span> ออกจากระบบ
       </button>
     </div>
 
@@ -112,9 +179,7 @@
         try {
           const staff = await verifyStaff(email);
           if (staff && staff.error) throw new Error(staff.error);
-          if (!staff) {
-            throw new Error('Email นี้ไม่มีสิทธิ์ใช้งาน — ติดต่อ Admin');
-          }
+          if (!staff) throw new Error('Email นี้ไม่มีสิทธิ์ใช้งาน — ติดต่อ Admin');
           setSession(staff);
           showMenu(staff);
         } catch (err) {
@@ -132,8 +197,27 @@
 
     async function showMenu(session) {
       document.getElementById('loginView').style.display = 'none';
-      document.getElementById('menuView').style.display = 'block';
+
+      let isGMUser = !!session.isGM;
+      if (typeof session.isGM === 'undefined') {
+        try {
+          const r = await checkIsGM(session.Email);
+          isGMUser = !!(r && r.isGM);
+          session.isGM = isGMUser;
+          setSession(session);
+        } catch { isGMUser = false; }
+      }
+
+      if (isGMUser) {
+        await showGMDashboard(session);
+      } else {
+        await showStaffMenu(session);
+      }
       renderBottomNav('home');
+    }
+
+    async function showStaffMenu(session) {
+      document.getElementById('menuView').style.display = 'block';
       document.getElementById('avatar').textContent = initials(session.Name);
       document.getElementById('userName').textContent = session.Name;
       document.getElementById('userDept').textContent =
@@ -171,6 +255,111 @@
       } catch {
         document.getElementById('monthStats').innerHTML =
           '<div class="empty" style="padding:20px;"><div class="sub">ยังไม่มีคำขอเดือนนี้</div></div>';
+      }
+    }
+
+    async function showGMDashboard(session) {
+      document.getElementById('gmView').style.display = 'block';
+      document.getElementById('gmAvatar').textContent = initials(session.Name);
+      document.getElementById('gmName').textContent = session.Name;
+      document.getElementById('gmDept').textContent =
+        session.Department + (session.Position ? ' • ' + session.Position : '');
+
+      document.getElementById('iconPending').innerHTML = icon('bell');
+      document.getElementById('iconApproved').innerHTML = icon('check');
+      document.getElementById('iconAmount').innerHTML = icon('receipt');
+      document.getElementById('iconStaff').innerHTML = icon('user');
+      document.getElementById('iconInbox').innerHTML = icon('bell');
+      document.getElementById('iconAllRequests').innerHTML = icon('list');
+      document.getElementById('iconLogout2').innerHTML = icon('logout');
+
+      document.getElementById('gmLogoutBtn').addEventListener('click', () => {
+        if (confirm('ออกจากระบบ?')) {
+          clearSession();
+          location.reload();
+        }
+      });
+
+      try {
+        const [pendingList, mySelfList] = await Promise.all([
+          fetchPendingApprovals(session.Email).catch(() => []),
+          fetchMyRequests(session.Email).catch(() => [])
+        ]);
+        const pending = Array.isArray(pendingList) ? pendingList : [];
+        const myReqs = Array.isArray(mySelfList) ? mySelfList : [];
+
+        document.getElementById('kpiPending').textContent = pending.length;
+        const totalAmount = pending.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+        document.getElementById('kpiAmount').textContent = formatCurrency(totalAmount);
+
+        const uniqueStaff = new Set(pending.map(r => r.StaffEmail)).size;
+        document.getElementById('kpiStaff').textContent = uniqueStaff;
+
+        const now = new Date();
+        const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        const myApproved = myReqs.filter(r => {
+          const d = r.ExpenseDate || r.Timestamp;
+          return r.Status === 'Approved' && d && String(d).startsWith(thisMonth);
+        }).length;
+        document.getElementById('kpiMyApproved').textContent = myApproved;
+
+        const spenders = {};
+        pending.forEach(r => {
+          const name = r.StaffName || 'Unknown';
+          if (!spenders[name]) spenders[name] = { name, amount: 0, count: 0, dept: r.Department };
+          spenders[name].amount += Number(r.Amount) || 0;
+          spenders[name].count += 1;
+        });
+        const sorted = Object.values(spenders).sort((a, b) => b.amount - a.amount).slice(0, 5);
+
+        const topEl = document.getElementById('topSpenders');
+        topEl.classList.remove('loading');
+        if (sorted.length === 0) {
+          topEl.innerHTML = '<div class="empty" style="padding:20px;"><div class="sub">ไม่มีข้อมูลรออนุมัติ</div></div>';
+        } else {
+          topEl.innerHTML = sorted.map((s, i) => `
+            <div class="spender-row">
+              <div class="rank ${i < 3 ? 'top' : ''}">#${i+1}</div>
+              <div class="info">
+                <div class="name">${s.name}</div>
+                <div class="meta">${s.dept || '-'} • ${s.count} รายการ</div>
+              </div>
+              <div class="amount">${formatCurrency(s.amount)}</div>
+            </div>`).join('');
+        }
+
+        const byCat = {};
+        pending.forEach(r => {
+          const cat = r.Category || 'OTHER';
+          if (!byCat[cat]) byCat[cat] = { cat, amount: 0, count: 0 };
+          byCat[cat].amount += Number(r.Amount) || 0;
+          byCat[cat].count += 1;
+        });
+        const catSorted = Object.values(byCat).sort((a, b) => b.amount - a.amount);
+        const maxAmount = Math.max(...catSorted.map(c => c.amount), 1);
+
+        const catEl = document.getElementById('byCategory');
+        catEl.classList.remove('loading');
+        if (catSorted.length === 0) {
+          catEl.innerHTML = '<div class="empty" style="padding:20px;"><div class="sub">ไม่มีข้อมูล</div></div>';
+        } else {
+          catEl.innerHTML = catSorted.map(c => {
+            const pct = (c.amount / maxAmount * 100).toFixed(0);
+            return `
+              <div style="margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+                  <span style="font-weight:600; font-size:13px;">${c.cat}</span>
+                  <span style="font-weight:700; font-size:13px;">${formatCurrency(c.amount)}</span>
+                </div>
+                <div style="background:var(--gray-100); border-radius:8px; height:8px; overflow:hidden;">
+                  <div style="background:var(--brand-2); height:100%; width:${pct}%; border-radius:8px;"></div>
+                </div>
+                <div style="font-size:11px; color:var(--gray-500); margin-top:2px;">${c.count} รายการ</div>
+              </div>`;
+          }).join('');
+        }
+      } catch (err) {
+        showToast('โหลดข้อมูลผิดพลาด: ' + err.message, 'error');
       }
     }
 
