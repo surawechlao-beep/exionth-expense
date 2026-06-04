@@ -1,13 +1,13 @@
 {
-  "name": "Exionth Expense Claim",
-  "short_name": "Exionth Expense",
-  "description": "ระบบขอเบิกค่าใช้จ่ายของพนักงาน Exionth",
+  "name": "Exion Thailand Expense",
+  "short_name": "EXION Expense",
+  "description": "ระบบขอเบิกค่าใช้จ่าย Exion Thailand",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F8FAFC",
-  "theme_color": "#0F172A",
+  "background_color": "#FFFFFF",
+  "theme_color": "#B7081D",
   "lang": "th",
   "icons": [
     {
