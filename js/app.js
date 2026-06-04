@@ -116,6 +116,85 @@ async function renderBottomNav(active) {
   }
 }
 
+/**
+ * SignaturePad — lightweight canvas signature
+ */
+class SignaturePad {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.isDrawing = false;
+    this.empty = true;
+    this._setup();
+  }
+  _setup() {
+    const c = this.canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = c.getBoundingClientRect();
+    c.width = rect.width * dpr;
+    c.height = rect.height * dpr;
+    this.ctx.scale(dpr, dpr);
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+    this.ctx.strokeStyle = '#0F172A';
+    this.ctx.lineWidth = 2.5;
+
+    const start = e => {
+      this.isDrawing = true;
+      const p = this._pos(e);
+      this.ctx.beginPath();
+      this.ctx.moveTo(p.x, p.y);
+      e.preventDefault();
+    };
+    const draw = e => {
+      if (!this.isDrawing) return;
+      const p = this._pos(e);
+      this.ctx.lineTo(p.x, p.y);
+      this.ctx.stroke();
+      this.empty = false;
+      const ph = c.parentElement.querySelector('.sig-placeholder');
+      if (ph) ph.style.display = 'none';
+      e.preventDefault();
+    };
+    const end = () => { this.isDrawing = false; };
+
+    c.addEventListener('mousedown', start);
+    c.addEventListener('mousemove', draw);
+    c.addEventListener('mouseup', end);
+    c.addEventListener('mouseout', end);
+    c.addEventListener('touchstart', start);
+    c.addEventListener('touchmove', draw);
+    c.addEventListener('touchend', end);
+  }
+  _pos(e) {
+    const r = this.canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    return { x, y };
+  }
+  isEmpty() { return this.empty; }
+  clear() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.empty = true;
+    const ph = this.canvas.parentElement.querySelector('.sig-placeholder');
+    if (ph) ph.style.display = '';
+  }
+  toDataURL() {
+    return this.canvas.toDataURL('image/png');
+  }
+}
+
+function signaturePadHtml(id) {
+  return `<div class="sig-box">
+    <canvas id="${id}" class="sig-canvas"></canvas>
+    <span class="sig-placeholder">เซ็นที่นี่ด้วยนิ้ว / เมาส์</span>
+    <div class="sig-actions">
+      <span>ลายเซ็น GM</span>
+      <button type="button" class="sig-clear" onclick="document.getElementById('${id}').__sig.clear()">ล้าง</button>
+    </div>
+  </div>`;
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').catch(err =>
