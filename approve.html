@@ -50,6 +50,10 @@
           <label>หมายเหตุ <span style="color:var(--gray-400); font-weight:400;">(optional)</span></label>
           <textarea id="remark" placeholder="เช่น Approved ภายในงบ Q2"></textarea>
         </div>
+        <div class="field">
+          <label>ลายเซ็น <span style="color:var(--gray-400); font-weight:400;">(สำหรับ Approve)</span></label>
+          <div id="sigContainer"></div>
+        </div>
         <div class="btn-row">
           <button class="btn btn-success" id="approveBtn"><span id="okIcon"></span> Approve</button>
           <button class="btn btn-danger" id="rejectBtn"><span id="xIcon"></span> Reject</button>
@@ -113,6 +117,13 @@
           document.getElementById('viewReceiptBtn').addEventListener('click', viewReceipt);
         }
 
+        // Inject signature pad
+        document.getElementById('sigContainer').innerHTML = signaturePadHtml('sigCanvas');
+        setTimeout(() => {
+          const canvas = document.getElementById('sigCanvas');
+          if (canvas) canvas.__sig = new SignaturePad(canvas);
+        }, 50);
+
         if (r.Status !== 'Pending') {
           document.getElementById('actionsBlock').innerHTML =
             `<div class="empty">
@@ -155,6 +166,16 @@
       if (!approverEmail) return showToast('ใส่ email GM', 'error');
       const remark = document.getElementById('remark').value.trim();
 
+      const canvas = document.getElementById('sigCanvas');
+      const sigPad = canvas ? canvas.__sig : null;
+      let signatureBase64 = '';
+      if (decision === 'Approved') {
+        if (!sigPad || sigPad.isEmpty()) {
+          return showToast('กรุณาเซ็นชื่อก่อนอนุมัติ', 'error');
+        }
+        signatureBase64 = sigPad.toDataURL();
+      }
+
       if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
 
       const isApprove = decision === 'Approved';
@@ -163,7 +184,7 @@
       btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>';
 
       try {
-        const result = await approveRequest({ id: requestId, decision, remark, approverEmail });
+        const result = await approveRequest({ id: requestId, decision, remark, approverEmail, signatureBase64 });
         if (result.error) throw new Error(result.error);
         document.getElementById('actionsBlock').style.display = 'none';
         document.getElementById('receiptBlock').style.display = 'none';
