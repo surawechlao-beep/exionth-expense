@@ -26,18 +26,16 @@
       <div class="card card-elev">
         <h2>Welcome</h2>
         <h3>เข้าสู่ระบบ</h3>
-        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">ใส่ email บริษัทของคุณ ระบบจะจำไว้ — ไม่ต้อง login ครั้งต่อไป</p>
-
+        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">ใส่ email บริษัทของคุณ ระบบจะจำไว้</p>
         <div class="field">
           <label>Email ของคุณ <span class="required">*</span></label>
           <input type="email" id="emailInput" placeholder="yourname@exionth.com" autocomplete="email" inputmode="email">
-          <div class="hint">ใช้ email บริษัทเท่านั้น — ต้องอยู่ในระบบที่ได้รับสิทธิ์ใช้งาน</div>
+          <div class="hint">ใช้ email บริษัทเท่านั้น</div>
         </div>
         <button class="btn btn-primary" id="loginBtn">เข้าสู่ระบบ</button>
       </div>
     </div>
 
-    <!-- STAFF MENU -->
     <div id="menuView" style="display:none;">
       <div class="card card-hero card-hero-red">
         <div class="user-greet">
@@ -49,37 +47,28 @@
           </div>
         </div>
       </div>
-
       <div class="menu-grid">
-        <a href="inbox.html" class="menu-tile">
-          <div class="icon-box icon-orange" id="iconInbox"></div>
-          <div class="label">Inbox</div>
-          <div class="sub">อนุมัติคำขอ</div>
-        </a>
-        <a href="all-requests.html" class="menu-tile">
-          <div class="icon-box icon-blue" id="iconAllReqs"></div>
-          <div class="label">All Requests</div>
-          <div class="sub">ดูทุกคำขอ</div>
+        <a href="submit.html" class="menu-tile">
+          <div class="icon-box icon-blue" id="iconNew"></div>
+          <div class="label">ขอเบิกใหม่</div>
+          <div class="sub">สร้างคำขอ</div>
         </a>
         <a href="status.html" class="menu-tile">
-          <div class="icon-box icon-green" id="iconAllRequests"></div>
+          <div class="icon-box icon-green" id="iconList"></div>
           <div class="label">คำขอของฉัน</div>
-          <div class="sub">ของตัวเอง</div>
+          <div class="sub">ดูสถานะ</div>
         </a>
       </div>
-
       <div class="card" style="margin-top:16px;">
         <h2>เดือนนี้</h2>
         <h3 id="monthLabel" style="margin-bottom:14px;">—</h3>
         <div id="monthStats" class="loading"><div class="spinner"></div></div>
       </div>
-
       <button class="btn btn-ghost" id="logoutBtn" style="width:100%; margin-top:8px;">
         <span id="iconLogout"></span> ออกจากระบบ
       </button>
     </div>
 
-    <!-- GM DASHBOARD -->
     <div id="gmView" style="display:none;">
       <div class="card card-hero card-hero-red">
         <div class="user-greet">
@@ -91,7 +80,6 @@
           </div>
         </div>
       </div>
-
       <div class="gm-stat-grid">
         <div class="gm-stat warn" onclick="location.href='inbox.html'" style="cursor:pointer;">
           <div class="icon-corner" id="iconPending"></div>
@@ -118,32 +106,33 @@
           <div class="delta">อนุมัติแล้ว</div>
         </div>
       </div>
-
       <div class="card" style="margin-top:16px;">
         <h2>Top Spenders</h2>
         <h3 style="margin-bottom:12px;">รออนุมัติเรียงตามมูลค่า</h3>
         <div id="topSpenders" class="loading"><div class="spinner"></div></div>
       </div>
-
       <div class="card">
         <h2>แยกตามประเภท</h2>
         <h3 style="margin-bottom:12px;">รออนุมัติ</h3>
         <div id="byCategory" class="loading"><div class="spinner"></div></div>
       </div>
-
       <div class="menu-grid">
         <a href="inbox.html" class="menu-tile">
           <div class="icon-box icon-orange" id="iconInbox"></div>
           <div class="label">Inbox</div>
           <div class="sub">อนุมัติคำขอ</div>
         </a>
+        <a href="all-requests.html" class="menu-tile">
+          <div class="icon-box icon-blue" id="iconAllReqs"></div>
+          <div class="label">All Requests</div>
+          <div class="sub">ดูทุกคำขอ</div>
+        </a>
         <a href="status.html" class="menu-tile">
           <div class="icon-box icon-green" id="iconAllRequests"></div>
           <div class="label">คำขอของฉัน</div>
-          <div class="sub">ดูประวัติ</div>
+          <div class="sub">ของตัวเอง</div>
         </a>
       </div>
-
       <button class="btn btn-ghost" id="gmLogoutBtn" style="width:100%; margin-top:8px;">
         <span id="iconLogout2"></span> ออกจากระบบ
       </button>
@@ -157,10 +146,15 @@
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
+    function setIcon(id, name) {
+      const el = document.getElementById(id);
+      if (el && typeof icon === 'function') el.innerHTML = icon(name);
+    }
+
     async function init() {
-      document.getElementById('iconNew').innerHTML = icon('plus');
-      document.getElementById('iconList').innerHTML = icon('list');
-      document.getElementById('iconLogout').innerHTML = icon('logout');
+      setIcon('iconNew', 'plus');
+      setIcon('iconList', 'list');
+      setIcon('iconLogout', 'logout');
 
       const session = getSession();
       document.getElementById('initialLoading').style.display = 'none';
@@ -172,8 +166,7 @@
       document.getElementById('loginView').style.display = 'block';
 
       const handleLogin = async () => {
-        const emailInput = document.getElementById('emailInput');
-        const email = emailInput.value.trim().toLowerCase();
+        const email = document.getElementById('emailInput').value.trim().toLowerCase();
         if (!email || email.indexOf('@') < 0) {
           return showToast('กรุณาใส่ email ให้ถูกต้อง', 'error');
         }
@@ -213,11 +206,8 @@
         } catch { isGMUser = false; }
       }
 
-      if (isGMUser) {
-        await showGMDashboard(session);
-      } else {
-        await showStaffMenu(session);
-      }
+      if (isGMUser) await showGMDashboard(session);
+      else await showStaffMenu(session);
       renderBottomNav('home');
     }
 
@@ -232,10 +222,7 @@
       document.getElementById('monthLabel').textContent = monthLabel;
 
       document.getElementById('logoutBtn').addEventListener('click', () => {
-        if (confirm('ออกจากระบบ?')) {
-          clearSession();
-          location.reload();
-        }
+        if (confirm('ออกจากระบบ?')) { clearSession(); location.reload(); }
       });
 
       try {
@@ -270,20 +257,17 @@
       document.getElementById('gmDept').textContent =
         session.Department + (session.Position ? ' • ' + session.Position : '');
 
-      document.getElementById('iconPending').innerHTML = icon('bell');
-      document.getElementById('iconApproved').innerHTML = icon('check');
-      document.getElementById('iconAmount').innerHTML = icon('receipt');
-      document.getElementById('iconStaff').innerHTML = icon('user');
-      document.getElementById('iconInbox').innerHTML = icon('bell');
-      document.getElementById('iconAllReqs').innerHTML = icon('list');
-      document.getElementById('iconAllRequests').innerHTML = icon('user');
-      document.getElementById('iconLogout2').innerHTML = icon('logout');
+      setIcon('iconPending', 'bell');
+      setIcon('iconApproved', 'check');
+      setIcon('iconAmount', 'receipt');
+      setIcon('iconStaff', 'user');
+      setIcon('iconInbox', 'bell');
+      setIcon('iconAllReqs', 'list');
+      setIcon('iconAllRequests', 'user');
+      setIcon('iconLogout2', 'logout');
 
       document.getElementById('gmLogoutBtn').addEventListener('click', () => {
-        if (confirm('ออกจากระบบ?')) {
-          clearSession();
-          location.reload();
-        }
+        if (confirm('ออกจากระบบ?')) { clearSession(); location.reload(); }
       });
 
       try {
@@ -297,7 +281,6 @@
         document.getElementById('kpiPending').textContent = pending.length;
         const totalAmount = pending.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
         document.getElementById('kpiAmount').textContent = formatCurrency(totalAmount);
-
         const uniqueStaff = new Set(pending.map(r => r.StaffEmail)).size;
         document.getElementById('kpiStaff').textContent = uniqueStaff;
 
