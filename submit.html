@@ -6,12 +6,15 @@
   <title>ขอเบิกใหม่ — Exionth Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0F172A">
+  <meta name="theme-color" content="#B7081D">
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>ขอเบิกใหม่</h1>
+    <h1>
+      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
+      <span style="font-size:14px; font-weight:600; margin-left:6px;">ขอเบิกใหม่</span>
+    </h1>
   </div>
 
   <div class="container">
@@ -202,19 +205,23 @@
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังส่ง...';
+      showLoading('กำลังส่งคำขอ...');
 
       try {
         const result = await submitExpense({
           staffEmail: session.Email, category: code, expenseDate,
           venue, occasion, attendees, amount, mileageKm, receiptBase64, receiptName
         });
-        if (result.error) throw new Error(result.error);
+      if (result.error) throw new Error(result.error);
+        hideLoading();
         showToast('ส่งสำเร็จ! สถานะ: ' + result.status, 'success');
         setTimeout(() => location.href = 'status.html', 1200);
-      } catch (err) {
+        } catch (err) {
+        hideLoading();
         showToast(err.message, 'error');
         btn.disabled = false;
         btn.innerHTML = icon('check') + ' ส่งคำขอ';
+      }
       }
     }
 
