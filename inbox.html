@@ -122,6 +122,10 @@
           <label>หมายเหตุ <span style="color:var(--gray-400); font-weight:400;">(optional)</span></label>
           <textarea id="remark" placeholder="เช่น Approved ภายในงบ Q2"></textarea>
         </div>
+        <div class="field">
+          <label>ลายเซ็น <span style="color:var(--gray-400); font-weight:400;">(สำหรับ Approve)</span></label>
+          ${signaturePadHtml('sigCanvas')}
+        </div>
         <div class="btn-row" style="margin-top:8px;">
           <button class="btn btn-success" onclick="decide('${r.ID}', 'Approved')">${icon('check')} Approve</button>
           <button class="btn btn-danger" onclick="decide('${r.ID}', 'Rejected')">${icon('x')} Reject</button>
@@ -129,6 +133,11 @@
 
       document.getElementById('modalContent').innerHTML = html;
       document.getElementById('modal').classList.add('show');
+
+      setTimeout(() => {
+        const canvas = document.getElementById('sigCanvas');
+        if (canvas) canvas.__sig = new SignaturePad(canvas);
+      }, 50);
     }
 
     async function loadReceipt(id) {
@@ -151,12 +160,24 @@
     async function decide(id, decision) {
       const remarkEl = document.getElementById('remark');
       const remark = remarkEl ? remarkEl.value.trim() : '';
+
+      const canvas = document.getElementById('sigCanvas');
+      const sigPad = canvas ? canvas.__sig : null;
+      let signatureBase64 = '';
+      if (decision === 'Approved') {
+        if (!sigPad || sigPad.isEmpty()) {
+          return showToast('กรุณาเซ็นชื่อก่อนอนุมัติ', 'error');
+        }
+        signatureBase64 = sigPad.toDataURL();
+      }
+
       if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
 
       try {
         const result = await approveRequest({
           id, decision, remark,
-          approverEmail: session.Email
+          approverEmail: session.Email,
+          signatureBase64
         });
         if (result && result.error) throw new Error(result.error);
         showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว' : '❌ ปฏิเสธแล้ว', 'success');
