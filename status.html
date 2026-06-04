@@ -6,12 +6,15 @@
   <title>คำขอของฉัน — Exionth Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0F172A">
+  <meta name="theme-color" content="#B7081D">
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>คำขอของฉัน</h1>
+    <h1>
+      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
+      <span style="font-size:14px; font-weight:600; margin-left:6px;">คำขอของฉัน</span>
+    </h1>
   </div>
 
   <div class="container">
@@ -131,17 +134,23 @@
       document.getElementById('modal').classList.add('show');
     }
 
-    async function loadReceipt(id) {
+  async function loadReceipt(id) {
       const btn = document.getElementById('rcptBtn');
       btn.disabled = true;
       btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
+      showLoading('กำลังโหลดใบเสร็จ...');
       try {
         const r = await fetchReceiptImage(id, session.Email);
         if (r.error) throw new Error(r.error);
-        document.getElementById('rcptImg').src = r.dataUrl;
-        document.getElementById('rcptImg').style.display = 'block';
+        hideLoading();
+        const img = document.getElementById('rcptImg');
+        img.src = r.dataUrl;
+        img.style.display = 'block';
+        img.classList.add('zoomable');
+        img.onclick = () => openImageViewer(r.dataUrl, 'คลิก/แตะ 2 ครั้งเพื่อซูม');
         document.getElementById('rcptLocked').style.display = 'none';
       } catch (err) {
+        hideLoading();
         showToast(err.message, 'error');
         btn.disabled = false;
         btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
