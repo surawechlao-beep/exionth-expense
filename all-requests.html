@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>All Requests — EXION Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>
+      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
+      <span style="font-size:14px; font-weight:600; margin-left:6px;">All Requests</span>
+    </h1>
+  </div>
+
+  <div class="container">
+    <!-- Filters -->
+    <div class="card" style="padding:16px;">
+      <h2>Filters</h2>
+      <h3 style="margin-bottom:12px;">กรองรายการ</h3>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="field" style="margin:0;">
+          <label style="font-size:11px;">สถานะ</label>
+          <select id="fStatus">
+            <option value="">ทั้งหมด</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label style="font-size:11px;">แผนก</label>
+          <select id="fDept"><option value="">ทั้งหมด</option></select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label style="font-size:11px;">พนักงาน</label>
+          <select id="fStaff"><option value="">ทั้งหมด</option></select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label style="font-size:11px;">ประเภท</label>
+          <select id="fCategory"><option value="">ทั้งหมด</option></select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label style="font-size:11px;">ปี</label>
+          <select id="fYear"><option value="">ทั้งหมด</option></select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label style="font-size:11px;">เดือน</label>
+          <select id="fMonth">
+            <option value="">ทั้งหมด</option>
+            <option value="01">ม.ค.</option><option value="02">ก.พ.</option>
+            <option value="03">มี.ค.</option><option value="04">เม.ย.</option>
+            <option value="05">พ.ค.</option><option value="06">มิ.ย.</option>
+            <option value="07">ก.ค.</option><option value="08">ส.ค.</option>
+            <option value="09">ก.ย.</option><option value="10">ต.ค.</option>
+            <option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" style="margin:10px 0 0;">
+        <input type="text" id="fSearch" placeholder="🔍 ค้นหา ชื่อพนักงาน, สถานที่, ID..." style="font-size:14px;">
+      </div>
+
+      <button class="btn btn-secondary" id="clearBtn" style="width:100%; margin-top:8px; font-size:13px;">ล้างฟิลเตอร์ทั้งหมด</button>
+    </div>
+
+    <!-- Stats summary -->
+    <div class="card" id="statsCard" style="display:none;">
+      <h2>สรุปผลลัพธ์</h2>
+      <h3 id="statsLabel" style="margin-bottom:12px;">—</h3>
+      <div class="stats-grid">
+        <div class="stat warning"><div class="value" id="cntPending">0</div><div class="label">รออนุมัติ</div></div>
+        <div class="stat success"><div class="value" id="cntApproved">0</div><div class="label">อนุมัติ</div></div>
+        <div class="stat"><div class="value" id="cntRejected" style="color:var(--danger);">0</div><div class="label">ปฏิเสธ</div></div>
+      </div>
+      <div style="text-align:center; margin-top:14px; padding-top:14px; border-top:1px solid var(--gray-100);">
+        <div style="font-size:11px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">รวมมูลค่า</div>
+        <div style="font-size:26px; font-weight:800; color:var(--brand-2); letter-spacing:-0.02em; margin-top:4px;" id="totalAmount">0.00 THB</div>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div id="list" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Detail modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="modalTitle">รายละเอียดคำขอ</h3>
+        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    let allRequests = [];
+
+    async function load() {
+      document.getElementById('backBtn').innerHTML = icon('back');
+      document.getElementById('closeBtn').innerHTML = icon('x');
+
+      try {
+        const result = await fetchAllRequests(session.Email);
+        if (result && result.error) throw new Error(result.error);
+        allRequests = Array.isArray(result) ? result : [];
+        populateFilters();
+        applyFilters();
+        renderBottomNav('home');
+      } catch (err) {
+        document.getElementById('list').innerHTML =
+          `<div class="empty"><div class="title">${err.message}</div></div>`;
+        renderBottomNav('home');
+      }
+
+      // Filter listeners
+      ['fStatus','fDept','fStaff','fCategory','fYear','fMonth','fSearch'].forEach(id => {
+        document.getElementById(id).addEventListener('change', applyFilters);
+        document.getElementById(id).addEventListener('input', applyFilters);
+      });
+      document.getElementById('clearBtn').addEventListener('click', clearFilters);
+    }
+
+    function populateFilters() {
+      const depts = new Set(), staffs = new Set(), cats = new Set(), years = new Set();
+      allRequests.forEach(r => {
+        if (r.Department) depts.add(r.Department);
+        if (r.StaffName) staffs.add(r.StaffName);
+        if (r.Category) cats.add(r.Category);
+        const d = r.ExpenseDate || r.Timestamp;
+        if (d) {
+          const y = String(d).substring(0, 4);
+          if (/^\d{4}$/.test(y)) years.add(y);
+        }
+      });
+      fill('fDept', [...depts].sort());
+      fill('fStaff', [...staffs].sort());
+      fill('fCategory', [...cats].sort());
+      fill('fYear', [...years].sort().reverse());
+    }
+
+    function fill(id, items) {
+      const sel = document.getElementById(id);
+      const first = sel.options[0];
+      sel.innerHTML = '';
+      sel.appendChild(first);
+      items.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        sel.appendChild(o);
+      });
+    }
+
+    function clearFilters() {
+      ['fStatus','fDept','fStaff','fCategory','fYear','fMonth','fSearch'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const status = document.getElementById('fStatus').value;
+      const dept = document.getElementById('fDept').value;
+      const staff = document.getElementById('fStaff').value;
+      const cat = document.getElementById('fCategory').value;
+      const year = document.getElementById('fYear').value;
+      const month = document.getElementById('fMonth').value;
+      const search = document.getElementById('fSearch').value.trim().toLowerCase();
+
+      const filtered = allRequests.filter(r => {
+        if (status && r.Status !== status) return false;
+        if (dept && r.Department !== dept) return false;
+        if (staff && r.StaffName !== staff) return false;
+        if (cat && r.Category !== cat) return false;
+        const d = String(r.ExpenseDate || r.Timestamp || '');
+        if (year && !d.startsWith(year)) return false;
+        if (month && d.substring(5, 7) !== month) return false;
+        if (search) {
+          const blob = `${r.StaffName} ${r.Venue} ${r.ID} ${r.Occasion}`.toLowerCase();
+          if (!blob.includes(search)) return false;
+        }
+        return true;
+      });
+
+      renderStats(filtered);
+      renderList(filtered);
+    }
+
+    function renderStats(items) {
+      const card = document.getElementById('statsCard');
+      card.style.display = 'block';
+      card.classList.remove('loading');
+      document.getElementById('statsLabel').textContent = items.length + ' รายการ';
+
+      const cntP = items.filter(r => r.Status === 'Pending').length;
+      const cntA = items.filter(r => r.Status === 'Approved').length;
+      const cntR = items.filter(r => r.Status === 'Rejected').length;
+      const total = items.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+
+      document.getElementById('cntPending').textContent = cntP;
+      document.getElementById('cntApproved').textContent = cntA;
+      document.getElementById('cntRejected').textContent = cntR;
+      document.getElementById('totalAmount').textContent = formatCurrency(total) + ' THB';
+    }
+
+    function renderList(items) {
+      const list = document.getElementById('list');
+      list.classList.remove('loading');
+
+      if (items.length === 0) {
+        list.innerHTML = `
+          <div class="empty">
+            <div class="icon-wrap">${icon('inbox')}</div>
+            <div class="title">ไม่พบรายการ</div>
+            <div class="sub">ลองปรับฟิลเตอร์</div>
+          </div>`;
+        return;
+      }
+
+      // Group by month
+      const byMonth = {};
+      items.forEach((r, idx) => {
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        const key = d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
+        if (!byMonth[key]) byMonth[key] = [];
+        byMonth[key].push({...r, _idx: allRequests.indexOf(r)});
+      });
+
+      let html = '';
+      Object.entries(byMonth).forEach(([month, reqs]) => {
+        html += `<h2 style="font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">${month}</h2>`;
+        reqs.forEach(r => {
+          const statusColor = r.Status === 'Pending' ? '#FEF3C7' :
+                             r.Status === 'Approved' ? '#D1FAE5' : '#FEE2E2';
+          const textColor = r.Status === 'Pending' ? '#92400E' :
+                           r.Status === 'Approved' ? '#065F46' : '#991B1B';
+          html += `
+            <div class="request-item" onclick="showDetail(${r._idx})">
+              <div class="cat-icon" style="background:${statusColor}; color:${textColor};">${categoryIcon(r.Category)}</div>
+              <div class="info">
+                <div class="title">${r.StaffName} — ${r.Category}</div>
+                <div class="meta">${formatDate(r.ExpenseDate || r.Timestamp)}${r.Venue ? ' • ' + r.Venue : ''}</div>
+              </div>
+              <div class="right">
+                <div class="amount">${formatCurrency(r.Amount)}</div>
+                ${statusBadge(r.Status)}
+              </div>
+            </div>`;
+        });
+      });
+      list.innerHTML = html;
+    }
+
+    function showDetail(idx) {
+      const r = allRequests[idx];
+      document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + r.Category;
+
+      const rows = [
+        ['Request ID', r.ID],
+        ['พนักงาน', r.StaffName + ' (' + r.Department + ')'],
+        ['Email', r.StaffEmail],
+        ['ประเภท', r.Category],
+        ['วันที่', formatDate(r.ExpenseDate)],
+        ['สถานที่', r.Venue || '-'],
+        ['โอกาส', r.Occasion || '-'],
+        ['ผู้ร่วม', r.Attendees || '-']
+      ];
+
+      let html = `
+        <div class="detail-row">
+          <div class="key">จำนวนเงิน</div>
+          <div class="val big">${formatCurrency(r.Amount)} <span style="font-size:13px; color:var(--gray-500); font-weight:600;">THB</span></div>
+        </div>
+        <div class="detail-row">
+          <div class="key">สถานะ</div>
+          <div class="val">${statusBadge(r.Status)}</div>
+        </div>` + rows.map(([k, v]) =>
+          `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`
+        ).join('');
+
+      if (r.ApprovedBy) html += `<div class="detail-row"><div class="key">ผู้อนุมัติ</div><div class="val">${r.ApprovedBy}</div></div>`;
+      if (r.ApprovedAt) html += `<div class="detail-row"><div class="key">เวลาอนุมัติ</div><div class="val">${formatDate(r.ApprovedAt)}</div></div>`;
+      if (r.Remark) html += `<div class="detail-row"><div class="key">หมายเหตุ</div><div class="val">${r.Remark}</div></div>`;
+
+      if (r.ReceiptURL) {
+        html += `<div style="margin-top:16px;">
+          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ใบเสร็จ</div>
+          <div class="locked-box" id="rcptLocked">
+            <div class="lock-icon">${icon('lock')}</div>
+            <button class="btn btn-secondary" onclick="loadReceipt('${r.ID}')" id="rcptBtn">${icon('lock')} ดูใบเสร็จ</button>
+          </div>
+          <img id="rcptImg" class="preview-img" style="display:none;">
+        </div>`;
+      }
+
+      if (r.Signature) {
+        html += `<div style="margin-top:14px;">
+          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ลายเซ็น GM</div>
+          <a href="${r.Signature}" target="_blank" style="color:var(--accent); font-size:12px;">เปิดดูในแท็บใหม่ →</a>
+        </div>`;
+      }
+
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('modal').classList.add('show');
+    }
+
+    async function loadReceipt(id) {
+      const btn = document.getElementById('rcptBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
+      showLoading('กำลังโหลดใบเสร็จ...');
+      try {
+        const r = await fetchReceiptImage(id, session.Email);
+        if (r.error) throw new Error(r.error);
+        hideLoading();
+        const img = document.getElementById('rcptImg');
+        img.src = r.dataUrl;
+        img.style.display = 'block';
+        img.classList.add('zoomable');
+        img.onclick = () => openImageViewer(r.dataUrl, 'แตะ 2 ครั้งเพื่อซูม');
+        document.getElementById('rcptLocked').style.display = 'none';
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+    document.getElementById('modal').addEventListener('click', e => {
+      if (e.target.id === 'modal') closeModal();
+    });
+
+    if (session) load();
+  </script>
+</body>
+</html>
