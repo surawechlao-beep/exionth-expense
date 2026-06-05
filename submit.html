@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>ขอเบิกใหม่ — Exionth Expense</title>
+  <title>ขอเบิกใหม่ — EXION Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
@@ -49,7 +49,7 @@
         </div>
         <div class="field">
           <label>ผู้ร่วมรับประทาน <span class="required">*</span></label>
-          <textarea id="attendees" placeholder="ระบุชื่อ + บริษัท เช่น&#10;Mr. Smith (ABC Co.)&#10;Mr. Lee (ABC Co.)&#10;Somchai (Exionth)"></textarea>
+          <textarea id="attendees" placeholder="ระบุชื่อ + บริษัท"></textarea>
         </div>
       </div>
 
@@ -89,26 +89,42 @@
     let categories = [];
     let receiptBase64 = '';
     let receiptName = '';
-    let currentFuelRate = null;  // { rate, gasPrice, getsDepreciation }
+    let currentFuelRate = null;
 
     async function init() {
-      document.getElementById('backBtn').innerHTML = icon('back');
-      document.getElementById('iconCamera').innerHTML = icon('camera');
-      document.getElementById('iconCheck').innerHTML = icon('check');
+      const setIcon = (id, name) => {
+        const el = document.getElementById(id);
+        if (el && typeof icon === 'function') el.innerHTML = icon(name);
+      };
+      setIcon('backBtn', 'back');
+      setIcon('iconCamera', 'camera');
+      setIcon('iconCheck', 'check');
 
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('expenseDate').value = today;
 
-      categories = await fetchCategories();
-      const select = document.getElementById('category');
-      categories.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.Code;
-        opt.textContent = c.NameTH + ' — ' + c.NameEN;
-        select.appendChild(opt);
-      });
+      try {
+        const result = await fetchCategories();
+        if (result && result.error) throw new Error(result.error);
+        categories = Array.isArray(result) ? result : [];
 
-      select.addEventListener('change', onCategoryChange);
+        if (categories.length === 0) {
+          showToast('ไม่พบประเภทค่าใช้จ่าย', 'error');
+          return;
+        }
+
+        const select = document.getElementById('category');
+        categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.Code;
+          opt.textContent = c.NameTH + ' — ' + c.NameEN;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        showToast('โหลดประเภทไม่สำเร็จ: ' + err.message, 'error');
+      }
+
+      document.getElementById('category').addEventListener('change', onCategoryChange);
       document.getElementById('mileageKm').addEventListener('input', updateFuelPreview);
       document.getElementById('receiptInput').addEventListener('change', onReceiptSelected);
       document.getElementById('submitBtn').addEventListener('click', onSubmit);
@@ -130,7 +146,6 @@
       document.getElementById('receiptField').style.display = needReceipt ? 'block' : 'none';
       document.getElementById('categoryHint').textContent = cat.Notes || '';
 
-      // Fetch current fuel rate for this staff (only when FUEL chosen)
       if (isFuel && !currentFuelRate) {
         document.getElementById('fuelPreview').textContent = 'กำลังโหลดอัตรา...';
         try {
@@ -212,20 +227,19 @@
           staffEmail: session.Email, category: code, expenseDate,
           venue, occasion, attendees, amount, mileageKm, receiptBase64, receiptName
         });
-      if (result.error) throw new Error(result.error);
+        if (result.error) throw new Error(result.error);
         hideLoading();
         showToast('ส่งสำเร็จ! สถานะ: ' + result.status, 'success');
         setTimeout(() => location.href = 'status.html', 1200);
-        } catch (err) {
+      } catch (err) {
         hideLoading();
         showToast(err.message, 'error');
         btn.disabled = false;
         btn.innerHTML = icon('check') + ' ส่งคำขอ';
       }
-      }
     }
 
-   if (session) { init(); renderBottomNav('new'); }
+    if (session) { init(); renderBottomNav('new'); }
   </script>
 </body>
 </html>
