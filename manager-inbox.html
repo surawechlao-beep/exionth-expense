@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Manager Inbox — EXION</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>
+      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
+      <span style="font-size:14px; font-weight:600; margin-left:6px;">Manager Inbox</span>
+    </h1>
+  </div>
+
+  <div class="container">
+    <div id="list" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="modalTitle">รายละเอียด</h3>
+        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    let pending = [];
+
+    function setI(id, n) { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); }
+
+    async function load() {
+      setI('backBtn', 'back'); setI('closeBtn', 'x');
+
+      try {
+        const result = await fetchManagerInbox(session.Email);
+        if (result && result.error) throw new Error(result.error);
+        pending = Array.isArray(result) ? result : [];
+
+        const list = document.getElementById('list');
+        list.classList.remove('loading');
+
+        if (pending.length === 0) {
+          list.innerHTML = `
+            <div class="empty">
+              <div class="icon-wrap">${icon('check')}</div>
+              <div class="title">เคลียร์แล้ว 🎉</div>
+              <div class="sub">ไม่มีคำขอรออนุมัติ</div>
+            </div>`;
+          renderBottomNav('inbox');
+          return;
+        }
+
+        // Group by BatchID
+        const batches = {};
+        pending.forEach((r, idx) => {
+          const bid = r.BatchID || r.ID;
+          if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, preApprove: !!r.PreApproveBudget };
+          batches[bid].items.push({...r, _idx: idx});
+          batches[bid].total += Number(r.Amount) || Number(r.PreApproveBudget) || 0;
+        });
+
+        let html = `<div class="card" style="text-align:center; padding:16px;">
+          <div style="font-size:13px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">รออนุมัติ</div>
+          <div style="font-size:36px; font-weight:800; color:var(--warning); letter-spacing:-0.03em; margin-top:4px;">${pending.length}</div>
+          <div style="font-size:12px; color:var(--gray-500); margin-top:4px;">${Object.keys(batches).length} ชุด</div>
+        </div>`;
+
+        Object.entries(batches).forEach(([bid, b]) => {
+          const isPre = b.preApprove;
+          html += `<div class="card" style="padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+              <div>
+                <div style="font-weight:700;">${b.staff}</div>
+                <div style="font-size:11px; color:var(--gray-500);">${b.dept} • ${b.items.length} รายการ${isPre ? ' • Pre-Approve' : ''}</div>
+              </div>
+              <div style="font-weight:800; color:var(--brand-2); font-size:18px;">${formatCurrency(b.total)}</div>
+            </div>`;
+
+          b.items.forEach(r => {
+            html += `<div class="request-item" onclick="showDetail(${r._idx})" style="margin-bottom:6px; padding:10px 12px;">
+              <div class="cat-icon" style="background:#FEF3C7; color:#92400E; width:32px; height:32px;">${categoryIcon(r.Category)}</div>
+              <div class="info">
+                <div class="title" style="font-size:13px;">${r.Category}${isPre ? ' (Pre)' : ''}</div>
+                <div class="meta">${formatDate(r.ExpenseDate)}${r.Venue ? ' • ' + r.Venue : ''}</div>
+              </div>
+              <div class="right">
+                <div class="amount" style="font-size:14px;">${formatCurrency(r.Amount || r.PreApproveBudget)}</div>
+              </div>
+            </div>`;
+          });
+
+          html += `<div style="display:flex; gap:8px; margin-top:10px;">
+            <button class="btn btn-success" style="flex:1; font-size:13px; padding:10px;" onclick="approveBatch('${bid}')">${icon('check')} Approve ทั้งชุด</button>
+            <button class="btn btn-danger" style="flex:1; font-size:13px; padding:10px;" onclick="rejectBatch('${bid}')">${icon('x')} Reject</button>
+          </div></div>`;
+        });
+
+        list.innerHTML = html;
+        renderBottomNav('inbox');
+      } catch (err) {
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="title">${err.message}</div></div>`;
+        renderBottomNav('inbox');
+      }
+    }
+
+    function showDetail(idx) {
+      const r = pending[idx];
+      document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + r.Category;
+
+      const rows = [
+        ['Request ID', r.ID],
+        ['BatchID', r.BatchID || '-'],
+        ['ประเภท', r.Category + (r.PreApproveBudget ? ' (Pre-Approve)' : '')],
+        ['วันที่', formatDate(r.ExpenseDate)],
+        ['สถานที่', r.Venue || '-'],
+        ['โอกาส', r.Occasion || '-'],
+        ['ผู้ร่วม', r.Attendees || '-']
+      ];
+
+      if (r.Origin) rows.push(['ต้นทาง', r.Origin]);
+      if (r.Destination) rows.push(['ปลายทาง', r.Destination]);
+      if (r.Customer) rows.push(['ลูกค้า', r.Customer + (r.CustomerContact ? ' (' + r.CustomerContact + ')' : '')]);
+
+      const amount = r.PreApproveBudget || r.Amount;
+      const label = r.PreApproveBudget ? 'งบประมาณ' : 'จำนวนเงิน';
+
+      let html = `<div class="detail-row">
+        <div class="key">${label}</div>
+        <div class="val big">${formatCurrency(amount)} <span style="font-size:13px; color:var(--gray-500);">THB</span></div>
+      </div>` + rows.map(([k, v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
+
+      // Multi-file receipts
+      let urls = [];
+      try { urls = JSON.parse(r.ReceiptURLs || '[]'); } catch { urls = []; }
+      if (urls.length === 0 && r.ReceiptURL) urls = [r.ReceiptURL];
+
+      if (urls.length > 0) {
+        html += `<div style="margin-top:16px;">
+          <div style="font-size:13px; font-weight:600; margin-bottom:8px;">ใบเสร็จ (${urls.length} ไฟล์)</div>
+          <div id="rcptThumbs">`;
+        for (let i = 0; i < urls.length; i++) {
+          html += `<button class="btn btn-secondary" style="margin:4px; font-size:12px;" onclick="loadReceipt('${r.ID}', ${i})">${icon('lock')} ไฟล์ ${i+1}</button>`;
+        }
+        html += `</div><img id="rcptImg" class="preview-img" style="display:none;"></div>`;
+      }
+
+      html += `<div class="field" style="margin-top:16px;">
+        <label>หมายเหตุ (optional)</label>
+        <textarea id="remark" placeholder="..."></textarea>
+      </div>
+      <div class="field">
+        <label>ลายเซ็น (สำหรับ Approve)</label>
+        ${signaturePadHtml('sigCanvas')}
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-success" onclick="decide('${r.ID}', 'Approved')">${icon('check')} Approve</button>
+        <button class="btn btn-danger" onclick="decide('${r.ID}', 'Rejected')">${icon('x')} Reject</button>
+      </div>`;
+
+      document.getElementById('modalContent').innerHTML = html;
+      document.getElementById('modal').classList.add('show');
+      setTimeout(() => {
+        const c = document.getElementById('sigCanvas');
+        if (c && typeof SignaturePad === 'function') c.__sig = new SignaturePad(c);
+      }, 100);
+    }
+
+    async function loadReceipt(id, fileIndex) {
+      showLoading('โหลดใบเสร็จ...');
+      try {
+        const r = await fetchReceiptImage(id, session.Email, fileIndex);
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        const img = document.getElementById('rcptImg');
+        img.src = r.dataUrl;
+        img.style.display = 'block';
+        img.classList.add('zoomable');
+        img.onclick = () => openImageViewer(r.dataUrl, 'แตะ 2 ครั้งเพื่อซูม');
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function decide(id, decision) {
+      const remarkEl = document.getElementById('remark');
+      const remark = remarkEl ? remarkEl.value.trim() : '';
+      const canvas = document.getElementById('sigCanvas');
+      const sigPad = canvas ? canvas.__sig : null;
+      let signatureBase64 = '';
+      if (decision === 'Approved') {
+        if (!sigPad || sigPad.isEmpty()) return showToast('เซ็นชื่อก่อนอนุมัติ', 'error');
+        signatureBase64 = sigPad.toDataURL();
+      }
+      if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
+
+      showLoading(decision === 'Approved' ? 'อนุมัติ...' : 'ปฏิเสธ...');
+      try {
+        const result = await managerApprove({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
+        if (result && result.error) throw new Error(result.error);
+        hideLoading();
+        showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว — ส่งต่อ Senior' : '❌ ปฏิเสธแล้ว', 'success');
+        closeModal();
+        load();
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    }
+
+    window.approveBatch = async (bid) => {
+      const itemsInBatch = pending.filter(r => (r.BatchID || r.ID) === bid);
+      if (!confirm('Approve ทั้ง ' + itemsInBatch.length + ' รายการ?\n\n⚠️ ต้องเซ็นชื่อในแต่ละรายการ — เปิดทีละอันแทน')) return;
+      showToast('กรุณาเปิดทีละรายการเพื่อเซ็นชื่อ', 'info');
+      // Open first item
+      if (itemsInBatch.length > 0) {
+        const idx = pending.indexOf(itemsInBatch[0]);
+        showDetail(idx);
+      }
+    };
+
+    window.rejectBatch = async (bid) => {
+      const itemsInBatch = pending.filter(r => (r.BatchID || r.ID) === bid);
+      const remark = prompt('เหตุผลที่ปฏิเสธทั้งชุด:');
+      if (!remark) return;
+      showLoading('กำลังปฏิเสธ ' + itemsInBatch.length + ' รายการ...');
+      try {
+        for (const r of itemsInBatch) {
+          await managerApprove({ id: r.ID, decision: 'Rejected', remark, approverEmail: session.Email });
+        }
+        hideLoading();
+        showToast('ปฏิเสธทั้งชุดแล้ว', 'success');
+        load();
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    };
+
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+    if (session) load();
+  </script>
+</body>
+</html>
