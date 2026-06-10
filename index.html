@@ -22,121 +22,23 @@
   </div>
 
   <div class="container">
+    <!-- LOGIN -->
     <div id="loginView" style="display:none;">
       <div class="card card-elev">
         <h2>Welcome</h2>
         <h3>เข้าสู่ระบบ</h3>
-        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">ใส่ email บริษัทของคุณ ระบบจะจำไว้</p>
+        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">ใส่ email บริษัทของคุณ</p>
         <div class="field">
           <label>Email ของคุณ <span class="required">*</span></label>
           <input type="email" id="emailInput" placeholder="yourname@exionth.com" autocomplete="email" inputmode="email">
-          <div class="hint">ใช้ email บริษัทเท่านั้น</div>
+          <div class="hint">ต้องเป็น email ใน Staff sheet</div>
         </div>
         <button class="btn btn-primary" id="loginBtn">เข้าสู่ระบบ</button>
       </div>
     </div>
 
-    <div id="menuView" style="display:none;">
-      <div class="card card-hero card-hero-red">
-        <div class="user-greet">
-          <div class="avatar" id="avatar">?</div>
-          <div class="who">
-            <div class="greet">สวัสดี 👋</div>
-            <div class="name" id="userName">—</div>
-            <div class="meta" id="userDept">—</div>
-          </div>
-        </div>
-      </div>
-      <div class="menu-grid">
-        <a href="submit.html" class="menu-tile">
-          <div class="icon-box icon-blue" id="iconNew"></div>
-          <div class="label">ขอเบิกใหม่</div>
-          <div class="sub">สร้างคำขอ</div>
-        </a>
-        <a href="status.html" class="menu-tile">
-          <div class="icon-box icon-green" id="iconList"></div>
-          <div class="label">คำขอของฉัน</div>
-          <div class="sub">ดูสถานะ</div>
-        </a>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h2>เดือนนี้</h2>
-        <h3 id="monthLabel" style="margin-bottom:14px;">—</h3>
-        <div id="monthStats" class="loading"><div class="spinner"></div></div>
-      </div>
-      <button class="btn btn-ghost" id="logoutBtn" style="width:100%; margin-top:8px;">
-        <span id="iconLogout"></span> ออกจากระบบ
-      </button>
-    </div>
-
-    <div id="gmView" style="display:none;">
-      <div class="card card-hero card-hero-red">
-        <div class="user-greet">
-          <div class="avatar" id="gmAvatar">?</div>
-          <div class="who">
-            <div class="greet">สวัสดี GM 👔</div>
-            <div class="name" id="gmName">—</div>
-            <div class="meta" id="gmDept">—</div>
-          </div>
-        </div>
-      </div>
-      <div class="gm-stat-grid">
-        <div class="gm-stat warn" onclick="location.href='inbox.html'" style="cursor:pointer;">
-          <div class="icon-corner" id="iconPending"></div>
-          <div class="label">รออนุมัติ</div>
-          <div class="value" id="kpiPending">—</div>
-          <div class="delta">แตะเพื่อดู →</div>
-        </div>
-        <div class="gm-stat red">
-          <div class="icon-corner" id="iconAmount"></div>
-          <div class="label">มูลค่ารอ</div>
-          <div class="value" id="kpiAmount">—</div>
-          <div class="delta">THB</div>
-        </div>
-        <div class="gm-stat">
-          <div class="icon-corner" id="iconStaff"></div>
-          <div class="label">พนักงาน</div>
-          <div class="value" id="kpiStaff">—</div>
-          <div class="delta">คนรออนุมัติ</div>
-        </div>
-        <div class="gm-stat success">
-          <div class="icon-corner" id="iconApproved"></div>
-          <div class="label">ของฉันเดือนนี้</div>
-          <div class="value" id="kpiMyApproved">—</div>
-          <div class="delta">อนุมัติแล้ว</div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h2>Top Spenders</h2>
-        <h3 style="margin-bottom:12px;">รออนุมัติเรียงตามมูลค่า</h3>
-        <div id="topSpenders" class="loading"><div class="spinner"></div></div>
-      </div>
-      <div class="card">
-        <h2>แยกตามประเภท</h2>
-        <h3 style="margin-bottom:12px;">รออนุมัติ</h3>
-        <div id="byCategory" class="loading"><div class="spinner"></div></div>
-      </div>
-      <div class="menu-grid">
-        <a href="inbox.html" class="menu-tile">
-          <div class="icon-box icon-orange" id="iconInbox"></div>
-          <div class="label">Inbox</div>
-          <div class="sub">อนุมัติคำขอ</div>
-        </a>
-        <a href="all-requests.html" class="menu-tile">
-          <div class="icon-box icon-blue" id="iconAllReqs"></div>
-          <div class="label">All Requests</div>
-          <div class="sub">ดูทุกคำขอ</div>
-        </a>
-        <a href="status.html" class="menu-tile">
-          <div class="icon-box icon-green" id="iconAllRequests"></div>
-          <div class="label">คำขอของฉัน</div>
-          <div class="sub">ของตัวเอง</div>
-        </a>
-      </div>
-      <button class="btn btn-ghost" id="gmLogoutBtn" style="width:100%; margin-top:8px;">
-        <span id="iconLogout2"></span> ออกจากระบบ
-      </button>
-    </div>
+    <!-- USER VIEW (rendered dynamically per role) -->
+    <div id="userView" style="display:none;"></div>
 
     <div id="initialLoading" class="loading"><div class="spinner"></div></div>
   </div>
@@ -146,90 +48,149 @@
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
-    function setIcon(id, name) {
-      const el = document.getElementById(id);
-      if (el && typeof icon === 'function') el.innerHTML = icon(name);
-    }
+    function setI(id, n) { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); }
 
     async function init() {
-      setIcon('iconNew', 'plus');
-      setIcon('iconList', 'list');
-      setIcon('iconLogout', 'logout');
-
       const session = getSession();
       document.getElementById('initialLoading').style.display = 'none';
-      if (session) showMenu(session);
+      if (session) showDashboard(session);
       else showLogin();
     }
 
     async function showLogin() {
       document.getElementById('loginView').style.display = 'block';
-
-      const handleLogin = async () => {
+      const doLogin = async () => {
         const email = document.getElementById('emailInput').value.trim().toLowerCase();
-        if (!email || email.indexOf('@') < 0) {
-          return showToast('กรุณาใส่ email ให้ถูกต้อง', 'error');
-        }
+        if (!email || email.indexOf('@') < 0) return showToast('ใส่ email ให้ถูก', 'error');
         const btn = document.getElementById('loginBtn');
         btn.disabled = true;
-        btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังตรวจสอบ...';
-
+        btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> ตรวจสอบ...';
         try {
           const staff = await verifyStaff(email);
           if (staff && staff.error) throw new Error(staff.error);
-          if (!staff) throw new Error('Email นี้ไม่มีสิทธิ์ใช้งาน — ติดต่อ Admin');
+          if (!staff) throw new Error('Email นี้ไม่มีสิทธิ์ใช้งาน');
+          // Get role
+          const role = await getMyRole(email);
+          staff.role = role.role;
+          staff.isManager = role.isManager;
+          staff.isSenior = role.isSenior;
+          staff.isGM = role.isGM;
           setSession(staff);
-          showMenu(staff);
+          showDashboard(staff);
         } catch (err) {
           showToast(err.message, 'error');
           btn.disabled = false;
           btn.textContent = 'เข้าสู่ระบบ';
         }
       };
-
-      document.getElementById('loginBtn').addEventListener('click', handleLogin);
-      document.getElementById('emailInput').addEventListener('keydown', e => {
-        if (e.key === 'Enter') handleLogin();
-      });
+      document.getElementById('loginBtn').addEventListener('click', doLogin);
+      document.getElementById('emailInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
     }
 
-    async function showMenu(session) {
+    async function showDashboard(session) {
       document.getElementById('loginView').style.display = 'none';
+      const view = document.getElementById('userView');
+      view.style.display = 'block';
 
-      let isGMUser = !!session.isGM;
-      if (typeof session.isGM === 'undefined') {
-        try {
-          const r = await checkIsGM(session.Email);
-          isGMUser = !!(r && r.isGM);
-          session.isGM = isGMUser;
-          setSession(session);
-        } catch { isGMUser = false; }
-      }
+      // Build dashboard based on role
+      const role = session.role || 'staff';
+      const isGM = !!session.isGM;
+      const isSenior = !!session.isSenior;
+      const isManager = !!session.isManager;
 
-      if (isGMUser) await showGMDashboard(session);
-      else await showStaffMenu(session);
-      renderBottomNav('home');
-    }
+      view.innerHTML = `
+        <div class="card card-hero card-hero-red">
+          <div class="user-greet">
+            <div class="avatar">${initials(session.Name)}</div>
+            <div class="who">
+              <div class="greet">สวัสดี ${roleEmoji(role)}</div>
+              <div class="name">${session.Name}</div>
+              <div class="meta">${session.Department} • ${roleLabel(role)}${session.Team ? ' • ' + session.Team : ''}</div>
+            </div>
+          </div>
+        </div>
 
-    async function showStaffMenu(session) {
-      document.getElementById('menuView').style.display = 'block';
-      document.getElementById('avatar').textContent = initials(session.Name);
-      document.getElementById('userName').textContent = session.Name;
-      document.getElementById('userDept').textContent =
-        session.Department + (session.Position ? ' • ' + session.Position : '');
+        <div class="menu-grid">
+          <a href="submit.html" class="menu-tile">
+            <div class="icon-box icon-blue">${icon('plus')}</div>
+            <div class="label">ขอเบิกใหม่</div>
+            <div class="sub">สร้างคำขอ</div>
+          </a>
+          <a href="status.html" class="menu-tile">
+            <div class="icon-box icon-green">${icon('list')}</div>
+            <div class="label">คำขอของฉัน</div>
+            <div class="sub">ดูสถานะ</div>
+          </a>
+          ${isManager && !isGM ? `<a href="manager-inbox.html" class="menu-tile">
+            <div class="icon-box icon-orange">${icon('bell')}</div>
+            <div class="label">Manager Inbox</div>
+            <div class="sub" id="mgrCount">— รออนุมัติ</div>
+          </a>` : ''}
+          ${isSenior || isGM ? `<a href="senior-inbox.html" class="menu-tile">
+            <div class="icon-box icon-orange">${icon('bell')}</div>
+            <div class="label">Senior Inbox</div>
+            <div class="sub" id="snrCount">— รออนุมัติ</div>
+          </a>` : ''}
+          ${isSenior || isGM ? `<a href="all-requests.html" class="menu-tile">
+            <div class="icon-box icon-blue">${icon('list')}</div>
+            <div class="label">All Requests</div>
+            <div class="sub">ดูทุกคำขอ</div>
+          </a>` : ''}
+        </div>
 
-      const monthLabel = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
-      document.getElementById('monthLabel').textContent = monthLabel;
+        <div class="card" style="margin-top:16px;">
+          <h2>เดือนนี้</h2>
+          <h3 style="margin-bottom:14px;" id="monthLabel">—</h3>
+          <div id="monthStats" class="loading"><div class="spinner"></div></div>
+        </div>
 
+        ${isManager || isSenior || isGM ? `<div class="card">
+          <h2>${isSenior || isGM ? 'รวมทั้งบริษัท' : 'ทีมของฉัน'}</h2>
+          <h3 style="margin-bottom:12px;">Top Spenders</h3>
+          <div id="topSpenders" class="loading"><div class="spinner"></div></div>
+        </div>` : ''}
+
+        <button class="btn btn-ghost" id="logoutBtn" style="width:100%;">
+          ${icon('logout')} ออกจากระบบ
+        </button>
+      `;
+
+      document.getElementById('monthLabel').textContent = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
       document.getElementById('logoutBtn').addEventListener('click', () => {
         if (confirm('ออกจากระบบ?')) { clearSession(); location.reload(); }
       });
 
+      await loadStats(session);
+      renderBottomNav('home');
+    }
+
+    function roleEmoji(role) {
+      return {gm:'👔', senior:'👑', manager:'👨‍💼', staff:'👋'}[role] || '👋';
+    }
+    function roleLabel(role) {
+      return {gm:'GM', senior:'Senior Approver', manager:'Manager', staff:'Sales'}[role] || 'Sales';
+    }
+
+    async function loadStats(session) {
       try {
-        const requests = await fetchMyRequests(session.Email);
+        const [myReqs, mgrInbox, snrInbox, teamReqs] = await Promise.all([
+          fetchMyRequests(session.Email).catch(() => []),
+          (session.isManager && !session.isGM) ? fetchManagerInbox(session.Email).catch(() => []) : Promise.resolve([]),
+          (session.isSenior || session.isGM) ? fetchSeniorInbox(session.Email).catch(() => []) : Promise.resolve([]),
+          (session.isManager && !session.isGM) ? fetchMyTeamRequests(session.Email).catch(() => []) : Promise.resolve([])
+        ]);
+
+        // Inbox badges
+        const mgrEl = document.getElementById('mgrCount');
+        if (mgrEl) mgrEl.textContent = (Array.isArray(mgrInbox) ? mgrInbox.length : 0) + ' รออนุมัติ';
+        const snrEl = document.getElementById('snrCount');
+        if (snrEl) snrEl.textContent = (Array.isArray(snrInbox) ? snrInbox.length : 0) + ' รออนุมัติ';
+
+        // Month stats (my own)
         const now = new Date();
         const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        const monthReqs = requests.filter(r => {
+        const reqs = Array.isArray(myReqs) ? myReqs : [];
+        const monthReqs = reqs.filter(r => {
           const d = r.ExpenseDate || r.Timestamp;
           return d && String(d).startsWith(thisMonth);
         });
@@ -244,111 +205,46 @@
             <div class="stat success"><div class="value">${approved}</div><div class="label">อนุมัติ</div></div>
             <div class="stat accent"><div class="value">${formatCurrency(total)}</div><div class="label">รวม THB</div></div>
           </div>`;
-      } catch {
-        document.getElementById('monthStats').innerHTML =
-          '<div class="empty" style="padding:20px;"><div class="sub">ยังไม่มีคำขอเดือนนี้</div></div>';
-      }
-    }
 
-    async function showGMDashboard(session) {
-      document.getElementById('gmView').style.display = 'block';
-      document.getElementById('gmAvatar').textContent = initials(session.Name);
-      document.getElementById('gmName').textContent = session.Name;
-      document.getElementById('gmDept').textContent =
-        session.Department + (session.Position ? ' • ' + session.Position : '');
-
-      setIcon('iconPending', 'bell');
-      setIcon('iconApproved', 'check');
-      setIcon('iconAmount', 'receipt');
-      setIcon('iconStaff', 'user');
-      setIcon('iconInbox', 'bell');
-      setIcon('iconAllReqs', 'list');
-      setIcon('iconAllRequests', 'user');
-      setIcon('iconLogout2', 'logout');
-
-      document.getElementById('gmLogoutBtn').addEventListener('click', () => {
-        if (confirm('ออกจากระบบ?')) { clearSession(); location.reload(); }
-      });
-
-      try {
-        const [pendingList, mySelfList] = await Promise.all([
-          fetchPendingApprovals(session.Email).catch(() => []),
-          fetchMyRequests(session.Email).catch(() => [])
-        ]);
-        const pending = Array.isArray(pendingList) ? pendingList : [];
-        const myReqs = Array.isArray(mySelfList) ? mySelfList : [];
-
-        document.getElementById('kpiPending').textContent = pending.length;
-        const totalAmount = pending.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
-        document.getElementById('kpiAmount').textContent = formatCurrency(totalAmount);
-        const uniqueStaff = new Set(pending.map(r => r.StaffEmail)).size;
-        document.getElementById('kpiStaff').textContent = uniqueStaff;
-
-        const now = new Date();
-        const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        const myApproved = myReqs.filter(r => {
-          const d = r.ExpenseDate || r.Timestamp;
-          return r.Status === 'Approved' && d && String(d).startsWith(thisMonth);
-        }).length;
-        document.getElementById('kpiMyApproved').textContent = myApproved;
-
-        const spenders = {};
-        pending.forEach(r => {
-          const name = r.StaffName || 'Unknown';
-          if (!spenders[name]) spenders[name] = { name, amount: 0, count: 0, dept: r.Department };
-          spenders[name].amount += Number(r.Amount) || 0;
-          spenders[name].count += 1;
-        });
-        const sorted = Object.values(spenders).sort((a, b) => b.amount - a.amount).slice(0, 5);
-
+        // Top spenders (Manager → team / Senior → company)
         const topEl = document.getElementById('topSpenders');
-        topEl.classList.remove('loading');
-        if (sorted.length === 0) {
-          topEl.innerHTML = '<div class="empty" style="padding:20px;"><div class="sub">ไม่มีข้อมูลรออนุมัติ</div></div>';
-        } else {
-          topEl.innerHTML = sorted.map((s, i) => `
-            <div class="spender-row">
-              <div class="rank ${i < 3 ? 'top' : ''}">#${i+1}</div>
-              <div class="info">
-                <div class="name">${s.name}</div>
-                <div class="meta">${s.dept || '-'} • ${s.count} รายการ</div>
-              </div>
-              <div class="amount">${formatCurrency(s.amount)}</div>
-            </div>`).join('');
-        }
+        if (topEl) {
+          let source;
+          if (session.isSenior || session.isGM) source = [...snrInbox, ...await fetchAllRequests(session.Email).catch(() => [])];
+          else source = teamReqs;
+          source = Array.isArray(source) ? source : [];
 
-        const byCat = {};
-        pending.forEach(r => {
-          const cat = r.Category || 'OTHER';
-          if (!byCat[cat]) byCat[cat] = { cat, amount: 0, count: 0 };
-          byCat[cat].amount += Number(r.Amount) || 0;
-          byCat[cat].count += 1;
-        });
-        const catSorted = Object.values(byCat).sort((a, b) => b.amount - a.amount);
-        const maxAmount = Math.max(...catSorted.map(c => c.amount), 1);
+          const monthOnly = source.filter(r => {
+            const d = r.ExpenseDate || r.Timestamp;
+            return d && String(d).startsWith(thisMonth);
+          });
 
-        const catEl = document.getElementById('byCategory');
-        catEl.classList.remove('loading');
-        if (catSorted.length === 0) {
-          catEl.innerHTML = '<div class="empty" style="padding:20px;"><div class="sub">ไม่มีข้อมูล</div></div>';
-        } else {
-          catEl.innerHTML = catSorted.map(c => {
-            const pct = (c.amount / maxAmount * 100).toFixed(0);
-            return `
-              <div style="margin-bottom:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
-                  <span style="font-weight:600; font-size:13px;">${c.cat}</span>
-                  <span style="font-weight:700; font-size:13px;">${formatCurrency(c.amount)}</span>
+          const spenders = {};
+          monthOnly.forEach(r => {
+            const name = r.StaffName || 'Unknown';
+            if (!spenders[name]) spenders[name] = { name, amount: 0, count: 0, dept: r.Department };
+            spenders[name].amount += Number(r.Amount) || 0;
+            spenders[name].count += 1;
+          });
+          const sorted = Object.values(spenders).sort((a, b) => b.amount - a.amount).slice(0, 5);
+
+          topEl.classList.remove('loading');
+          if (sorted.length === 0) {
+            topEl.innerHTML = '<div class="empty" style="padding:20px;"><div class="sub">ยังไม่มีข้อมูล</div></div>';
+          } else {
+            topEl.innerHTML = sorted.map((s, i) => `
+              <div class="spender-row">
+                <div class="rank ${i < 3 ? 'top' : ''}">#${i+1}</div>
+                <div class="info">
+                  <div class="name">${s.name}</div>
+                  <div class="meta">${s.dept || '-'} • ${s.count} รายการ</div>
                 </div>
-                <div style="background:var(--gray-100); border-radius:8px; height:8px; overflow:hidden;">
-                  <div style="background:var(--brand-2); height:100%; width:${pct}%; border-radius:8px;"></div>
-                </div>
-                <div style="font-size:11px; color:var(--gray-500); margin-top:2px;">${c.count} รายการ</div>
-              </div>`;
-          }).join('');
+                <div class="amount">${formatCurrency(s.amount)}</div>
+              </div>`).join('');
+          }
         }
       } catch (err) {
-        showToast('โหลดข้อมูลผิดพลาด: ' + err.message, 'error');
+        console.error(err);
       }
     }
 
