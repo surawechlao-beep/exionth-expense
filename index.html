@@ -7,7 +7,6 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="EXION Expense">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -22,24 +21,61 @@
   </div>
 
   <div class="container">
-    <!-- LOGIN -->
-    <div id="loginView" style="display:none;">
+    <!-- LOGIN: STEP 1 - Email -->
+    <div id="emailStep" style="display:none;">
       <div class="card card-elev">
         <h2>Welcome</h2>
         <h3>เข้าสู่ระบบ</h3>
         <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">ใส่ email บริษัทของคุณ</p>
         <div class="field">
-          <label>Email ของคุณ <span class="required">*</span></label>
+          <label>Email <span class="required">*</span></label>
           <input type="email" id="emailInput" placeholder="yourname@exionth.com" autocomplete="email" inputmode="email">
-          <div class="hint">ต้องเป็น email ใน Staff sheet</div>
         </div>
-        <button class="btn btn-primary" id="loginBtn">เข้าสู่ระบบ</button>
+        <button class="btn btn-primary" id="emailBtn">ต่อไป →</button>
       </div>
     </div>
 
-    <!-- USER VIEW (rendered dynamically per role) -->
-    <div id="userView" style="display:none;"></div>
+    <!-- LOGIN: STEP 2 - First time setup -->
+    <div id="setupStep" style="display:none;">
+      <div class="card card-elev">
+        <h2>ยินดีต้อนรับ <span id="setupName">—</span></h2>
+        <h3>ตั้งรหัสครั้งแรก</h3>
+        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;">
+          อย่างน้อย 8 ตัว มีตัวเลข<br>
+          ⚠️ <b>อย่าใช้รหัสซ้ำ</b>กับ Outlook/email อื่น
+        </p>
+        <div class="field">
+          <label>รหัสผ่าน <span class="required">*</span></label>
+          <input type="password" id="setupPwd" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label>ยืนยันรหัสผ่าน <span class="required">*</span></label>
+          <input type="password" id="setupPwd2" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" id="setupBtn">ตั้งรหัส + เข้าสู่ระบบ</button>
+        <button class="btn btn-ghost" onclick="goEmail()" style="width:100%; margin-top:8px;">← กลับ</button>
+      </div>
+    </div>
 
+    <!-- LOGIN: STEP 3 - Password -->
+    <div id="passwordStep" style="display:none;">
+      <div class="card card-elev">
+        <h2>สวัสดี <span id="pwdName">—</span></h2>
+        <h3>ใส่รหัสผ่าน</h3>
+        <p style="color:var(--gray-500); font-size:14px; margin:-8px 0 18px;" id="pwdEmailShow">—</p>
+        <div class="field">
+          <label>รหัสผ่าน <span class="required">*</span></label>
+          <input type="password" id="loginPwd" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary" id="loginBtn">เข้าสู่ระบบ</button>
+        <div style="text-align:center; margin-top:12px; font-size:13px;">
+          <a href="reset-password.html" style="color:var(--accent);">ลืมรหัสผ่าน?</a> &nbsp;|&nbsp;
+          <a href="#" onclick="goEmail(); return false;" style="color:var(--gray-500);">เปลี่ยน email</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="userView" style="display:none;"></div>
     <div id="initialLoading" class="loading"><div class="spinner"></div></div>
   </div>
 
@@ -48,64 +84,127 @@
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
-    function setI(id, n) { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); }
+    let currentEmail = '';
 
     async function init() {
       const session = getSession();
       document.getElementById('initialLoading').style.display = 'none';
-      if (session) showDashboard(session);
-      else showLogin();
+      if (session) return showDashboard(session);
+      goEmail();
     }
 
-    async function showLogin() {
-      document.getElementById('loginView').style.display = 'block';
-      const doLogin = async () => {
-        const email = document.getElementById('emailInput').value.trim().toLowerCase();
-        if (!email || email.indexOf('@') < 0) return showToast('ใส่ email ให้ถูก', 'error');
-        const btn = document.getElementById('loginBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> ตรวจสอบ...';
-        try {
-          const staff = await verifyStaff(email);
-          if (staff && staff.error) throw new Error(staff.error);
-          if (!staff) throw new Error('Email นี้ไม่มีสิทธิ์ใช้งาน');
-          // Get role
-          const role = await getMyRole(email);
-          staff.role = role.role;
-          staff.isManager = role.isManager;
-          staff.isSenior = role.isSenior;
-          staff.isGM = role.isGM;
-          setSession(staff);
-          showDashboard(staff);
-        } catch (err) {
-          showToast(err.message, 'error');
-          btn.disabled = false;
-          btn.textContent = 'เข้าสู่ระบบ';
-        }
-      };
-      document.getElementById('loginBtn').addEventListener('click', doLogin);
-      document.getElementById('emailInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    function hideAll() {
+      ['emailStep','setupStep','passwordStep','userView'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+      });
     }
+
+    function goEmail() {
+      hideAll();
+      document.getElementById('emailStep').style.display = 'block';
+      document.getElementById('emailInput').focus();
+    }
+
+    document.getElementById('emailBtn').addEventListener('click', async () => {
+      const email = document.getElementById('emailInput').value.trim().toLowerCase();
+      if (!email || email.indexOf('@') < 0) return showToast('ใส่ email ให้ถูก', 'error');
+      const btn = document.getElementById('emailBtn');
+      btn.disabled = true;
+      showLoading('กำลังตรวจสอบ...');
+      try {
+        const r = await checkUser(email);
+        hideLoading();
+        if (!r.exists) throw new Error('Email นี้ไม่อยู่ในระบบ');
+        if (r.active === false) throw new Error('Account ปิดอยู่');
+        currentEmail = email;
+        hideAll();
+        if (r.hasPassword) {
+          document.getElementById('pwdName').textContent = r.name;
+          document.getElementById('pwdEmailShow').textContent = email;
+          document.getElementById('passwordStep').style.display = 'block';
+          document.getElementById('loginPwd').focus();
+        } else {
+          document.getElementById('setupName').textContent = r.name;
+          document.getElementById('setupStep').style.display = 'block';
+          document.getElementById('setupPwd').focus();
+        }
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+      btn.disabled = false;
+    });
+
+    document.getElementById('emailInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('emailBtn').click();
+    });
+
+    document.getElementById('setupBtn').addEventListener('click', async () => {
+      const pwd = document.getElementById('setupPwd').value;
+      const pwd2 = document.getElementById('setupPwd2').value;
+      if (pwd.length < 8) return showToast('รหัสต้อง ≥ 8 ตัว', 'error');
+      if (!/[0-9]/.test(pwd)) return showToast('ต้องมีตัวเลข', 'error');
+      if (pwd !== pwd2) return showToast('รหัสไม่ตรง', 'error');
+      showLoading('กำลังตั้งรหัส...');
+      try {
+        const r = await setPassword(currentEmail, pwd, pwd2);
+        if (r.error) throw new Error(r.error);
+        // Auto login
+        const login = await loginWithPassword(currentEmail, pwd);
+        if (login.error) throw new Error(login.error);
+        const role = await getMyRole(currentEmail);
+        login.role = role.role;
+        login.isManager = role.isManager;
+        login.isSenior = role.isSenior;
+        login.isGM = role.isGM;
+        setSession(login);
+        hideLoading();
+        showToast('ตั้งรหัสสำเร็จ!', 'success');
+        showDashboard(login);
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    });
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const pwd = document.getElementById('loginPwd').value;
+      if (!pwd) return showToast('ใส่รหัสผ่าน', 'error');
+      showLoading('กำลังเข้าสู่ระบบ...');
+      try {
+        const login = await loginWithPassword(currentEmail, pwd);
+        if (login.error) throw new Error(login.error);
+        const role = await getMyRole(currentEmail);
+        login.role = role.role;
+        login.isManager = role.isManager;
+        login.isSenior = role.isSenior;
+        login.isGM = role.isGM;
+        setSession(login);
+        hideLoading();
+        showDashboard(login);
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    });
+    document.getElementById('loginPwd').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
 
     async function showDashboard(session) {
-      document.getElementById('loginView').style.display = 'none';
+      hideAll();
       const view = document.getElementById('userView');
       view.style.display = 'block';
-
-      // Build dashboard based on role
-      const role = session.role || 'staff';
-      const isGM = !!session.isGM;
-      const isSenior = !!session.isSenior;
-      const isManager = !!session.isManager;
+      const isGM = !!session.isGM, isSenior = !!session.isSenior, isManager = !!session.isManager;
 
       view.innerHTML = `
         <div class="card card-hero card-hero-red">
           <div class="user-greet">
             <div class="avatar">${initials(session.Name)}</div>
             <div class="who">
-              <div class="greet">สวัสดี ${roleEmoji(role)}</div>
+              <div class="greet">สวัสดี ${roleEmoji(session.role)}</div>
               <div class="name">${session.Name}</div>
-              <div class="meta">${session.Department} • ${roleLabel(role)}${session.Team ? ' • ' + session.Team : ''}</div>
+              <div class="meta">${session.Department} • ${roleLabel(session.role)}${session.Team ? ' • ' + session.Team : ''}</div>
             </div>
           </div>
         </div>
@@ -114,7 +213,12 @@
           <a href="submit.html" class="menu-tile">
             <div class="icon-box icon-blue">${icon('plus')}</div>
             <div class="label">ขอเบิกใหม่</div>
-            <div class="sub">สร้างคำขอ</div>
+            <div class="sub">จ่ายแล้ว มีใบเสร็จ</div>
+          </a>
+          <a href="pre-approves.html" class="menu-tile">
+            <div class="icon-box icon-orange">📋</div>
+            <div class="label">Pre-Approves</div>
+            <div class="sub">ขอวงเงิน ENT/Golf</div>
           </a>
           <a href="status.html" class="menu-tile">
             <div class="icon-box icon-green">${icon('list')}</div>
@@ -125,16 +229,21 @@
             <div class="icon-box icon-orange">${icon('bell')}</div>
             <div class="label">Manager Inbox</div>
             <div class="sub" id="mgrCount">— รออนุมัติ</div>
+          </a>
+          <a href="my-team.html" class="menu-tile">
+            <div class="icon-box icon-blue">👥</div>
+            <div class="label">ทีมของฉัน</div>
+            <div class="sub">Excel Reports</div>
           </a>` : ''}
           ${isSenior || isGM ? `<a href="senior-inbox.html" class="menu-tile">
             <div class="icon-box icon-orange">${icon('bell')}</div>
             <div class="label">Senior Inbox</div>
             <div class="sub" id="snrCount">— รออนุมัติ</div>
-          </a>` : ''}
-          ${isSenior || isGM ? `<a href="all-requests.html" class="menu-tile">
+          </a>
+          <a href="all-requests.html" class="menu-tile">
             <div class="icon-box icon-blue">${icon('list')}</div>
             <div class="label">All Requests</div>
-            <div class="sub">ดูทุกคำขอ</div>
+            <div class="sub">ทุกคำขอ</div>
           </a>` : ''}
         </div>
 
@@ -143,12 +252,6 @@
           <h3 style="margin-bottom:14px;" id="monthLabel">—</h3>
           <div id="monthStats" class="loading"><div class="spinner"></div></div>
         </div>
-
-        ${isManager || isSenior || isGM ? `<div class="card">
-          <h2>${isSenior || isGM ? 'รวมทั้งบริษัท' : 'ทีมของฉัน'}</h2>
-          <h3 style="margin-bottom:12px;">Top Spenders</h3>
-          <div id="topSpenders" class="loading"><div class="spinner"></div></div>
-        </div>` : ''}
 
         <button class="btn btn-ghost" id="logoutBtn" style="width:100%;">
           ${icon('logout')} ออกจากระบบ
@@ -164,29 +267,21 @@
       renderBottomNav('home');
     }
 
-    function roleEmoji(role) {
-      return {gm:'👔', senior:'👑', manager:'👨‍💼', staff:'👋'}[role] || '👋';
-    }
-    function roleLabel(role) {
-      return {gm:'GM', senior:'Senior Approver', manager:'Manager', staff:'Sales'}[role] || 'Sales';
-    }
+    function roleEmoji(role) { return {gm:'👔', senior:'👑', manager:'👨‍💼', staff:'👋'}[role] || '👋'; }
+    function roleLabel(role) { return {gm:'GM', senior:'Senior Approver', manager:'Manager', staff:'Sales'}[role] || 'Sales'; }
 
     async function loadStats(session) {
       try {
-        const [myReqs, mgrInbox, snrInbox, teamReqs] = await Promise.all([
+        const [myReqs, mgrInbox, snrInbox] = await Promise.all([
           fetchMyRequests(session.Email).catch(() => []),
           (session.isManager && !session.isGM) ? fetchManagerInbox(session.Email).catch(() => []) : Promise.resolve([]),
-          (session.isSenior || session.isGM) ? fetchSeniorInbox(session.Email).catch(() => []) : Promise.resolve([]),
-          (session.isManager && !session.isGM) ? fetchMyTeamRequests(session.Email).catch(() => []) : Promise.resolve([])
+          (session.isSenior || session.isGM) ? fetchSeniorInbox(session.Email).catch(() => []) : Promise.resolve([])
         ]);
-
-        // Inbox badges
         const mgrEl = document.getElementById('mgrCount');
         if (mgrEl) mgrEl.textContent = (Array.isArray(mgrInbox) ? mgrInbox.length : 0) + ' รออนุมัติ';
         const snrEl = document.getElementById('snrCount');
         if (snrEl) snrEl.textContent = (Array.isArray(snrInbox) ? snrInbox.length : 0) + ' รออนุมัติ';
 
-        // Month stats (my own)
         const now = new Date();
         const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         const reqs = Array.isArray(myReqs) ? myReqs : [];
@@ -205,47 +300,7 @@
             <div class="stat success"><div class="value">${approved}</div><div class="label">อนุมัติ</div></div>
             <div class="stat accent"><div class="value">${formatCurrency(total)}</div><div class="label">รวม THB</div></div>
           </div>`;
-
-        // Top spenders (Manager → team / Senior → company)
-        const topEl = document.getElementById('topSpenders');
-        if (topEl) {
-          let source;
-          if (session.isSenior || session.isGM) source = [...snrInbox, ...await fetchAllRequests(session.Email).catch(() => [])];
-          else source = teamReqs;
-          source = Array.isArray(source) ? source : [];
-
-          const monthOnly = source.filter(r => {
-            const d = r.ExpenseDate || r.Timestamp;
-            return d && String(d).startsWith(thisMonth);
-          });
-
-          const spenders = {};
-          monthOnly.forEach(r => {
-            const name = r.StaffName || 'Unknown';
-            if (!spenders[name]) spenders[name] = { name, amount: 0, count: 0, dept: r.Department };
-            spenders[name].amount += Number(r.Amount) || 0;
-            spenders[name].count += 1;
-          });
-          const sorted = Object.values(spenders).sort((a, b) => b.amount - a.amount).slice(0, 5);
-
-          topEl.classList.remove('loading');
-          if (sorted.length === 0) {
-            topEl.innerHTML = '<div class="empty" style="padding:20px;"><div class="sub">ยังไม่มีข้อมูล</div></div>';
-          } else {
-            topEl.innerHTML = sorted.map((s, i) => `
-              <div class="spender-row">
-                <div class="rank ${i < 3 ? 'top' : ''}">#${i+1}</div>
-                <div class="info">
-                  <div class="name">${s.name}</div>
-                  <div class="meta">${s.dept || '-'} • ${s.count} รายการ</div>
-                </div>
-                <div class="amount">${formatCurrency(s.amount)}</div>
-              </div>`).join('');
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
 
     init();
