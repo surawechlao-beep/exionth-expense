@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Pre-Approves — EXION</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>
+      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
+      <span style="font-size:14px; font-weight:600; margin-left:6px;">Pre-Approves</span>
+    </h1>
+  </div>
+
+  <div class="container">
+    <a href="pre-approve.html" class="btn btn-primary" style="text-decoration:none; margin-bottom:16px; display:block;">
+      ➕ ขอ Pre-Approve ใหม่
+    </a>
+    <div id="list" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Finalize Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="modalTitle">ส่งใบเสร็จ</h3>
+        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    let myPres = [];
+    let currentItem = null;
+    let pendingFiles = [];
+
+    function setI(id, n) { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); }
+
+    async function load() {
+      setI('backBtn', 'back'); setI('closeBtn', 'x');
+
+      try {
+        const all = await fetchMyRequests(session.Email);
+        myPres = (all || []).filter(r => r.PreApproveStatus);
+
+        const list = document.getElementById('list');
+        list.classList.remove('loading');
+
+        if (myPres.length === 0) {
+          list.innerHTML = `
+            <div class="empty">
+              <div class="icon-wrap">📋</div>
+              <div class="title">ยังไม่มี Pre-Approve</div>
+              <div class="sub">กดด้านบนเพื่อขอ Pre-Approve ใหม่</div>
+            </div>`;
+          renderBottomNav('new');
+          return;
+        }
+
+        const pending = myPres.filter(r => r.PreApproveStatus === 'Pending');
+        const approved = myPres.filter(r => r.PreApproveStatus === 'Approved' && r.Amount == 0);
+        const done = myPres.filter(r => r.Amount > 0 || r.PreApproveStatus === 'Rejected');
+
+        let html = '';
+
+        if (pending.length > 0) {
+          html += `<h2 style="font-size:12px; font-weight:700; color:var(--warning); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">⏳ รอ Manager อนุมัติงบ (${pending.length})</h2>`;
+          pending.forEach((r) => { html += renderRow(r, myPres.indexOf(r), 'pending'); });
+        }
+
+        if (approved.length > 0) {
+          html += `<h2 style="font-size:12px; font-weight:700; color:var(--success); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">✅ อนุมัติงบแล้ว — รอส่งใบเสร็จ (${approved.length})</h2>`;
+          approved.forEach((r) => { html += renderRow(r, myPres.indexOf(r), 'ready'); });
+        }
+
+        if (done.length > 0) {
+          html += `<h2 style="font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">เสร็จสิ้น (${done.length})</h2>`;
+          done.forEach((r) => { html += renderRow(r, myPres.indexOf(r), 'done'); });
+        }
+
+        list.innerHTML = html;
+        renderBottomNav('new');
+      } catch (err) {
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="title">${err.message}</div></div>`;
+        renderBottomNav('new');
+      }
+    }
+
+    function renderRow(r, idx, state) {
+      const labels = {
+        pending: '<span class="badge pending">รอ Manager</span>',
+        ready: '<span class="badge approved">พร้อมส่งใบเสร็จ</span>',
+        done: r.Status === 'Approved' ? statusBadge('Approved') :
+              r.Status === 'Rejected' ? statusBadge('Rejected') :
+              r.PreApproveStatus === 'Rejected' ? '<span class="badge rejected">Manager Reject</span>' :
+              statusBadge(r.Status)
+      };
+
+      const action = state === 'ready'
+        ? `<button class="btn btn-primary" style="margin-top:10px; padding:10px; font-size:13px;" onclick="openFinalize(${idx})">📤 ส่งใบเสร็จ + ยอดจริง</button>`
+        : '';
+
+      return `<div class="card" style="padding:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+          <div>
+            <div style="font-weight:700;">${r.Category} — ${r.Customer || '-'}</div>
+            <div style="font-size:11px; color:var(--gray-500);">${formatDate(r.ExpenseDate)} • ${r.Venue || '-'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:800; color:var(--brand-2);">${formatCurrency(r.PreApproveBudget)}</div>
+            <div style="font-size:10px; color:var(--gray-500);">งบ THB</div>
+          </div>
+        </div>
+        <div>${labels[state]}</div>
+        ${r.Amount > 0 ? `<div style="margin-top:8px; padding:8px; background:var(--gray-50); border-radius:8px; font-size:12px;">
+          ยอดจริง: <b>${formatCurrency(r.Amount)} THB</b>
+          ${Number(r.Amount) > Number(r.PreApproveBudget) ? '<span style="color:var(--danger);"> (เกินงบ)</span>' : '<span style="color:var(--success);"> ✓ ภายในงบ</span>'}
+        </div>` : ''}
+        ${r.PreApproveBy ? `<div style="font-size:11px; color:var(--gray-500); margin-top:4px;">อนุมัติโดย: ${r.PreApproveBy}</div>` : ''}
+        ${action}
+      </div>`;
+    }
+
+    window.openFinalize = (idx) => {
+      currentItem = myPres[idx];
+      pendingFiles = [];
+
+      document.getElementById('modalTitle').textContent = 'ส่งใบเสร็จ — ' + currentItem.Customer;
+      document.getElementById('modalContent').innerHTML = `
+        <div style="background:#FEF3C7; padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:14px;">
+          <div><b>ลูกค้า:</b> ${currentItem.Customer}</div>
+          <div><b>วันที่:</b> ${formatDate(currentItem.ExpenseDate)}</div>
+          <div><b>งบที่ approve:</b> ${formatCurrency(currentItem.PreApproveBudget)} THB</div>
+        </div>
+
+        <div class="field">
+          <label>ยอดจริง (THB) <span class="required">*</span></label>
+          <input type="number" id="actualAmount" step="0.01" min="0" placeholder="0.00" style="font-size:18px; font-weight:700;">
+          <div class="hint" id="varianceHint" style="display:none;"></div>
+        </div>
+
+        <div class="field">
+          <label>ใบเสร็จ (แนบได้หลายไฟล์) <span class="required">*</span></label>
+          <label for="receiptFiles" class="upload-area">
+            <input type="file" id="receiptFiles" accept="image/*,application/pdf" multiple>
+            <div class="icon-wrap" style="color:var(--accent);">📎</div>
+            <div class="text">แตะเพื่อแนบไฟล์</div>
+            <div class="sub">ภาพ/PDF — สูงสุด 10 ไฟล์</div>
+          </label>
+          <div id="filesList" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn btn-secondary" onclick="closeModal()" style="flex:0.4;">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="finalize()" style="flex:1;">ส่ง Final Claim</button>
+        </div>
+      `;
+
+      document.getElementById('actualAmount').addEventListener('input', e => {
+        const v = parseFloat(e.target.value) || 0;
+        const budget = parseFloat(currentItem.PreApproveBudget) || 0;
+        const hint = document.getElementById('varianceHint');
+        if (v > budget && budget > 0) {
+          const over = v - budget;
+          const pct = ((over/budget)*100).toFixed(0);
+          hint.style.display = 'block';
+          hint.innerHTML = `<span style="color:var(--danger);">⚠️ เกินงบ ${formatCurrency(over)} (${pct}%) — Manager ต้อง re-approve</span>`;
+        } else if (v > 0) {
+          hint.style.display = 'block';
+          hint.innerHTML = `<span style="color:var(--success);">✓ ภายในงบ — ส่ง Senior approve โดยตรง</span>`;
+        } else {
+          hint.style.display = 'none';
+        }
+      });
+
+      document.getElementById('receiptFiles').addEventListener('change', async e => {
+        const files = Array.from(e.target.files);
+        if (pendingFiles.length + files.length > 10) return showToast('ไฟล์เกิน 10', 'error');
+        for (const f of files) {
+          if (f.size > 5 * 1024 * 1024) { showToast(f.name + ' > 5MB', 'error'); continue; }
+          const b64 = await fileToBase64(f);
+          pendingFiles.push({ name: f.name, base64: b64 });
+        }
+        renderFilesList();
+        e.target.value = '';
+      });
+
+      document.getElementById('modal').classList.add('show');
+    };
+
+    function renderFilesList() {
+      document.getElementById('filesList').innerHTML = pendingFiles.map((f, i) =>
+        `<span style="display:inline-flex; align-items:center; gap:6px; background:var(--accent-light); color:var(--brand-2); padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; margin:4px 4px 0 0;">
+          📎 ${f.name.length > 18 ? f.name.substr(0,15)+'...' : f.name}
+          <button onclick="removeFile(${i})" style="background:none; border:none; color:var(--brand-2); cursor:pointer; padding:0 4px;">✕</button>
+        </span>`
+      ).join('');
+    }
+
+    window.removeFile = (idx) => {
+      pendingFiles.splice(idx, 1);
+      renderFilesList();
+    };
+
+    window.finalize = async () => {
+      const amount = parseFloat(document.getElementById('actualAmount').value) || 0;
+      if (amount <= 0) return showToast('ใส่ยอดจริง', 'error');
+      if (pendingFiles.length === 0) return showToast('แนบใบเสร็จ', 'error');
+
+      showLoading('กำลังส่ง Final Claim...');
+      try {
+        const result = await finalizeClaim({
+          preApproveId: currentItem.ID,
+          amount,
+          receipts: pendingFiles
+        });
+        if (result.error) throw new Error(result.error);
+        hideLoading();
+        showToast('ส่งสำเร็จ! ' + (result.status || ''), 'success');
+        closeModal();
+        load();
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    };
+
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+    if (session) load();
+  </script>
+</body>
+</html>
