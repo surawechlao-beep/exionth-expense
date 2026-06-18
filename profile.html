@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>โปรไฟล์ — Exionth Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>โปรไฟล์</h1>
+  </div>
+
+  <div class="container">
+    <!-- User Info -->
+    <div class="card card-elev" style="text-align:center;">
+      <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#B7081D,#7a0512);color:white;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:bold;margin:0 auto 16px;" id="avatar">?</div>
+      <h2 id="userName" style="margin:0 0 4px;color:var(--gray-900);">-</h2>
+      <p id="userPosition" style="margin:0 0 4px;color:var(--gray-600);">-</p>
+      <p id="userEmail" style="margin:0;color:var(--gray-500);font-size:13px;">-</p>
+      <p id="userDept" style="margin:8px 0 0;display:inline-block;background:var(--gray-100);padding:4px 12px;border-radius:12px;font-size:12px;color:var(--gray-700);">-</p>
+    </div>
+
+    <!-- Export My Report -->
+    <div class="card card-elev">
+      <h3 style="margin:0 0 12px;color:var(--gray-900);">📊 Export ใบเบิกของฉัน</h3>
+      <p style="margin:0 0 16px;color:var(--gray-600);font-size:13px;">
+        Export Excel report เฉพาะรายการที่ <b>Approved</b> แล้วในเดือนที่เลือก
+      </p>
+
+      <div class="field">
+        <label>เดือน / ปี</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <select id="exportMonth"></select>
+          <select id="exportYear"></select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="exportBtn" style="width:100%;">
+        📥 Export Excel
+      </button>
+    </div>
+
+    <!-- Account Actions -->
+    <div class="card card-elev">
+      <h3 style="margin:0 0 12px;color:var(--gray-900);">⚙️ บัญชี</h3>
+
+      <button class="btn btn-secondary" onclick="location.href='index.html'" style="width:100%;margin-bottom:8px;">
+        🔄 Reset รหัสผ่าน
+      </button>
+
+      <button class="btn btn-danger" id="logoutBtn" style="width:100%;background:#dc2626;color:white;">
+        🚪 ออกจากระบบ
+      </button>
+    </div>
+
+    <p style="text-align:center;color:var(--gray-500);font-size:12px;margin-top:16px;">
+      EXION Expense v3.4 • Exion Thailand
+    </p>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+
+    function init() {
+      document.getElementById('backBtn').innerHTML = icon('back');
+
+      // Avatar = first letter of name
+      const initial = (session.Name || '?').trim().charAt(0).toUpperCase();
+      document.getElementById('avatar').textContent = initial;
+
+      document.getElementById('userName').textContent = session.Name || '-';
+      document.getElementById('userPosition').textContent = session.Position || '-';
+      document.getElementById('userEmail').textContent = session.Email || '-';
+      document.getElementById('userDept').textContent = session.Department || '-';
+
+      // Populate month/year dropdowns
+      const monthSel = document.getElementById('exportMonth');
+      const yearSel = document.getElementById('exportYear');
+      const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                      'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      const now = new Date();
+      const curMonth = now.getMonth() + 1;
+      const curYear = now.getFullYear();
+
+      months.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = i + 1;
+        opt.textContent = m;
+        if (i + 1 === curMonth) opt.selected = true;
+        monthSel.appendChild(opt);
+      });
+
+      for (let y = curYear; y >= curYear - 3; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === curYear) opt.selected = true;
+        yearSel.appendChild(opt);
+      }
+
+      document.getElementById('exportBtn').addEventListener('click', onExport);
+      document.getElementById('logoutBtn').addEventListener('click', onLogout);
+    }
+
+    async function onExport() {
+      const year = parseInt(document.getElementById('exportYear').value);
+      const month = parseInt(document.getElementById('exportMonth').value);
+
+      const btn = document.getElementById('exportBtn');
+      btn.disabled = true;
+      btn.textContent = 'กำลัง Export...';
+      showLoading('กำลังสร้าง Excel report...');
+
+      try {
+        const result = await exportStaffReport({
+          staffEmail: session.Email,
+          year, month,
+          requesterEmail: session.Email
+        });
+        hideLoading();
+
+        if (result.error) throw new Error(result.error);
+        if (!result.ok) throw new Error('Export ไม่สำเร็จ');
+
+        showToast('Export สำเร็จ! กำลังเปิดไฟล์...', 'success');
+        setTimeout(() => window.open(result.url, '_blank'), 800);
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📥 Export Excel';
+      }
+    }
+
+    function onLogout() {
+      if (confirm('ออกจากระบบ?')) {
+        clearSession();
+        location.href = 'index.html';
+      }
+    }
+
+    if (session) {
+      init();
+      renderBottomNav('profile');
+    }
+  </script>
+</body>
+</html>
