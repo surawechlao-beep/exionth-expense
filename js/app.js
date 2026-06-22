@@ -9,12 +9,15 @@ function getSession() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; }
   catch { return null; }
 }
+
 function setSession(staff) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(staff));
 }
+
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
+
 function requireLogin() {
   const sess = getSession();
   if (!sess) {
@@ -30,6 +33,7 @@ function formatCurrency(n) {
     minimumFractionDigits: 2, maximumFractionDigits: 2
   });
 }
+
 function formatDate(d) {
   if (!d) return '-';
   const dt = new Date(d);
@@ -38,11 +42,13 @@ function formatDate(d) {
     year: 'numeric', month: 'short', day: 'numeric'
   });
 }
+
 function statusBadge(status) {
   const cls = (status || '').toLowerCase();
   const labels = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
   return `<span class="badge ${cls}">${labels[cls] || status}</span>`;
 }
+
 function showToast(msg, type = 'info') {
   const t = document.createElement('div');
   t.className = 'toast ' + (type === 'success' ? 'success' : type === 'error' ? 'error' : '');
@@ -56,159 +62,14 @@ function showToast(msg, type = 'info') {
 }
 
 /**
- * Loading overlay — prevents double-click during async operations
- */
-function showLoading(text = 'กำลังประมวลผล...') {
-  hideLoading();
-  const overlay = document.createElement('div');
-  overlay.className = 'loading-overlay';
-  overlay.id = '__loadingOverlay';
-  overlay.innerHTML = `
-    <div class="loader-card">
-      <div class="spinner" style="animation: spin 0.8s linear infinite;"></div>
-      <div class="loader-text">${text}</div>
-    </div>`;
-  document.body.appendChild(overlay);
-}
-function hideLoading() {
-  const o = document.getElementById('__loadingOverlay');
-  if (o) o.remove();
-}
-
-/**
- * Image Lightbox — fullscreen image viewer with pinch/scroll zoom
- */
-function openImageViewer(src, hint = '') {
-  closeImageViewer();
-  const lb = document.createElement('div');
-  lb.className = 'lightbox';
-  lb.id = '__lightbox';
-  lb.innerHTML = `
-    ${hint ? `<div class="lightbox-hint">${hint}</div>` : ''}
-    <button class="lightbox-close" onclick="closeImageViewer()">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-    </button>
-    <img class="lightbox-img" src="${src}" id="__lbImg">
-    <div class="lightbox-controls">
-      <button onclick="lbZoom(-1)">−</button>
-      <button onclick="lbReset()">100%</button>
-      <button onclick="lbZoom(1)">+</button>
-    </div>`;
-  document.body.appendChild(lb);
-
-  const img = document.getElementById('__lbImg');
-  let scale = 1, tx = 0, ty = 0;
-  let isDragging = false, startX, startY, startTx, startTy;
-  let lastTap = 0;
-  let initialDist = null, initialScale = 1;
-
-  function apply() {
-    img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-    img.classList.toggle('zoomed', scale > 1);
-  }
-  window.lbZoom = (dir) => {
-    scale = Math.max(0.5, Math.min(5, scale + dir * 0.3));
-    if (scale === 1) { tx = 0; ty = 0; }
-    apply();
-  };
-  window.lbReset = () => { scale = 1; tx = 0; ty = 0; apply(); };
-
-  lb.addEventListener('wheel', e => {
-    e.preventDefault();
-    lbZoom(e.deltaY < 0 ? 1 : -1);
-  }, { passive: false });
-
-  img.addEventListener('click', e => {
-    const now = Date.now();
-    if (now - lastTap < 300) {
-      scale = scale > 1 ? 1 : 2;
-      if (scale === 1) { tx = 0; ty = 0; }
-      apply();
-    }
-    lastTap = now;
-  });
-
-  img.addEventListener('touchstart', e => {
-    if (e.touches.length === 2) {
-      initialDist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      initialScale = scale;
-    } else if (e.touches.length === 1 && scale > 1) {
-      isDragging = true;
-      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-      startTx = tx; startTy = ty;
-      img.classList.add('dragging');
-    }
-  });
-  img.addEventListener('touchmove', e => {
-    if (e.touches.length === 2 && initialDist) {
-      const d = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      scale = Math.max(0.5, Math.min(5, initialScale * (d / initialDist)));
-      apply();
-      e.preventDefault();
-    } else if (isDragging && e.touches.length === 1) {
-      tx = startTx + (e.touches[0].clientX - startX);
-      ty = startTy + (e.touches[0].clientY - startY);
-      apply();
-      e.preventDefault();
-    }
-  }, { passive: false });
-  img.addEventListener('touchend', () => {
-    isDragging = false;
-    initialDist = null;
-    img.classList.remove('dragging');
-  });
-
-  img.addEventListener('mousedown', e => {
-    if (scale > 1) {
-      isDragging = true;
-      startX = e.clientX; startY = e.clientY;
-      startTx = tx; startTy = ty;
-      img.classList.add('dragging');
-      e.preventDefault();
-    }
-  });
-  document.addEventListener('mousemove', e => {
-    if (isDragging) {
-      tx = startTx + (e.clientX - startX);
-      ty = startTy + (e.clientY - startY);
-      apply();
-    }
-  });
-  document.addEventListener('mouseup', () => {
-    isDragging = false;
-    if (img) img.classList.remove('dragging');
-  });
-
-  lb.addEventListener('click', e => {
-    if (e.target === lb) closeImageViewer();
-  });
-
-  document.addEventListener('keydown', escHandler);
-  function escHandler(e) {
-    if (e.key === 'Escape') {
-      closeImageViewer();
-      document.removeEventListener('keydown', escHandler);
-    }
-  }
-}
-function closeImageViewer() {
-  const lb = document.getElementById('__lightbox');
-  if (lb) lb.remove();
-}
-
-/**
- * Render bottom navigation
+ * Render bottom navigation. Pass `active` = one of: home / new / status / inbox
+ * Shows Inbox tab only if isGM=true in session.
  */
 async function renderBottomNav(active) {
   const session = getSession();
   if (!session) return;
 
+  // Check if user is GM (cached in session, refresh in background)
   let isGM = !!session.isGM;
   if (typeof session.isGM === 'undefined') {
     try {
@@ -230,9 +91,8 @@ async function renderBottomNav(active) {
   ];
   if (isGM) {
     items.push({ key: 'inbox', href: 'inbox.html', label: 'Inbox', icon: 'bell' });
-  } else {
-    items.push({ key: 'profile', href: '#', label: 'Profile', icon: 'user' });
   }
+  items.push({ key: 'profile', href: 'profile.html', label: 'Profile', icon: 'user' });
 
   nav.innerHTML = items.map(it => `
     <a href="${it.href}" class="nav-item ${it.key === active ? 'active' : ''}">
@@ -241,6 +101,7 @@ async function renderBottomNav(active) {
     </a>`).join('');
   document.body.appendChild(nav);
 
+  // Async load badge count for GM Inbox
   if (isGM && active !== 'inbox') {
     try {
       const pending = await fetchPendingApprovals(session.Email);
@@ -256,8 +117,14 @@ async function renderBottomNav(active) {
   }
 }
 
+// Register service worker (PWA)
 /**
- * SignaturePad
+ * SignaturePad — lightweight canvas signature
+ * Usage:
+ *   const sig = new SignaturePad(canvasElement);
+ *   sig.isEmpty();           // → true/false
+ *   sig.toDataURL();         // → 'data:image/png;base64,...'
+ *   sig.clear();
  */
 class SignaturePad {
   constructor(canvas) {
@@ -276,16 +143,10 @@ class SignaturePad {
     this.ctx.scale(dpr, dpr);
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
-    this.ctx.strokeStyle = '#231F20';
+    this.ctx.strokeStyle = '#0F172A';
     this.ctx.lineWidth = 2.5;
 
-    const start = e => {
-      this.isDrawing = true;
-      const p = this._pos(e);
-      this.ctx.beginPath();
-      this.ctx.moveTo(p.x, p.y);
-      e.preventDefault();
-    };
+    const start = e => { this.isDrawing = true; const p = this._pos(e); this.ctx.beginPath(); this.ctx.moveTo(p.x, p.y); e.preventDefault(); };
     const draw = e => {
       if (!this.isDrawing) return;
       const p = this._pos(e);
@@ -322,6 +183,158 @@ class SignaturePad {
   toDataURL() {
     return this.canvas.toDataURL('image/png');
   }
+}
+
+/**
+ * Loading overlay — prevents double-click during async operations
+ */
+function showLoading(text = 'กำลังประมวลผล...') {
+  hideLoading();  // remove any existing
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay';
+  overlay.id = '__loadingOverlay';
+  overlay.innerHTML = `
+    <div class="loader-card">
+      <div class="spinner"></div>
+      <div class="loader-text">${text}</div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+function hideLoading() {
+  const o = document.getElementById('__loadingOverlay');
+  if (o) o.remove();
+}
+
+/**
+ * Image Lightbox — fullscreen image viewer with pinch/scroll zoom
+ */
+function openImageViewer(src, hint = '') {
+  const lb = document.createElement('div');
+  lb.className = 'lightbox';
+  lb.id = '__lightbox';
+  lb.innerHTML = `
+    ${hint ? `<div class="lightbox-hint">${hint}</div>` : ''}
+    <button class="lightbox-close" onclick="closeImageViewer()">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    <img class="lightbox-img" src="${src}" id="__lbImg">
+    <div class="lightbox-controls">
+      <button onclick="lbZoom(-1)">−</button>
+      <button onclick="lbReset()">100%</button>
+      <button onclick="lbZoom(1)">+</button>
+    </div>`;
+  document.body.appendChild(lb);
+
+  const img = document.getElementById('__lbImg');
+  let scale = 1, tx = 0, ty = 0;
+  let isDragging = false, startX, startY, startTx, startTy;
+  let lastTap = 0;
+  let initialDist = null, initialScale = 1;
+
+  function apply() {
+    img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    img.classList.toggle('zoomed', scale > 1);
+  }
+  window.lbZoom = (dir) => {
+    scale = Math.max(0.5, Math.min(5, scale + dir * 0.3));
+    if (scale === 1) { tx = 0; ty = 0; }
+    apply();
+  };
+  window.lbReset = () => { scale = 1; tx = 0; ty = 0; apply(); };
+
+  // Mouse wheel zoom
+  lb.addEventListener('wheel', e => {
+    e.preventDefault();
+    lbZoom(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
+  // Double click / double tap to zoom
+  img.addEventListener('click', e => {
+    const now = Date.now();
+    if (now - lastTap < 300) {
+      scale = scale > 1 ? 1 : 2;
+      if (scale === 1) { tx = 0; ty = 0; }
+      apply();
+    }
+    lastTap = now;
+  });
+
+  // Touch pinch zoom
+  img.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      initialDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      initialScale = scale;
+    } else if (e.touches.length === 1 && scale > 1) {
+      isDragging = true;
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      startTx = tx; startTy = ty;
+      img.classList.add('dragging');
+    }
+  });
+  img.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && initialDist) {
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      scale = Math.max(0.5, Math.min(5, initialScale * (d / initialDist)));
+      apply();
+      e.preventDefault();
+    } else if (isDragging && e.touches.length === 1) {
+      tx = startTx + (e.touches[0].clientX - startX);
+      ty = startTy + (e.touches[0].clientY - startY);
+      apply();
+      e.preventDefault();
+    }
+  }, { passive: false });
+  img.addEventListener('touchend', () => {
+    isDragging = false;
+    initialDist = null;
+    img.classList.remove('dragging');
+  });
+
+  // Mouse drag when zoomed
+  img.addEventListener('mousedown', e => {
+    if (scale > 1) {
+      isDragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startTx = tx; startTy = ty;
+      img.classList.add('dragging');
+      e.preventDefault();
+    }
+  });
+  document.addEventListener('mousemove', e => {
+    if (isDragging) {
+      tx = startTx + (e.clientX - startX);
+      ty = startTy + (e.clientY - startY);
+      apply();
+    }
+  });
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    if (img) img.classList.remove('dragging');
+  });
+
+  // Close on background click
+  lb.addEventListener('click', e => {
+    if (e.target === lb) closeImageViewer();
+  });
+
+  // ESC key
+  document.addEventListener('keydown', escHandler);
+  function escHandler(e) {
+    if (e.key === 'Escape') {
+      closeImageViewer();
+      document.removeEventListener('keydown', escHandler);
+    }
+  }
+}
+function closeImageViewer() {
+  const lb = document.getElementById('__lightbox');
+  if (lb) lb.remove();
 }
 
 function signaturePadHtml(id) {
