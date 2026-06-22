@@ -35,6 +35,18 @@ async function fetchCategories() { return apiGet('getCategories'); }
 async function fetchMyRequests(email) { return apiGet('getMyRequests', { email }); }
 async function fetchRequest(id) { return apiGet('getRequest', { id }); }
 async function submitExpense(payload) { return apiPost('submit', payload); }
+async function submitBatch(payload) { return apiPost('submit', payload); }
+async function submitPreApprove(payload) { return apiPost('submitPreApprove', payload); }
+async function finalizeClaim(payload) { return apiPost('finalizeClaim', payload); }
+async function managerApprove(payload) { return apiPost('managerApprove', payload); }
+async function seniorApprove(payload) { return apiPost('seniorApprove', payload); }
+async function fetchManagerInbox(email) { return apiGet('getManagerInbox', { email }); }
+async function fetchSeniorInbox(email) { return apiGet('getSeniorInbox', { email }); }
+async function fetchMyTeam(email) { return apiGet('getMyTeam', { email }); }
+async function fetchMyTeamRequests(email) { return apiGet('getMyTeamRequests', { email }); }
+async function fetchAllRequests(email) { return apiGet('getAllRequests', { email }); }
+async function fetchMyRole(email) { return apiGet('getMyRole', { email }); }
+async function fetchCustomers(email) { return apiGet('getCustomers', { email }); }
 async function approveRequest(payload) { return apiPost('approve', payload); }
 async function fetchReceiptImage(id, viewerEmail) {
   return apiPost('getReceiptImage', { id, viewerEmail });
