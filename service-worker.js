@@ -1,8 +1,8 @@
 /**
  * Service Worker for PWA offline cache
- * Strategy: Cache First for static assets, Network First for API calls
+ * Strategy: Network First for JS/HTML (always fresh) + Cache First for static assets
  */
-const CACHE_NAME = 'exionth-expense-v4';
+const CACHE_NAME = 'exionth-expense-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -48,13 +48,28 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Always go to network for API calls (Apps Script)
+  // Always go to network for API calls
   if (url.hostname.includes('script.google.com')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // Cache First for static assets
+  // ✨ Network First for JS + HTML — ensures users always get latest code
+  const isJsOrHtml = /\.(js|html)$/.test(url.pathname) || url.pathname.endsWith('/');
+  if (isJsOrHtml) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response.ok && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request).then(c => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Cache First for everything else (CSS, fonts, icons)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
