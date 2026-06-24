@@ -66,21 +66,29 @@ async function exportStaffReport(payload) {
 async function emailStaffReport(payload) {
   return apiPost('emailStaffReport', payload);
 }
-async function loginWithPassword(payload) {
-  return apiPost('login', payload);
+async function loginWithPassword(emailOrPayload, password) {
+  if (typeof emailOrPayload === 'object') return apiPost('login', emailOrPayload);
+  return apiPost('login', { email: emailOrPayload, password });
 }
 async function checkUser(email) {
   return apiGet('checkUser', { email });
 }
-async function setPassword(payload) {
-  return apiPost('setPassword', payload);
+async function setPassword(emailOrPayload, password, confirmPassword) {
+  if (typeof emailOrPayload === 'object') return apiPost('setPassword', emailOrPayload);
+  return apiPost('setPassword', { email: emailOrPayload, password, confirmPassword });
 }
-async function requestPasswordReset(payload) {
-  return apiPost('requestReset', payload);
+async function requestPasswordReset(emailOrPayload) {
+  if (typeof emailOrPayload === 'object') return apiPost('requestReset', emailOrPayload);
+  return apiPost('requestReset', { email: emailOrPayload });
 }
-async function resetPassword(payload) {
-  return apiPost('resetPassword', payload);
+async function resetPassword(emailOrPayload, token, newPassword, confirmPassword) {
+  if (typeof emailOrPayload === 'object') return apiPost('resetPassword', emailOrPayload);
+  return apiPost('resetPassword', { email: emailOrPayload, token, newPassword, confirmPassword });
 }
+
+// Aliases for backward compatibility (some pages call without 'fetch' prefix)
+async function getMyRole(email) { return apiGet('getMyRole', { email }); }
+async function fetchCustomerHistory(email) { return apiGet('getCustomers', { email }); }
 
 // --- File helpers ---
 function fileToBase64(file) {
