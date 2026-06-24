@@ -26,29 +26,26 @@
       <span style="font-size:14px; font-weight:600; margin-left:6px;">ขอเบิกใหม่</span>
     </h1>
   </div>
-
   <div class="container">
     <div class="batch-summary" id="batchSummary">
       <div style="font-size:11px; opacity:0.9; font-weight:600; text-transform:uppercase;">รายการในชุดนี้</div>
       <div style="font-size:28px; font-weight:800; letter-spacing:-0.02em;" id="batchCount">1 รายการ</div>
       <div style="font-size:13px; opacity:0.85; margin-top:2px;" id="batchTotal">รวม 0.00 THB</div>
     </div>
-
     <div id="itemsContainer"></div>
-
     <button class="add-item-btn" id="addItemBtn">➕ เพิ่มรายการ</button>
-
     <button class="btn btn-primary" id="submitBtn" style="margin-top:16px;">
       <span id="iconCheck"></span> ส่งคำขอทั้งหมด
     </button>
   </div>
-
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
+    // ⚠️ ENT/GOLF ถูกซ่อนเพราะใช้ flow Pre-Approve แยก
+    const HIDDEN_CATEGORIES = ['ENT', 'GOLF'];
     let categories = [];
     let currentFuelRate = null;
     let customerHistory = [];
@@ -59,23 +56,20 @@
       const setI = (id, n) => { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); };
       setI('backBtn', 'back');
       setI('iconCheck', 'check');
-
       try {
         const result = await fetchCategories();
-        categories = Array.isArray(result) ? result : [];
+        const all = Array.isArray(result) ? result : [];
+        categories = all.filter(c => !HIDDEN_CATEGORIES.includes(c.Code));
         if (categories.length === 0) throw new Error('ไม่มีประเภท');
       } catch (err) {
         showToast('โหลดประเภทไม่สำเร็จ: ' + err.message, 'error');
         return;
       }
-
       try {
         const ch = await fetchCustomerHistory(session.Email);
         customerHistory = Array.isArray(ch) ? ch : [];
       } catch {}
-
-      addItem();  // first row
-
+      addItem();
       document.getElementById('addItemBtn').addEventListener('click', addItem);
       document.getElementById('submitBtn').addEventListener('click', onSubmit);
     }
@@ -84,44 +78,86 @@
       itemSeq++;
       const id = 'item_' + itemSeq;
       const today = new Date().toISOString().split('T')[0];
-
-      items.push({
+      const newItem = {
         id, category: '', expenseDate: today,
         venue: '', occasion: '', attendees: '',
         amount: 0, mileageKm: 0,
         origin: '', destination: '', customer: '', customerContact: '',
         receipts: []
-      });
-
-      renderItems();
+      };
+      items.push(newItem);
+      // ✨ Append เฉพาะ card ใหม่ — ไม่ re-render ทั้งหมด
+      const container = document.getElementById('itemsContainer');
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = itemCardHtml(newItem, items.length);
+      const card = wrapper.firstElementChild;
+      container.appendChild(card);
+      attachItemListeners(newItem);
+      updateRemoveButtonVisibility();
+      updateBatchNumbers();
       updateBatchSummary();
     }
 
     function removeItem(id) {
       if (items.length === 1) return showToast('ต้องมีอย่างน้อย 1 รายการ', 'error');
-      items = items.filter(i => i.id !== id);
-      renderItems();
+      const idx = items.findIndex(i => i.id === id);
+      if (idx < 0) return;
+      items.splice(idx, 1);
+      const cards = document.querySelectorAll('#itemsContainer .item-card');
+      if (cards[idx]) cards[idx].remove();
+      updateRemoveButtonVisibility();
+      updateBatchNumbers();
       updateBatchSummary();
     }
 
-    function renderItems() {
-      const container = document.getElementById('itemsContainer');
-      container.innerHTML = items.map((it, idx) => itemCardHtml(it, idx + 1)).join('');
-
-      items.forEach(it => {
-        const sel = document.getElementById(it.id + '_cat');
-        if (sel) sel.addEventListener('change', e => onCategoryChange(it.id, e.target.value));
-        ['expenseDate','venue','occasion','attendees','amount','mileageKm','origin','destination','customer','customerContact'].forEach(field => {
-          const el = document.getElementById(it.id + '_' + field);
-          if (el) el.addEventListener('input', e => {
-            it[field] = e.target.value;
-            if (field === 'mileageKm') updateFuelPreview(it.id);
-            if (field === 'amount') updateBatchSummary();
-          });
-        });
-        const fileInput = document.getElementById(it.id + '_files');
-        if (fileInput) fileInput.addEventListener('change', e => onFilesSelected(it.id, e));
+    function updateBatchNumbers() {
+      document.querySelectorAll('#itemsContainer .item-num').forEach((el, i) => {
+        el.textContent = 'รายการ ' + (i + 1);
       });
+    }
+
+    function updateRemoveButtonVisibility() {
+      document.querySelectorAll('#itemsContainer .item-card').forEach((card, idx) => {
+        const existing = card.querySelector('.remove-item');
+        if (existing) existing.remove();
+        if (items.length > 1 && items[idx]) {
+          const btn = document.createElement('button');
+          btn.className = 'remove-item';
+          btn.type = 'button';
+          btn.textContent = '✕';
+          btn.addEventListener('click', () => removeItem(items[idx].id));
+          card.appendChild(btn);
+        }
+      });
+    }
+
+    function rerenderCard(it) {
+      const idx = items.findIndex(i => i.id === it.id);
+      if (idx < 0) return;
+      const cards = document.querySelectorAll('#itemsContainer .item-card');
+      const oldCard = cards[idx];
+      if (!oldCard) return;
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = itemCardHtml(it, idx + 1);
+      const newCard = wrapper.firstElementChild;
+      oldCard.replaceWith(newCard);
+      attachItemListeners(it);
+      updateRemoveButtonVisibility();
+    }
+
+    function attachItemListeners(it) {
+      const sel = document.getElementById(it.id + '_cat');
+      if (sel) sel.addEventListener('change', e => onCategoryChange(it.id, e.target.value));
+      ['expenseDate','venue','occasion','attendees','amount','mileageKm','origin','destination','customer','customerContact'].forEach(field => {
+        const el = document.getElementById(it.id + '_' + field);
+        if (el) el.addEventListener('input', e => {
+          it[field] = e.target.value;
+          if (field === 'mileageKm') updateFuelPreview(it.id);
+          if (field === 'amount') updateBatchSummary();
+        });
+      });
+      const fileInput = document.getElementById(it.id + '_files');
+      if (fileInput) fileInput.addEventListener('change', e => onFilesSelected(it.id, e));
     }
 
     function itemCardHtml(it, num) {
@@ -131,11 +167,8 @@
       const isEnt = cat && cat.NeedClaimForm === 'YES';
       const needReceipt = cat && cat.NeedReceipt === 'YES';
       const needTravel = cat && cat.NeedTravelInfo === 'YES';
-
       return `<div class="item-card">
         <span class="item-num">รายการ ${num}</span>
-        ${items.length > 1 ? `<button class="remove-item" onclick="removeItem('${it.id}')">✕</button>` : ''}
-
         <div class="field" style="margin-top:8px;">
           <label>ประเภท <span class="required">*</span></label>
           <select id="${it.id}_cat">
@@ -144,19 +177,16 @@
           </select>
           <div class="hint">${cat ? cat.Notes || '' : ''}</div>
         </div>
-
         <div class="field">
           <label>วันที่ <span class="required">*</span></label>
           <input type="date" id="${it.id}_expenseDate" value="${it.expenseDate}">
         </div>
-
         ${isFuel ? `
         <div class="field">
           <label>กิโลเมตร <span class="required">*</span></label>
           <input type="number" id="${it.id}_mileageKm" step="0.1" min="0" value="${it.mileageKm || ''}" placeholder="เช่น 45.5">
           <div class="hint">คำนวณ: <b id="${it.id}_fuelPreview">0 THB</b></div>
         </div>` : ''}
-
         ${isEnt ? `
         <div class="field">
           <label>สถานที่ <span class="required">*</span></label>
@@ -170,7 +200,6 @@
           <label>ผู้ร่วม <span class="required">*</span></label>
           <textarea id="${it.id}_attendees" placeholder="ชื่อ + บริษัท">${it.attendees}</textarea>
         </div>` : ''}
-
         ${needTravel ? `
         <div class="field">
           <label>ต้นทาง</label>
@@ -188,19 +217,16 @@
           <label>ผู้ติดต่อ</label>
           <input type="text" id="${it.id}_customerContact" value="${it.customerContact}" placeholder="ชื่อ ตำแหน่ง">
         </div>` : ''}
-
         ${(!isFuel && !isEnt) ? `
         <div class="field">
           <label>รายละเอียด</label>
           <input type="text" id="${it.id}_venue" value="${it.venue}" placeholder="เช่น ค่าทางด่วน">
         </div>` : ''}
-
         ${!isFuel ? `
         <div class="field">
           <label>จำนวนเงิน (THB) <span class="required">*</span></label>
           <input type="number" id="${it.id}_amount" step="0.01" min="0" value="${it.amount || ''}" placeholder="0.00">
         </div>` : ''}
-
         ${needReceipt ? `
         <div class="field">
           <label>ใบเสร็จ (แนบได้หลายไฟล์) <span class="required">*</span></label>
@@ -227,13 +253,13 @@
       if (!it) return;
       const files = Array.from(e.target.files);
       if (it.receipts.length + files.length > 10) return showToast('ไฟล์เกิน 10', 'error');
-
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) { showToast(file.name + ' > 5MB', 'error'); continue; }
         const base64 = await fileToBase64(file);
         it.receipts.push({ name: file.name, base64 });
       }
-      document.getElementById(itemId + '_filesList').innerHTML = renderFileChips(it);
+      const list = document.getElementById(itemId + '_filesList');
+      if (list) list.innerHTML = renderFileChips(it);
       e.target.value = '';
     }
 
@@ -241,7 +267,8 @@
       const it = items.find(i => i.id === itemId);
       if (!it) return;
       it.receipts.splice(idx, 1);
-      document.getElementById(itemId + '_filesList').innerHTML = renderFileChips(it);
+      const list = document.getElementById(itemId + '_filesList');
+      if (list) list.innerHTML = renderFileChips(it);
     };
 
     async function onCategoryChange(itemId, code) {
@@ -253,7 +280,8 @@
           currentFuelRate = await fetchFuelRate(session.Email);
         } catch {}
       }
-      renderItems();
+      // ✨ Re-render เฉพาะ card นี้ ไม่ทั้งหมด
+      rerenderCard(it);
       updateBatchSummary();
     }
 
@@ -275,7 +303,6 @@
     }
 
     async function onSubmit() {
-      // Validate
       for (const it of items) {
         if (!it.category) return showToast('เลือกประเภทให้ครบ', 'error');
         if (!it.expenseDate) return showToast('ใส่วันที่ให้ครบ', 'error');
@@ -287,12 +314,10 @@
         if (isEnt && (!it.venue || !it.occasion || !it.attendees)) return showToast('กรอกข้อมูลรับรองให้ครบ', 'error');
         if (cat.NeedReceipt === 'YES' && it.receipts.length === 0) return showToast('แนบใบเสร็จ', 'error');
       }
-
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังส่ง...';
       showLoading('กำลังส่งคำขอ ' + items.length + ' รายการ...');
-
       try {
         const payload = {
           staffEmail: session.Email,
@@ -326,7 +351,6 @@
 
     if (session) { init(); renderBottomNav('new'); }
   </script>
-
   <datalist id="customerList"></datalist>
 </body>
 </html>
