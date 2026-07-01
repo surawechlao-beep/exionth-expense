@@ -130,8 +130,26 @@
         if (result.error) throw new Error(result.error);
         if (!result.ok) throw new Error('Export ไม่สำเร็จ');
 
-        showToast('Export สำเร็จ! กำลังเปิดไฟล์...', 'success');
-        setTimeout(() => window.open(result.url, '_blank'), 800);
+        // ✨ Download ตรง ไม่ผ่าน Drive (แก้ปัญหา permission + popup blocked)
+        if (result.base64) {
+          const bytes = atob(result.base64);
+          const arr = new Uint8Array(bytes.length);
+          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+          const blob = new Blob([arr], { type: result.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = result.filename || 'expense_report.xlsx';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          showToast('Download สำเร็จ ✅', 'success');
+        } else if (result.url || result.driveUrl) {
+          // Fallback (server เก่า)
+          showToast('Export สำเร็จ! กำลังเปิดไฟล์...', 'success');
+          window.location.href = result.url || result.driveUrl;
+        }
       } catch (err) {
         hideLoading();
         showToast(err.message, 'error');
