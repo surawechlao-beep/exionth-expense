@@ -90,6 +90,14 @@ async function resetPassword(emailOrPayload, token, newPassword, confirmPassword
 async function getMyRole(email) { return apiGet('getMyRole', { email }); }
 async function fetchCustomerHistory(email) { return apiGet('getCustomers', { email }); }
 
+// ✨ Signature — save once, use everywhere
+async function saveSignature(email, signatureBase64) {
+  return apiPost('saveSignature', { email, signatureBase64 });
+}
+async function getMySignature(email) {
+  return apiGet('getMySignature', { email });
+}
+
 // --- File helpers ---
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
