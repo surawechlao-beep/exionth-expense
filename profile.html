@@ -44,6 +44,29 @@
       </button>
     </div>
 
+    <!-- ✨ My Signature -->
+    <div class="card card-elev">
+      <h3 style="margin:0 0 12px;color:var(--gray-900);">✍️ ลายเซ็นของฉัน</h3>
+      <p style="margin:0 0 16px;color:var(--gray-600);font-size:13px;">
+        เซ็นชื่อ 1 ครั้ง — เวลา Approve คำขอจะใช้ลายเซ็นนี้อัตโนมัติ ไม่ต้องเซ็นทุกครั้ง
+      </p>
+
+      <div id="currentSigWrap" style="text-align:center;margin-bottom:16px;display:none;">
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px;">ลายเซ็นปัจจุบัน:</div>
+        <img id="currentSig" style="max-width:280px;max-height:120px;border:1px solid var(--gray-300);border-radius:8px;background:white;padding:8px;">
+      </div>
+
+      <div style="position:relative;margin-bottom:12px;">
+        <canvas id="sigCanvas" style="width:100%;height:150px;background:white;border:2px dashed var(--gray-400);border-radius:12px;touch-action:none;"></canvas>
+        <span id="sigPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--gray-400);font-size:14px;pointer-events:none;">✍️ เซ็นที่นี่ด้วยนิ้ว/เมาส์</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button class="btn btn-secondary" id="clearSigBtn">🗑 ล้าง</button>
+        <button class="btn btn-primary" id="saveSigBtn">💾 บันทึกลายเซ็น</button>
+      </div>
+    </div>
+
     <!-- Account Actions -->
     <div class="card card-elev">
       <h3 style="margin:0 0 12px;color:var(--gray-900);">⚙️ บัญชี</h3>
@@ -166,9 +189,111 @@
       }
     }
 
+    // ✨ Signature Pad
+    let sigPad = null;
+
+    async function initSignature() {
+      const canvas = document.getElementById('sigCanvas');
+      if (!canvas) return;
+
+      // Load current saved signature
+      try {
+        const r = await getMySignature(session.Email);
+        if (r && r.hasSignature && r.dataUrl) {
+          document.getElementById('currentSig').src = r.dataUrl;
+          document.getElementById('currentSigWrap').style.display = 'block';
+        }
+      } catch {}
+
+      // Setup canvas drawing
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#0F172A';
+      ctx.lineWidth = 2.5;
+
+      let drawing = false;
+      let empty = true;
+      const placeholder = document.getElementById('sigPlaceholder');
+
+      function getPos(e) {
+        const r = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+        return { x, y };
+      }
+
+      function start(e) {
+        drawing = true;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        e.preventDefault();
+      }
+      function draw(e) {
+        if (!drawing) return;
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        empty = false;
+        placeholder.style.display = 'none';
+        e.preventDefault();
+      }
+      function end() { drawing = false; }
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseout', end);
+      canvas.addEventListener('touchstart', start);
+      canvas.addEventListener('touchmove', draw);
+      canvas.addEventListener('touchend', end);
+
+      sigPad = {
+        isEmpty: () => empty,
+        clear: () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          empty = true;
+          placeholder.style.display = 'block';
+        },
+        toDataURL: () => canvas.toDataURL('image/png')
+      };
+
+      document.getElementById('clearSigBtn').addEventListener('click', () => sigPad.clear());
+      document.getElementById('saveSigBtn').addEventListener('click', onSaveSignature);
+    }
+
+    async function onSaveSignature() {
+      if (!sigPad || sigPad.isEmpty()) return showToast('กรุณาเซ็นก่อน', 'error');
+      const base64 = sigPad.toDataURL();
+      const btn = document.getElementById('saveSigBtn');
+      btn.disabled = true;
+      showLoading('กำลังบันทึกลายเซ็น...');
+      try {
+        const r = await saveSignature(session.Email, base64);
+        hideLoading();
+        if (r && r.error) throw new Error(r.error);
+        showToast('บันทึกลายเซ็นสำเร็จ ✅', 'success');
+        document.getElementById('currentSig').src = base64;
+        document.getElementById('currentSigWrap').style.display = 'block';
+        sigPad.clear();
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     if (session) {
       init();
       renderBottomNav('profile');
+      initSignature();
     }
   </script>
 </body>
