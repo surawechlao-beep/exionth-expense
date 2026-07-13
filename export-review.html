@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ตรวจสอบและอนุมัติ Export — EXION Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+  <style>
+    .summary-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0; }
+    .summary-item { background:#f9fafb;padding:12px;border-radius:12px;text-align:center; }
+    .summary-item .label { font-size:11px;color:var(--gray-500);text-transform:uppercase; }
+    .summary-item .value { font-size:20px;font-weight:800;color:var(--gray-900);margin-top:4px; }
+    .items-table { width:100%;border-collapse:collapse;font-size:12px;margin-top:12px; }
+    .items-table th, .items-table td { padding:8px;border-bottom:1px solid var(--gray-200);text-align:left; }
+    .items-table th { background:#f9fafb;font-weight:700;font-size:11px;color:var(--gray-600);text-transform:uppercase; }
+    .items-table tr.total { background:#fef3c7;font-weight:800; }
+    .status-pill { display:inline-block; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; }
+    .status-pending { background:#fef3c7; color:#92400e; }
+    .status-approved { background:#dcfce7; color:#166534; }
+    .status-rejected { background:#fee2e2; color:#991b1b; }
+    .approver-chain { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
+    .approver-step { flex:1; min-width:80px; text-align:center; padding:8px; border-radius:8px; background:#f3f4f6; font-size:11px; }
+    .approver-step.done { background:#dcfce7; color:#166534; }
+    .approver-step.current { background:#fef3c7; color:#92400e; font-weight:700; }
+    .approver-step.rejected { background:#fee2e2; color:#991b1b; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="history.back()" id="backBtn"></button>
+    <h1>ตรวจสอบ Export</h1>
+  </div>
+
+  <div class="container">
+    <div id="content" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    document.getElementById('backBtn').innerHTML = icon('back');
+    const params = new URLSearchParams(location.search);
+    const exportId = params.get('id');
+    let detail = null;
+
+    async function load() {
+      if (!exportId) {
+        document.getElementById('content').innerHTML = '<div class="empty"><div class="title">❌ Missing ID</div></div>';
+        return;
+      }
+      try {
+        detail = await apiGet('getExportRequestDetail', { id: exportId, viewerEmail: session.Email });
+        if (detail.error) throw new Error(detail.error);
+        render();
+      } catch (err) {
+        document.getElementById('content').innerHTML = `<div class="empty"><div class="title">เกิดข้อผิดพลาด</div><div class="sub">${err.message}</div></div>`;
+      }
+    }
+
+    function render() {
+      const req = detail.request;
+      const me = session.Email.toLowerCase();
+
+      // Determine current stage + whether current user can approve
+      let currentStage = null;
+      if (req.ManagerStatus === 'Pending') currentStage = 'Manager';
+      else if (req.SeniorStatus === 'Pending') currentStage = 'Senior';
+      else if (req.GMStatus === 'Pending') currentStage = 'GM';
+
+      const canApprove = (currentStage === 'Manager' && String(req.ManagerEmail || '').toLowerCase() === me) ||
+                        (currentStage === 'Senior' && String(req.SeniorEmail || '').toLowerCase() === me) ||
+                        (currentStage === 'GM' && String(req.GMEmail || '').toLowerCase() === me);
+
+      // Chain
+      const stages = [
+        { name: 'Manager', email: req.ManagerEmail, status: req.ManagerStatus, at: req.ManagerAt, remark: req.ManagerRemark },
+        { name: 'Senior', email: req.SeniorEmail, status: req.SeniorStatus, at: req.SeniorAt, remark: req.SeniorRemark },
+        { name: 'GM', email: req.GMEmail, status: req.GMStatus, at: req.GMAt, remark: req.GMRemark }
+      ];
+      const chainHtml = stages.filter(s => s.email).map(s => {
+        let cls = '';
+        if (s.status === 'Approved') cls = 'done';
+        else if (s.status === 'Rejected') cls = 'rejected';
+        else if (s.status === 'Pending') cls = 'current';
+        return `<div class="approver-step ${cls}">
+          <div style="font-size:10px;">${s.name}</div>
+          <div style="font-weight:700;margin-top:2px;">${s.email.split('@')[0]}</div>
+          <div style="margin-top:4px;">${s.status === 'Approved' ? '✅' : s.status === 'Rejected' ? '❌' : s.status === 'Pending' ? '⏳' : '⏸'}</div>
+        </div>`;
+      }).join('');
+
+      // Items table
+      const itemsHtml = detail.items.map((r, i) => {
+        const date = r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('th-TH', { day:'numeric', month:'short' }) : '-';
+        return `<tr>
+          <td>${i+1}</td>
+          <td>${date}</td>
+          <td>${r.Category}</td>
+          <td>${r.Customer || '-'}</td>
+          <td>${r.Venue || r.Occasion || '-'}</td>
+          <td style="text-align:right;font-weight:600;">${Number(r.Amount).toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+
+      // Status badge
+      let statusBadge = '';
+      if (req.OverallStatus === 'Approved') statusBadge = '<span class="status-pill status-approved">✅ Approved</span>';
+      else if (req.OverallStatus === 'Rejected') statusBadge = '<span class="status-pill status-rejected">❌ Rejected</span>';
+      else statusBadge = '<span class="status-pill status-pending">⏳ Pending — รอ ' + (currentStage || '') + '</span>';
+
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+      c.innerHTML = `
+        <div class="card card-elev">
+          <div style="text-align:center;">
+            ${statusBadge}
+            <h2 style="margin:12px 0 4px;">${req.StaffName}</h2>
+            <p style="margin:0;color:var(--gray-600);font-size:14px;">เดือน ${req.Month}/${req.Year}</p>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-item"><div class="label">รายการ</div><div class="value">${req.ItemCount}</div></div>
+            <div class="summary-item"><div class="label">รวม THB</div><div class="value" style="color:#B7081D;">${Number(req.TotalAmount).toLocaleString()}</div></div>
+            <div class="summary-item"><div class="label">Requested</div><div class="value" style="font-size:11px;">${new Date(req.RequestedAt).toLocaleDateString('th-TH')}</div></div>
+          </div>
+          <div class="approver-chain">${chainHtml}</div>
+        </div>
+
+        <div class="card card-elev">
+          <h3 style="margin:0 0 12px;">📋 รายการทั้งหมด</h3>
+          <div style="overflow-x:auto;">
+            <table class="items-table">
+              <thead><tr><th>#</th><th>วันที่</th><th>ประเภท</th><th>Customer</th><th>รายละเอียด</th><th style="text-align:right;">THB</th></tr></thead>
+              <tbody>${itemsHtml}<tr class="total"><td colspan="5" style="text-align:right;">รวม</td><td style="text-align:right;">${Number(req.TotalAmount).toLocaleString()}</td></tr></tbody>
+            </table>
+          </div>
+          <button class="btn btn-secondary" onclick="downloadDraft()" style="width:100%;margin-top:12px;">👀 Download Draft (มี Watermark)</button>
+        </div>
+
+        ${canApprove ? `
+        <div class="card card-elev" style="border:2px solid #B7081D;">
+          <h3 style="margin:0 0 12px;color:#B7081D;">✅ คุณคือ ${currentStage} — กรุณาตรวจสอบและอนุมัติ</h3>
+          <div class="field">
+            <label>หมายเหตุ (ถ้ามี)</label>
+            <textarea id="remarkInput" placeholder="ระบุเหตุผลถ้าไม่อนุมัติ..." rows="2"></textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button class="btn" onclick="decide('Rejected')" style="background:#dc2626;color:white;">❌ Reject</button>
+            <button class="btn btn-primary" onclick="decide('Approved')">✅ Approve</button>
+          </div>
+          <p style="margin:12px 0 0;font-size:11px;color:var(--gray-500);text-align:center;">💡 ระบบใช้ลายเซ็นที่บันทึกไว้ใน Profile อัตโนมัติ</p>
+        </div>
+        ` : (req.OverallStatus === 'Pending' ? `
+        <div class="card">
+          <p style="text-align:center;color:var(--gray-500);">⏳ รอ ${currentStage} คนอื่นอนุมัติ</p>
+        </div>` : '')}
+      `;
+    }
+
+    async function decide(decision) {
+      const remark = document.getElementById('remarkInput').value.trim();
+      if (decision === 'Rejected' && !remark) return showToast('กรุณาระบุเหตุผล', 'error');
+      if (!confirm(decision === 'Approved' ? 'อนุมัติ Export นี้?' : 'ปฏิเสธ Export นี้?')) return;
+      showLoading('กำลังบันทึก...');
+      try {
+        const r = await apiPost('approveExportRequest', {
+          id: exportId, decision, approverEmail: session.Email, remark
+        });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast(decision === 'Approved' ? 'อนุมัติเรียบร้อย ✅' : 'ปฏิเสธเรียบร้อย', 'success');
+        setTimeout(() => location.reload(), 1000);
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function downloadDraft() {
+      const req = detail.request;
+      showLoading('กำลังสร้าง Draft...');
+      try {
+        const r = await apiPost('downloadDraftExport', {
+          staffEmail: req.StaffEmail, year: req.Year, month: req.Month, requesterEmail: session.Email
+        });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        const bytes = atob(r.base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: r.mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = r.filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast('Download Draft สำเร็จ ✅', 'success');
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'error');
+      }
+    }
+
+    if (session) load();
+  </script>
+</body>
+</html>
