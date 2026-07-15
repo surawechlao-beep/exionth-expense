@@ -16,7 +16,6 @@
       <span style="font-size:14px; font-weight:600; margin-left:6px;">ขอ Pre-Approve</span>
     </h1>
   </div>
-
   <div class="container">
     <div class="card" style="background:#FEF3C7; border:1px solid #F59E0B; padding:14px;">
       <h2 style="color:#92400E;">📋 Pre-Approve</h2>
@@ -27,7 +26,6 @@
         หลังจ่ายเงินจริง → กลับมาส่งใบเสร็จในหน้า "Pre-Approves ของฉัน"
       </p>
     </div>
-
     <div class="card card-elev">
       <div class="field">
         <label>ประเภท <span class="required">*</span></label>
@@ -37,64 +35,64 @@
           <option value="GOLF">ค่ารับรอง (กอล์ฟ) — Golf</option>
         </select>
       </div>
-
       <div class="field">
         <label>วันที่นัด/วางแผนเลี้ยง <span class="required">*</span></label>
         <input type="date" id="expenseDate" required>
       </div>
-
       <div class="field">
         <label>สถานที่ <span class="required">*</span></label>
         <input type="text" id="venue" placeholder="ชื่อร้าน/สถานที่">
       </div>
 
+      <!-- ✨ NEW: Customer Type Selector -->
       <div class="field">
-        <label>ลูกค้า <span class="required">*</span></label>
-        <input type="text" id="customer" placeholder="ชื่อบริษัท" list="customerList">
+        <label>ประเภทลูกค้า <span class="required">*</span></label>
+        <select id="customerType" required>
+          <option value="">— เลือก —</option>
+          <option value="Customer">👤 Customer (ลูกค้า)</option>
+          <option value="Principle">🏢 Principle (ตัวแทน brand)</option>
+          <option value="Other Customer">👥 Other Customer</option>
+          <option value="Other Principle">🏛️ Other Principle</option>
+        </select>
       </div>
 
+      <div class="field">
+        <label>ชื่อลูกค้า / Principle <span class="required">*</span></label>
+        <input type="text" id="customer" placeholder="ชื่อบริษัท" list="customerList">
+      </div>
       <div class="field">
         <label>ผู้ติดต่อ</label>
         <input type="text" id="customerContact" placeholder="ชื่อ ตำแหน่ง">
       </div>
-
       <div class="field">
         <label>โอกาส/วัตถุประสงค์ <span class="required">*</span></label>
         <textarea id="occasion" placeholder="เช่น พบเพื่อ Demo โครงการ Q3"></textarea>
       </div>
-
       <div class="field">
         <label>ผู้ร่วม (คาดการณ์)</label>
         <textarea id="attendees" placeholder="ระบุชื่อ + บริษัท"></textarea>
       </div>
-
       <div class="field" style="background:#FEE2E2; border:1.5px solid #EF4444; border-radius:12px; padding:14px;">
         <label style="color:#991B1B;">งบประมาณคาดการณ์ (THB) <span class="required">*</span></label>
         <input type="number" id="budget" step="0.01" min="0" placeholder="0.00" style="font-size:18px; font-weight:700;">
         <div class="hint" style="color:#991B1B;">⚠️ ถ้ายอดจริงเกินงบ → Manager ต้อง re-approve อีกรอบ</div>
       </div>
-
       <button class="btn btn-primary" id="submitBtn" style="margin-top:8px;">
         📋 ส่งขอ Pre-Approve
       </button>
     </div>
   </div>
-
   <datalist id="customerList"></datalist>
-
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-
     async function init() {
       const setI = (id, n) => { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); };
       setI('backBtn', 'back');
-
       document.getElementById('expenseDate').value = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
       try {
         const customers = await fetchCustomerHistory(session.Email);
         const dl = document.getElementById('customerList');
@@ -104,32 +102,33 @@
           dl.appendChild(o);
         });
       } catch {}
-
       document.getElementById('submitBtn').addEventListener('click', onSubmit);
     }
-
     async function onSubmit() {
       const category = document.getElementById('category').value;
       const expenseDate = document.getElementById('expenseDate').value;
       const venue = document.getElementById('venue').value.trim();
-      const customer = document.getElementById('customer').value.trim();
+      const customerType = document.getElementById('customerType').value;  // ✨ NEW
+      const customerName = document.getElementById('customer').value.trim();
       const occasion = document.getElementById('occasion').value.trim();
       const budget = parseFloat(document.getElementById('budget').value) || 0;
       const customerContact = document.getElementById('customerContact').value.trim();
       const attendees = document.getElementById('attendees').value.trim();
-
       if (!category) return showToast('เลือกประเภท', 'error');
       if (!expenseDate) return showToast('ใส่วันที่', 'error');
       if (!venue) return showToast('ใส่สถานที่', 'error');
-      if (!customer) return showToast('ใส่ชื่อลูกค้า', 'error');
+      if (!customerType) return showToast('เลือกประเภทลูกค้า', 'error');  // ✨ NEW
+      if (!customerName) return showToast('ใส่ชื่อลูกค้า', 'error');
       if (!occasion) return showToast('ใส่โอกาส', 'error');
       if (budget <= 0) return showToast('ใส่งบประมาณ', 'error');
+
+      // ✨ Prefix customer with type: "[Customer] ABC Co." / "[Principle] XYZ Corp"
+      const customer = '[' + customerType + '] ' + customerName;
 
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังส่ง...';
       showLoading('กำลังส่ง Pre-Approve...');
-
       try {
         const result = await submitPreApprove({
           staffEmail: session.Email,
@@ -147,7 +146,6 @@
         btn.innerHTML = '📋 ส่งขอ Pre-Approve';
       }
     }
-
     if (session) { init(); renderBottomNav('new'); }
   </script>
 </body>
