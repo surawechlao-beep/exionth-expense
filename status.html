@@ -3,32 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>คำขอของฉัน — Exionth Expense</title>
+  <title>คำขอของฉัน — EXION Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
+  <style>
+    .filter-card { background:white; padding:12px; border-radius:12px; margin-bottom:12px; border:1px solid var(--gray-200); }
+    .filter-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+    .filter-grid select, .filter-grid input { padding:8px; border:1px solid var(--gray-300); border-radius:8px; font-size:13px; width:100%; }
+    .summary-row { display:flex; gap:8px; margin-bottom:12px; }
+    .summary-cell { flex:1; background:linear-gradient(135deg,#B7081D,#7a0512); color:white; padding:10px; border-radius:10px; text-align:center; }
+    .summary-cell .value { font-size:18px; font-weight:800; }
+    .summary-cell .label { font-size:10px; opacity:0.9; }
+    .req-item { background:white; border:1px solid var(--gray-200); border-radius:12px; padding:12px; margin-bottom:8px; }
+    .req-head { display:flex; align-items:center; gap:10px; }
+    .req-head .cat { font-weight:700; }
+    .req-head .amount { margin-left:auto; font-weight:800; color:#B7081D; }
+    .req-meta { font-size:12px; color:var(--gray-600); margin-top:4px; }
+    .req-actions { display:flex; gap:6px; margin-top:8px; }
+    .req-actions button { flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid var(--gray-300); background:white; cursor:pointer; }
+    .req-actions .edit { color:#0891b2; border-color:#0891b2; }
+    .req-actions .del { color:#dc2626; border-color:#dc2626; }
+    .req-actions .view { color:var(--gray-700); }
+    .badge-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; }
+    .badge-pending { background:#fef3c7; color:#92400e; }
+    .badge-approved { background:#dcfce7; color:#166534; }
+    .badge-rejected { background:#fee2e2; color:#991b1b; }
+    .badge-preapprove { background:#e0e7ff; color:#3730a3; }
+  </style>
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>
-      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
-      <span style="font-size:14px; font-weight:600; margin-left:6px;">คำขอของฉัน</span>
-    </h1>
+    <h1>คำขอของฉัน</h1>
   </div>
 
   <div class="container">
+    <!-- Filter -->
+    <div class="filter-card">
+      <div class="filter-grid">
+        <div>
+          <label style="font-size:11px;color:var(--gray-600);">ตั้งแต่วันที่</label>
+          <input type="date" id="dateFrom">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--gray-600);">ถึงวันที่</label>
+          <input type="date" id="dateTo">
+        </div>
+      </div>
+      <div class="filter-grid">
+        <div>
+          <label style="font-size:11px;color:var(--gray-600);">ประเภท</label>
+          <select id="filterCat"><option value="">ทั้งหมด</option></select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--gray-600);">สถานะ</label>
+          <select id="filterStatus">
+            <option value="">ทั้งหมด</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="PreApprove">PreApprove</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-secondary" onclick="clearFilters()" style="flex:1;padding:8px;font-size:12px;">🗑 Clear</button>
+        <button class="btn btn-primary" onclick="applyFilters()" style="flex:1;padding:8px;font-size:12px;">🔍 Filter</button>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-row" id="summaryRow" style="display:none;"></div>
+
+    <!-- List -->
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
 
-  <!-- Detail modal -->
-  <div id="modal" class="modal">
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
     <div class="modal-content">
       <div class="modal-head">
-        <h3 id="modalTitle">รายละเอียดคำขอ</h3>
-        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+        <h3>✏️ แก้ไขคำขอ</h3>
+        <button class="modal-close" onclick="closeEdit()">✕</button>
       </div>
-      <div id="modalContent"></div>
+      <div id="editContent"></div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="detailTitle">รายละเอียด</h3>
+        <button class="modal-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div id="detailContent"></div>
     </div>
   </div>
 
@@ -38,131 +108,193 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    let cache = [];
+    let allReqs = [];
+    let categories = [];
+    let filteredReqs = [];
 
     async function load() {
       document.getElementById('backBtn').innerHTML = icon('back');
-      document.getElementById('closeBtn').innerHTML = icon('x');
-
       try {
-        cache = await fetchMyRequests(session.Email);
-        const list = document.getElementById('list');
-        list.classList.remove('loading');
+        const [reqs, cats] = await Promise.all([
+          fetchMyRequests(session.Email),
+          fetchCategories()
+        ]);
+        allReqs = Array.isArray(reqs) ? reqs : [];
+        categories = Array.isArray(cats) ? cats : [];
 
-        if (!cache || cache.length === 0) {
-          list.innerHTML = `
-            <div class="empty">
-              <div class="icon-wrap">${icon('inbox')}</div>
-              <div class="title">ยังไม่มีคำขอ</div>
-              <div class="sub">กดด้านล่างเพื่อสร้างคำขอแรก</div>
-              <div style="margin-top:16px;"><a href="submit.html">+ ขอเบิกใหม่</a></div>
-            </div>`;
-          return;
-        }
-
-        // Group by month
-        const byMonth = {};
-        cache.forEach((r, idx) => {
-          const d = new Date(r.ExpenseDate || r.Timestamp);
-          const key = d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
-          if (!byMonth[key]) byMonth[key] = [];
-          byMonth[key].push({...r, _idx: idx});
+        // Populate category filter
+        const catSel = document.getElementById('filterCat');
+        categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.Code; opt.textContent = c.NameTH || c.Code;
+          catSel.appendChild(opt);
         });
 
-        let html = '';
-        Object.entries(byMonth).forEach(([month, reqs]) => {
-          html += `<h2 style="font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">${month}</h2>`;
-          reqs.forEach(r => {
-            html += `
-              <div class="request-item" onclick="showDetail(${r._idx})">
-                <div class="cat-icon">${categoryIcon(r.Category)}</div>
-                <div class="info">
-                  <div class="title">${r.Category}</div>
-                  <div class="meta">${formatDate(r.ExpenseDate || r.Timestamp)}${r.Venue ? ' • ' + r.Venue : ''}</div>
-                </div>
-                <div class="right">
-                  <div class="amount">${formatCurrency(r.Amount)}</div>
-                  ${statusBadge(r.Status)}
-                </div>
-              </div>`;
-          });
-        });
-        list.innerHTML = html;
+        applyFilters();
       } catch (err) {
-        document.getElementById('list').innerHTML =
-          `<div class="empty"><div class="title">เกิดข้อผิดพลาด</div><div class="sub">${err.message}</div></div>`;
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
       }
     }
 
-    function showDetail(idx) {
-      const r = cache[idx];
-      document.getElementById('modalTitle').textContent = r.Category;
-      const rows = [
-        ['Request ID', r.ID],
-        ['วันที่', formatDate(r.ExpenseDate)],
-        ['สถานที่', r.Venue || '-'],
-        ['โอกาส', r.Occasion || '-'],
-        ['ผู้ร่วม', r.Attendees || '-']
-      ];
-      let html = `
-        <div class="detail-row">
-          <div class="key">จำนวนเงิน</div>
-          <div class="val big">${formatCurrency(r.Amount)} <span style="font-size:13px; color:var(--gray-500); font-weight:600;">THB</span></div>
+    function applyFilters() {
+      const from = document.getElementById('dateFrom').value;
+      const to = document.getElementById('dateTo').value;
+      const cat = document.getElementById('filterCat').value;
+      const status = document.getElementById('filterStatus').value;
+
+      filteredReqs = allReqs.filter(r => {
+        const d = r.ExpenseDate || r.Timestamp;
+        if (!d) return false;
+        const rd = new Date(d);
+        if (from && rd < new Date(from)) return false;
+        if (to) { const t = new Date(to); t.setHours(23,59,59,999); if (rd > t) return false; }
+        if (cat && r.Category !== cat) return false;
+        if (status && r.Status !== status) return false;
+        return true;
+      });
+      renderList();
+    }
+
+    function clearFilters() {
+      document.getElementById('dateFrom').value = '';
+      document.getElementById('dateTo').value = '';
+      document.getElementById('filterCat').value = '';
+      document.getElementById('filterStatus').value = '';
+      applyFilters();
+    }
+
+    function renderList() {
+      const list = document.getElementById('list');
+      list.classList.remove('loading');
+      const summary = document.getElementById('summaryRow');
+
+      if (filteredReqs.length === 0) {
+        list.innerHTML = `<div class="empty"><div class="title">ยังไม่มีคำขอ</div><div class="sub">ลอง clear filter ดู</div></div>`;
+        summary.style.display = 'none';
+        return;
+      }
+
+      // Summary
+      const total = filteredReqs.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+      const pending = filteredReqs.filter(r => r.Status === 'Pending').length;
+      const approved = filteredReqs.filter(r => r.Status === 'Approved').length;
+      summary.style.display = 'flex';
+      summary.innerHTML = `
+        <div class="summary-cell"><div class="value">${filteredReqs.length}</div><div class="label">รายการ</div></div>
+        <div class="summary-cell" style="background:linear-gradient(135deg,#f59e0b,#d97706);"><div class="value">${pending}</div><div class="label">รอ</div></div>
+        <div class="summary-cell" style="background:linear-gradient(135deg,#16a34a,#15803d);"><div class="value">${approved}</div><div class="label">อนุมัติ</div></div>
+        <div class="summary-cell" style="background:linear-gradient(135deg,#7a0512,#450a0a);"><div class="value">${Math.round(total).toLocaleString()}</div><div class="label">THB</div></div>
+      `;
+
+      // Group by month
+      const byMonth = {};
+      filteredReqs.forEach((r, idx) => {
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        const key = d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
+        if (!byMonth[key]) byMonth[key] = [];
+        byMonth[key].push({...r, _idx: idx});
+      });
+
+      let html = '';
+      Object.entries(byMonth).forEach(([month, reqs]) => {
+        html += `<h4 style="font-size:11px;color:var(--gray-500);text-transform:uppercase;margin:16px 4px 8px;font-weight:700;">${month}</h4>`;
+        reqs.forEach(r => html += renderItem(r));
+      });
+      list.innerHTML = html;
+    }
+
+    function renderItem(r) {
+      const badgeCls = 'badge-' + (r.Status || 'pending').toLowerCase().replace(/\s/g, '');
+      const date = r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('th-TH', {day:'numeric', month:'short'}) : '-';
+      return `<div class="req-item">
+        <div class="req-head">
+          <span class="cat">${r.Category}</span>
+          <span class="badge-pill ${badgeCls}">${r.Status || '-'}</span>
+          <span class="amount">${Number(r.Amount || 0).toLocaleString()} ฿</span>
         </div>
-        <div class="detail-row">
-          <div class="key">สถานะ</div>
-          <div class="val">${statusBadge(r.Status)}</div>
-        </div>` + rows.map(([k, v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
-
-      if (r.ApprovedBy || r.Remark) {
-        if (r.ApprovedBy) html += `<div class="detail-row"><div class="key">ผู้อนุมัติ</div><div class="val">${r.ApprovedBy}</div></div>`;
-        if (r.Remark) html += `<div class="detail-row"><div class="key">หมายเหตุ</div><div class="val">${r.Remark}</div></div>`;
-      }
-
-      if (r.ReceiptURL) {
-        html += `<div style="margin-top:18px;">
-          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ใบเสร็จ</div>
-          <div class="locked-box" id="rcptLocked">
-            <div class="lock-icon">${icon('lock')}</div>
-            <div class="text">ใบเสร็จเก็บแบบ Private</div>
-            <button class="btn btn-secondary" onclick="loadReceipt('${r.ID}')" id="rcptBtn">${icon('lock')} ดูใบเสร็จ</button>
-          </div>
-          <img id="rcptImg" class="preview-img" style="display:none;">
-        </div>`;
-      }
-      document.getElementById('modalContent').innerHTML = html;
-      document.getElementById('modal').classList.add('show');
+        <div class="req-meta">${date}${r.Venue ? ' • ' + r.Venue : ''}${r.Customer ? ' • ' + r.Customer : ''}</div>
+        <div class="req-actions">
+          <button class="view" onclick="viewDetail('${r.ID}')">👁 ดู</button>
+          <button class="edit" onclick="openEdit('${r.ID}')">✏️ แก้</button>
+          <button class="del" onclick="deleteReq('${r.ID}')">🗑 ลบ</button>
+        </div>
+      </div>`;
     }
 
-  async function loadReceipt(id) {
-      const btn = document.getElementById('rcptBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
-      showLoading('กำลังโหลดใบเสร็จ...');
+    function viewDetail(id) {
+      const r = allReqs.find(x => x.ID === id);
+      if (!r) return;
+      document.getElementById('detailTitle').textContent = r.Category + ' — ' + Number(r.Amount).toLocaleString() + ' THB';
+      const rows = [
+        ['ID', r.ID], ['วันที่', r.ExpenseDate], ['ประเภท', r.Category],
+        ['สถานะ', r.Status], ['สถานที่', r.Venue || '-'],
+        ['ลูกค้า', r.Customer || '-'], ['Contact', r.CustomerContact || '-'],
+        ['ต้นทาง', r.Origin || '-'], ['ปลายทาง', r.Destination || '-'],
+        ['โอกาส', r.Occasion || '-'], ['ผู้ร่วม', r.Attendees || '-'],
+        ['หมายเหตุ', r.Remark || '-'], ['Approved by', r.ApprovedBy || '-']
+      ];
+      document.getElementById('detailContent').innerHTML = rows.map(([k,v]) =>
+        `<div style="padding:8px 0;border-bottom:1px solid var(--gray-100);"><b style="color:var(--gray-500);font-size:12px;">${k}:</b> ${v}</div>`
+      ).join('');
+      document.getElementById('detailModal').classList.add('show');
+    }
+    function closeDetail() { document.getElementById('detailModal').classList.remove('show'); }
+
+    function openEdit(id) {
+      const r = allReqs.find(x => x.ID === id);
+      if (!r) return;
+      const catOptions = categories.map(c => `<option value="${c.Code}" ${r.Category === c.Code ? 'selected' : ''}>${c.NameTH}</option>`).join('');
+      document.getElementById('editContent').innerHTML = `
+        <p style="font-size:12px;color:var(--gray-600);background:#fef3c7;padding:8px;border-radius:8px;margin-bottom:12px;">
+          ⚠️ ถ้าประเภทนี้ต้อง approve → หลังแก้ไข จะกลับเป็น Pending รอ Manager approve ใหม่
+        </p>
+        <div class="field"><label>ประเภท</label><select id="e_cat">${catOptions}</select></div>
+        <div class="field"><label>วันที่</label><input type="date" id="e_date" value="${r.ExpenseDate ? String(r.ExpenseDate).substr(0,10) : ''}"></div>
+        <div class="field"><label>จำนวนเงิน (THB)</label><input type="number" id="e_amount" step="0.01" value="${r.Amount || ''}"></div>
+        <div class="field"><label>สถานที่ / รายละเอียด</label><input type="text" id="e_venue" value="${r.Venue || ''}"></div>
+        <div class="field"><label>ลูกค้า</label><input type="text" id="e_customer" value="${r.Customer || ''}"></div>
+        <div class="field"><label>ผู้ติดต่อ</label><input type="text" id="e_contact" value="${r.CustomerContact || ''}"></div>
+        <div class="field"><label>ต้นทาง</label><input type="text" id="e_origin" value="${r.Origin || ''}"></div>
+        <div class="field"><label>ปลายทาง</label><input type="text" id="e_dest" value="${r.Destination || ''}"></div>
+        <button class="btn btn-primary" onclick="saveEdit('${r.ID}')" style="width:100%;margin-top:8px;">💾 บันทึก</button>
+      `;
+      document.getElementById('editModal').classList.add('show');
+    }
+    function closeEdit() { document.getElementById('editModal').classList.remove('show'); }
+
+    async function saveEdit(id) {
+      const updates = {
+        Category: document.getElementById('e_cat').value,
+        ExpenseDate: document.getElementById('e_date').value,
+        Amount: parseFloat(document.getElementById('e_amount').value) || 0,
+        Venue: document.getElementById('e_venue').value,
+        Customer: document.getElementById('e_customer').value,
+        CustomerContact: document.getElementById('e_contact').value,
+        Origin: document.getElementById('e_origin').value,
+        Destination: document.getElementById('e_dest').value
+      };
+      showLoading('กำลังบันทึก...');
       try {
-        const r = await fetchReceiptImage(id, session.Email);
+        const r = await apiPost('updateRequest', { id, requesterEmail: session.Email, updates });
+        hideLoading();
         if (r.error) throw new Error(r.error);
-        hideLoading();
-        const img = document.getElementById('rcptImg');
-        img.src = r.dataUrl;
-        img.style.display = 'block';
-        img.classList.add('zoomable');
-        img.onclick = () => openImageViewer(r.dataUrl, 'คลิก/แตะ 2 ครั้งเพื่อซูม');
-        document.getElementById('rcptLocked').style.display = 'none';
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
-      }
+        showToast('แก้ไขสำเร็จ ✅', 'success');
+        closeEdit();
+        load();
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
 
-    function closeModal() {
-      document.getElementById('modal').classList.remove('show');
+    async function deleteReq(id) {
+      if (!confirm('ลบคำขอนี้? การกระทำนี้ไม่สามารถย้อนกลับ')) return;
+      showLoading('กำลังลบ...');
+      try {
+        const r = await apiPost('deleteRequest', { id, requesterEmail: session.Email });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast('ลบสำเร็จ', 'success');
+        load();
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
-    document.getElementById('modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') closeModal();
-    });
 
     if (session) { load(); renderBottomNav('status'); }
   </script>
