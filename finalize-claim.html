@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Finalize Pre-Approve — EXION Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+  <style>
+    .info-card { background:linear-gradient(135deg,#B7081D,#7a0512); color:white; padding:16px; border-radius:14px; margin-bottom:12px; }
+    .info-card .lbl { font-size:11px; opacity:0.85; }
+    .info-card .val { font-size:16px; font-weight:700; margin-bottom:6px; }
+    .item-card { background:white; border:1.5px solid var(--gray-200); border-radius:14px; padding:16px; margin-bottom:12px; position:relative; }
+    .item-card .item-num { position:absolute; top:-10px; left:14px; background:#B7081D; color:white; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
+    .item-card .remove-item { position:absolute; top:10px; right:10px; background:none; border:none; color:#dc2626; cursor:pointer; font-size:18px; }
+    .file-chip { display:inline-flex; align-items:center; gap:6px; background:#fef3c7; color:#B7081D; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; margin:4px 4px 0 0; }
+    .file-chip button { background:none; border:none; color:#B7081D; cursor:pointer; padding:0 4px; }
+    .add-item-btn { width:100%; padding:14px; background:#fee2e2; color:#B7081D; border:2px dashed #B7081D; border-radius:12px; font-weight:700; cursor:pointer; }
+    .summary { background:linear-gradient(135deg,#B7081D,#7a0512); color:white; padding:14px; border-radius:12px; text-align:center; margin-bottom:12px; }
+    .over-budget { background:#fef3c7; color:#92400e; padding:10px; border-radius:8px; margin-top:8px; font-size:13px; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='pre-approves.html'" id="backBtn"></button>
+    <h1>ส่งบิลใช้จริง</h1>
+  </div>
+
+  <div class="container">
+    <div id="loading" class="loading"><div class="spinner"></div></div>
+    <div id="main" style="display:none;">
+      <!-- Pre-approve info -->
+      <div class="info-card" id="preInfo"></div>
+
+      <!-- Summary -->
+      <div class="summary">
+        <div style="font-size:11px;opacity:0.9;text-transform:uppercase;">รวมทั้งหมด</div>
+        <div style="font-size:28px;font-weight:800;" id="totalAmount">0.00 THB</div>
+        <div style="font-size:12px;opacity:0.85;" id="itemCount">0 รายการ</div>
+        <div id="overBudgetMsg" style="display:none;"></div>
+      </div>
+
+      <p style="background:#fef3c7;padding:10px;border-radius:8px;font-size:13px;margin-bottom:12px;color:#92400e;">
+        ⚠️ หลังส่ง Manager ต้อง approve อีกครั้ง (แม้ยอดไม่เกินงบ)
+      </p>
+
+      <!-- Items -->
+      <div id="itemsContainer"></div>
+
+      <button class="add-item-btn" id="addBtn">➕ เพิ่มรายการ / บิล</button>
+
+      <button class="btn btn-primary" id="submitBtn" style="margin-top:16px;width:100%;">
+        ✅ ส่งเพื่ออนุมัติทั้งหมด
+      </button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    document.getElementById('backBtn').innerHTML = icon('back');
+    const params = new URLSearchParams(location.search);
+    const preId = params.get('id');
+    let preApprove = null;
+    let items = [];
+    let itemSeq = 0;
+
+    async function load() {
+      if (!preId) { document.getElementById('loading').innerHTML = '<div class="empty"><div class="title">❌ Missing ID</div></div>'; return; }
+      try {
+        const r = await fetchRequest(preId);
+        if (!r || r.error) throw new Error((r && r.error) || 'ไม่พบ Pre-approve');
+        preApprove = r;
+        if (preApprove.PreApproveStatus !== 'Approved') throw new Error('Pre-approve ยังไม่ได้อนุมัติ');
+        if (preApprove.Status === 'Finalized') throw new Error('Pre-approve นี้ finalize ไปแล้ว');
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('main').style.display = 'block';
+        renderInfo();
+        addItem();  // เริ่ม 1 รายการ
+        document.getElementById('addBtn').addEventListener('click', addItem);
+        document.getElementById('submitBtn').addEventListener('click', onSubmit);
+      } catch (err) {
+        document.getElementById('loading').innerHTML = `<div class="empty"><div class="title">Error</div><div class="sub">${err.message}</div></div>`;
+      }
+    }
+
+    function renderInfo() {
+      const p = preApprove;
+      const budget = Number(p.PreApproveBudget) || 0;
+      document.getElementById('preInfo').innerHTML = `
+        <div class="lbl">Category</div><div class="val">${p.Category}</div>
+        <div class="lbl">โอกาส</div><div class="val" style="font-size:14px;">${p.Occasion || '-'}</div>
+        <div class="lbl">ลูกค้า / สถานที่</div><div class="val" style="font-size:14px;">${p.Customer || '-'} / ${p.Venue || '-'}</div>
+        <div class="lbl">งบที่อนุมัติ</div><div class="val" style="font-size:22px;">${budget.toLocaleString()} THB</div>
+      `;
+    }
+
+    function addItem() {
+      itemSeq++;
+      const id = 'item_' + itemSeq;
+      const today = new Date().toISOString().split('T')[0];
+      items.push({ id, date: today, description: '', amount: 0, receipts: [] });
+      renderItems();
+      updateSummary();
+    }
+
+    function removeItem(id) {
+      if (items.length === 1) return showToast('ต้องมีอย่างน้อย 1 รายการ', 'error');
+      items = items.filter(i => i.id !== id);
+      renderItems();
+      updateSummary();
+    }
+
+    function renderItems() {
+      const c = document.getElementById('itemsContainer');
+      c.innerHTML = items.map((it, i) => itemHtml(it, i + 1)).join('');
+      items.forEach(it => attachListeners(it));
+    }
+
+    function itemHtml(it, num) {
+      const chips = it.receipts.map((f, i) => `
+        <span class="file-chip">📎 ${f.name.length > 15 ? f.name.substr(0,12) + '...' : f.name}
+          <button onclick="removeFile('${it.id}', ${i})">✕</button>
+        </span>`).join('');
+      return `<div class="item-card">
+        <span class="item-num">บิล ${num}</span>
+        ${items.length > 1 ? `<button class="remove-item" onclick="removeItem('${it.id}')">✕</button>` : ''}
+        <div class="field" style="margin-top:8px;">
+          <label>วันที่บิล <span class="required">*</span></label>
+          <input type="date" id="${it.id}_date" value="${it.date}">
+        </div>
+        <div class="field">
+          <label>รายละเอียด <span class="required">*</span></label>
+          <input type="text" id="${it.id}_desc" value="${it.description}" placeholder="เช่น อาหารมื้อค่ำ, ค่าเครื่องดื่ม">
+        </div>
+        <div class="field">
+          <label>จำนวนเงิน (THB) <span class="required">*</span></label>
+          <input type="number" id="${it.id}_amount" step="0.01" min="0" value="${it.amount || ''}" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>ใบเสร็จ <span class="required">*</span></label>
+          <label for="${it.id}_files" class="upload-area">
+            <input type="file" id="${it.id}_files" accept="image/*,application/pdf" multiple>
+            <div class="icon-wrap" style="color:#B7081D;">📎</div>
+            <div class="text">แตะเพื่อแนบไฟล์</div>
+            <div class="sub">ภาพ/PDF — แนบได้หลายไฟล์</div>
+          </label>
+          <div id="${it.id}_chips" style="margin-top:8px;">${chips}</div>
+        </div>
+      </div>`;
+    }
+
+    function attachListeners(it) {
+      ['date','desc','amount'].forEach(f => {
+        const el = document.getElementById(it.id + '_' + f);
+        if (el) el.addEventListener('input', e => {
+          if (f === 'desc') it.description = e.target.value;
+          else if (f === 'amount') { it.amount = parseFloat(e.target.value) || 0; updateSummary(); }
+          else it[f] = e.target.value;
+        });
+      });
+      const fi = document.getElementById(it.id + '_files');
+      if (fi) fi.addEventListener('change', e => onFiles(it.id, e));
+    }
+
+    async function onFiles(itemId, e) {
+      const it = items.find(x => x.id === itemId);
+      if (!it) return;
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) { showToast(file.name + ' > 5MB', 'error'); continue; }
+        it.receipts.push({ name: file.name, base64: await fileToBase64(file) });
+      }
+      document.getElementById(itemId + '_chips').innerHTML = it.receipts.map((f, i) =>
+        `<span class="file-chip">📎 ${f.name.length > 15 ? f.name.substr(0,12) + '...' : f.name}<button onclick="removeFile('${itemId}', ${i})">✕</button></span>`
+      ).join('');
+      e.target.value = '';
+    }
+
+    window.removeFile = (itemId, idx) => {
+      const it = items.find(i => i.id === itemId);
+      if (!it) return;
+      it.receipts.splice(idx, 1);
+      document.getElementById(itemId + '_chips').innerHTML = it.receipts.map((f, i) =>
+        `<span class="file-chip">📎 ${f.name.length > 15 ? f.name.substr(0,12) + '...' : f.name}<button onclick="removeFile('${itemId}', ${i})">✕</button></span>`
+      ).join('');
+    };
+    window.removeItem = removeItem;
+
+    function updateSummary() {
+      const total = items.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+      const budget = Number(preApprove.PreApproveBudget) || 0;
+      document.getElementById('totalAmount').textContent = total.toLocaleString(undefined, {minimumFractionDigits:2}) + ' THB';
+      document.getElementById('itemCount').textContent = items.length + ' รายการ • งบ ' + budget.toLocaleString() + ' THB';
+      const msg = document.getElementById('overBudgetMsg');
+      if (total > budget && budget > 0) {
+        msg.className = 'over-budget';
+        msg.style.display = 'block';
+        msg.innerHTML = `⚠️ เกินงบ ${(total - budget).toLocaleString(undefined,{minimumFractionDigits:2})} THB`;
+      } else msg.style.display = 'none';
+    }
+
+    async function onSubmit() {
+      // Validate
+      for (const it of items) {
+        if (!it.date) return showToast('ใส่วันที่ให้ครบ', 'error');
+        if (!it.description || !it.description.trim()) return showToast('ใส่รายละเอียดให้ครบ', 'error');
+        if (!it.amount || it.amount <= 0) return showToast('ใส่จำนวนเงิน', 'error');
+        if (it.receipts.length === 0) return showToast('แนบใบเสร็จทุกรายการ', 'error');
+      }
+      showLoading('กำลังส่ง...');
+      try {
+        const r = await apiPost('finalizeClaim', {
+          preApproveId: preId,
+          items: items.map(it => ({ date: it.date, description: it.description, amount: it.amount, receipts: it.receipts }))
+        });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast(`ส่งสำเร็จ ${r.itemsCreated} รายการ ✅`, 'success');
+        setTimeout(() => location.href = 'status.html', 1500);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    }
+
+    if (session) load();
+  </script>
+</body>
+</html>
