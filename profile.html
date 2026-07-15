@@ -75,6 +75,12 @@
         <span id="sigPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--gray-400);font-size:14px;pointer-events:none;">✍️ เซ็นที่นี่ด้วยนิ้ว/เมาส์</span>
       </div>
 
+      <!-- ✨ Upload image option -->
+      <label for="sigUpload" style="display:block;text-align:center;padding:10px;background:var(--gray-100);border-radius:8px;font-size:12px;color:var(--gray-600);cursor:pointer;margin-bottom:12px;">
+        📷 หรืออัปโหลดรูปลายเซ็น (PNG/JPG พื้นหลังใส)
+        <input type="file" id="sigUpload" accept="image/png,image/jpeg" style="display:none;">
+      </label>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <button class="btn btn-secondary" id="clearSigBtn">🗑 ล้าง</button>
         <button class="btn btn-primary" id="saveSigBtn">💾 บันทึกลายเซ็น</button>
@@ -286,6 +292,30 @@
       };
       document.getElementById('clearSigBtn').addEventListener('click', () => sigPad.clear());
       document.getElementById('saveSigBtn').addEventListener('click', onSaveSignature);
+
+      // ✨ Upload image handler
+      document.getElementById('sigUpload').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) { showToast('ไฟล์ใหญ่เกิน 2 MB', 'error'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            sigPad.clear();
+            const ratio = Math.min(canvas.getBoundingClientRect().width / img.width, 150 / img.height);
+            const w = img.width * ratio, h = img.height * ratio;
+            const x = (canvas.getBoundingClientRect().width - w) / 2;
+            const y = (150 - h) / 2;
+            ctx.drawImage(img, x, y, w, h);
+            empty = false;
+            placeholder.style.display = 'none';
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      });
     }
 
     async function onSaveSignature() {
