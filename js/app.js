@@ -69,15 +69,24 @@ async function renderBottomNav(active) {
   const session = getSession();
   if (!session) return;
 
-  // Check if user is GM (cached in session, refresh in background)
+  // Check role (cached in session, refresh in background)
+  let role = session.role;
   let isGM = !!session.isGM;
-  if (typeof session.isGM === 'undefined') {
+  let isManager = !!session.isManager;
+  let isSenior = !!session.isSenior;
+  if (typeof session.role === 'undefined') {
     try {
-      const r = await checkIsGM(session.Email);
-      isGM = !!(r && r.isGM);
+      const r = await fetchMyRole(session.Email);
+      role = r.role || 'staff';
+      isGM = !!r.isGM;
+      isManager = !!r.isManager;
+      isSenior = !!r.isSenior;
+      session.role = role;
       session.isGM = isGM;
+      session.isManager = isManager;
+      session.isSenior = isSenior;
       setSession(session);
-    } catch { isGM = false; }
+    } catch { role = 'staff'; }
   }
 
   document.body.classList.add('has-bottom-nav');
@@ -89,8 +98,13 @@ async function renderBottomNav(active) {
     { key: 'new',    href: 'submit.html', label: 'ขอเบิก',  icon: 'plus' },
     { key: 'status', href: 'status.html', label: 'คำขอ',   icon: 'list' }
   ];
+  // GM = full inbox / Senior = senior-inbox / Manager = manager-inbox
   if (isGM) {
     items.push({ key: 'inbox', href: 'inbox.html', label: 'Inbox', icon: 'bell' });
+  } else if (isSenior) {
+    items.push({ key: 'inbox', href: 'senior-inbox.html', label: 'Inbox', icon: 'bell' });
+  } else if (isManager) {
+    items.push({ key: 'inbox', href: 'manager-inbox.html', label: 'Inbox', icon: 'bell' });
   }
   items.push({ key: 'profile', href: 'profile.html', label: 'Profile', icon: 'user' });
 
@@ -101,13 +115,13 @@ async function renderBottomNav(active) {
     </a>`).join('');
   document.body.appendChild(nav);
 
-  // Async load badge count for GM Inbox
-  if (isGM && active !== 'inbox') {
+  // Async load badge count for Inbox (GM/Senior/Manager)
+  if ((isGM || isSenior || isManager) && active !== 'inbox') {
     try {
       const pending = await fetchPendingApprovals(session.Email);
       const count = Array.isArray(pending) ? pending.length : 0;
       if (count > 0) {
-        const inboxLink = nav.querySelector('a[href="inbox.html"]');
+        const inboxLink = nav.querySelector('.nav-item[href*="inbox"]');
         if (inboxLink) {
           inboxLink.classList.add('has-badge');
           inboxLink.dataset.badge = count > 99 ? '99+' : count;
