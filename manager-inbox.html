@@ -11,10 +11,7 @@
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>
-      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
-      <span style="font-size:14px; font-weight:600; margin-left:6px;">Manager Inbox</span>
-    </h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">Manager Inbox</span></h1>
   </div>
 
   <div class="container">
@@ -25,7 +22,7 @@
     <div class="modal-content">
       <div class="modal-head">
         <h3 id="modalTitle">รายละเอียด</h3>
-        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
+        <button class="modal-close" onclick="closeModal()" id="closeBtn">✕</button>
       </div>
       <div id="modalContent"></div>
     </div>
@@ -38,145 +35,181 @@
   <script>
     const session = requireLogin();
     let pending = [];
+    let mySig = null;
+
+    const CAT_TH = { FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม', ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ', CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทร ตปท.', APT:'ที่พัก' };
+    const CAT_IC = { FUEL:'⛽', EXPRESS:'🛣️', PARK:'🅿️', HOTEL:'🏨', ENT:'🍽️', GOLF:'⛳', TRAVEL:'✈️', OTHER:'📦', CAR:'🚗', MOBILE:'📱', OVERSEAS:'☎️', APT:'🏠' };
 
     function setI(id, n) { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); }
 
     async function load() {
-      setI('backBtn', 'back'); setI('closeBtn', 'x');
-
+      setI('backBtn', 'back');
       try {
-        const result = await fetchManagerInbox(session.Email);
+        const [result, sig] = await Promise.all([
+          fetchManagerInbox(session.Email),
+          getMySignature(session.Email).catch(() => ({ hasSignature: false }))
+        ]);
+        mySig = sig;
         if (result && result.error) throw new Error(result.error);
         pending = Array.isArray(result) ? result : [];
-
-        const list = document.getElementById('list');
-        list.classList.remove('loading');
-
-        if (pending.length === 0) {
-          list.innerHTML = `
-            <div class="empty">
-              <div class="icon-wrap">${icon('check')}</div>
-              <div class="title">เคลียร์แล้ว 🎉</div>
-              <div class="sub">ไม่มีคำขอรออนุมัติ</div>
-            </div>`;
-          renderBottomNav('inbox');
-          return;
-        }
-
-        // Group by BatchID
-        const batches = {};
-        pending.forEach((r, idx) => {
-          const bid = r.BatchID || r.ID;
-          if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, preApprove: !!r.PreApproveBudget };
-          batches[bid].items.push({...r, _idx: idx});
-          batches[bid].total += Number(r.Amount) || Number(r.PreApproveBudget) || 0;
-        });
-
-        let html = `<div class="card" style="text-align:center; padding:16px;">
-          <div style="font-size:13px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">รออนุมัติ</div>
-          <div style="font-size:36px; font-weight:800; color:var(--warning); letter-spacing:-0.03em; margin-top:4px;">${pending.length}</div>
-          <div style="font-size:12px; color:var(--gray-500); margin-top:4px;">${Object.keys(batches).length} ชุด</div>
-        </div>`;
-
-        Object.entries(batches).forEach(([bid, b]) => {
-          const isPre = b.preApprove;
-          html += `<div class="card" style="padding:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
-              <div>
-                <div style="font-weight:700;">${b.staff}</div>
-                <div style="font-size:11px; color:var(--gray-500);">${b.dept} • ${b.items.length} รายการ${isPre ? ' • Pre-Approve' : ''}</div>
-              </div>
-              <div style="font-weight:800; color:var(--brand-2); font-size:18px;">${formatCurrency(b.total)}</div>
-            </div>`;
-
-          b.items.forEach(r => {
-            html += `<div class="request-item" onclick="showDetail(${r._idx})" style="margin-bottom:6px; padding:10px 12px;">
-              <div class="cat-icon" style="background:#FEF3C7; color:#92400E; width:32px; height:32px;">${categoryIcon(r.Category)}</div>
-              <div class="info">
-                <div class="title" style="font-size:13px;">${r.Category}${isPre ? ' (Pre)' : ''}</div>
-                <div class="meta">${formatDate(r.ExpenseDate)}${r.Venue ? ' • ' + r.Venue : ''}</div>
-              </div>
-              <div class="right">
-                <div class="amount" style="font-size:14px;">${formatCurrency(r.Amount || r.PreApproveBudget)}</div>
-              </div>
-            </div>`;
-          });
-
-          html += `<div style="display:flex; gap:8px; margin-top:10px;">
-            <button class="btn btn-success" style="flex:1; font-size:13px; padding:10px;" onclick="approveBatch('${bid}')">${icon('check')} Approve ทั้งชุด</button>
-            <button class="btn btn-danger" style="flex:1; font-size:13px; padding:10px;" onclick="rejectBatch('${bid}')">${icon('x')} Reject</button>
-          </div></div>`;
-        });
-
-        list.innerHTML = html;
-        renderBottomNav('inbox');
+        render();
       } catch (err) {
-        document.getElementById('list').innerHTML = `<div class="empty"><div class="title">${err.message}</div></div>`;
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">เกิดข้อผิดพลาด</div><div class="sub">${err.message}</div></div>`;
         renderBottomNav('inbox');
       }
     }
 
+    function render() {
+      const list = document.getElementById('list');
+      list.classList.remove('loading');
+
+      if (pending.length === 0) {
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div><div class="title">เคลียร์แล้ว!</div><div class="sub">ไม่มีคำขอรออนุมัติ</div></div>`;
+        renderBottomNav('inbox');
+        return;
+      }
+
+      const total = pending.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
+
+      // Group by batch
+      const batches = {};
+      pending.forEach((r, idx) => {
+        const bid = r.BatchID || r.ID;
+        if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, isPre: !!r.PreApproveBudget };
+        batches[bid].items.push({ ...r, _idx: idx });
+        batches[bid].total += Number(r.Amount) || Number(r.PreApproveBudget) || 0;
+      });
+
+      let html = `<div class="count-hero">
+        <div class="lbl">รออนุมัติ</div>
+        <div class="num">${pending.length}</div>
+        <div class="sub">${Object.keys(batches).length} ชุด • รวม ${Math.round(total).toLocaleString()} THB</div>
+      </div>`;
+
+      if (!mySig.hasSignature) {
+        html += `<div class="warn-box"><div class="t">✍️ ยังไม่มีลายเซ็นบันทึกไว้</div>
+          <div style="font-size:12px;">ตั้งลายเซ็น 1 ครั้งใน Profile → Approve เร็วขึ้น ไม่ต้องเซ็นทุกครั้ง</div>
+          <a href="profile.html" style="display:inline-block;margin-top:8px;font-weight:700;font-size:12px;">→ ไปตั้งลายเซ็น</a></div>`;
+      }
+
+      Object.entries(batches).forEach(([bid, b]) => {
+        html += `<div class="batch-card">
+          <div class="batch-head">
+            <div>
+              <div class="who">${b.staff}</div>
+              <div class="sub">${b.dept} • ${b.items.length} รายการ${b.isPre ? ' • 🍽️ Pre-Approve' : ''}</div>
+            </div>
+            <div class="amt">${Math.round(b.total).toLocaleString()}</div>
+          </div>`;
+        b.items.forEach(r => {
+          const amt = Number(r.Amount) || Number(r.PreApproveBudget) || 0;
+          html += `<div class="request-item" onclick="showDetail(${r._idx})">
+            <div class="cat-icon" style="background:#FEF3C7;color:#92400E;">${CAT_IC[r.Category] || '📦'}</div>
+            <div class="info">
+              <div class="title">${CAT_TH[r.Category] || r.Category}${b.isPre ? ' (งบ)' : ''}</div>
+              <div class="meta">${formatDate(r.ExpenseDate)}${r.Venue ? ' • ' + r.Venue : ''}</div>
+            </div>
+            <div class="right"><div class="amount">${Math.round(amt).toLocaleString()}</div></div>
+          </div>`;
+        });
+        html += `<div class="btn-row" style="margin-top:10px;">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="approveBatch('${bid}')">✅ Approve ทั้งชุด</button>
+          <button class="btn btn-sm" style="flex:1;background:var(--danger);color:white;" onclick="rejectBatch('${bid}')">❌ Reject</button>
+        </div></div>`;
+      });
+
+      list.innerHTML = html;
+      renderBottomNav('inbox');
+    }
+
     function showDetail(idx) {
       const r = pending[idx];
-      document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + r.Category;
+      const isPre = !!r.PreApproveBudget;
+      document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + (CAT_TH[r.Category] || r.Category);
 
       const rows = [
-        ['Request ID', r.ID],
-        ['BatchID', r.BatchID || '-'],
-        ['ประเภท', r.Category + (r.PreApproveBudget ? ' (Pre-Approve)' : '')],
+        ['ID', r.ID],
+        ['ประเภท', (CAT_TH[r.Category] || r.Category) + (isPre ? ' (Pre-Approve)' : '')],
         ['วันที่', formatDate(r.ExpenseDate)],
         ['สถานที่', r.Venue || '-'],
         ['โอกาส', r.Occasion || '-'],
         ['ผู้ร่วม', r.Attendees || '-']
       ];
-
       if (r.Origin) rows.push(['ต้นทาง', r.Origin]);
       if (r.Destination) rows.push(['ปลายทาง', r.Destination]);
       if (r.Customer) rows.push(['ลูกค้า', r.Customer + (r.CustomerContact ? ' (' + r.CustomerContact + ')' : '')]);
+      if (r.Mileage_KM) rows.push(['ระยะทาง', r.Mileage_KM + ' กม.']);
 
       const amount = r.PreApproveBudget || r.Amount;
-      const label = r.PreApproveBudget ? 'งบประมาณ' : 'จำนวนเงิน';
-
       let html = `<div class="detail-row">
-        <div class="key">${label}</div>
-        <div class="val big">${formatCurrency(amount)} <span style="font-size:13px; color:var(--gray-500);">THB</span></div>
-      </div>` + rows.map(([k, v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
+        <div class="key">${isPre ? 'งบประมาณ' : 'จำนวนเงิน'}</div>
+        <div class="val big">${Math.round(Number(amount)).toLocaleString()} <span style="font-size:13px;color:var(--gray-500);font-weight:600;">THB</span></div>
+      </div>` + rows.map(([k,v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
 
-      // Multi-file receipts
+      // Receipts
       let urls = [];
-      try { urls = JSON.parse(r.ReceiptURLs || '[]'); } catch { urls = []; }
+      try { urls = JSON.parse(r.ReceiptURLs || '[]'); } catch {}
       if (urls.length === 0 && r.ReceiptURL) urls = [r.ReceiptURL];
-
       if (urls.length > 0) {
         html += `<div style="margin-top:16px;">
-          <div style="font-size:13px; font-weight:600; margin-bottom:8px;">ใบเสร็จ (${urls.length} ไฟล์)</div>
-          <div id="rcptThumbs">`;
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;">📎 ใบเสร็จ (${urls.length})</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
         for (let i = 0; i < urls.length; i++) {
-          html += `<button class="btn btn-secondary" style="margin:4px; font-size:12px;" onclick="loadReceipt('${r.ID}', ${i})">${icon('lock')} ไฟล์ ${i+1}</button>`;
+          html += `<button class="btn btn-secondary btn-sm" onclick="loadReceipt('${r.ID}',${i})">🔒 ไฟล์ ${i+1}</button>`;
         }
         html += `</div><img id="rcptImg" class="preview-img" style="display:none;"></div>`;
       }
 
-      html += `<div class="field" style="margin-top:16px;">
-        <label>หมายเหตุ (optional)</label>
-        <textarea id="remark" placeholder="..."></textarea>
-      </div>
-      <div class="field">
-        <label>ลายเซ็น (สำหรับ Approve)</label>
-        ${signaturePadHtml('sigCanvas')}
-      </div>
-      <div class="btn-row" style="margin-top:10px;">
-        <button class="btn btn-success" onclick="decide('${r.ID}', 'Approved')">${icon('check')} Approve</button>
-        <button class="btn btn-danger" onclick="decide('${r.ID}', 'Rejected')">${icon('x')} Reject</button>
+      html += `<div class="field" style="margin-top:18px;">
+        <label>หมายเหตุ <span style="color:var(--gray-400);font-weight:400;">(ถ้ามี)</span></label>
+        <textarea id="remark" placeholder="เช่น อนุมัติภายในงบ Q3" rows="2"></textarea>
+      </div>`;
+
+      // Signature — use saved if available
+      if (mySig.hasSignature) {
+        html += `<div class="saved-sig"><img src="${mySig.dataUrl}" alt="sig"><div>✅ ใช้ลายเซ็นที่บันทึกไว้อัตโนมัติ</div></div>`;
+      } else {
+        html += `<div class="field" style="margin-top:14px;">
+          <label>ลายเซ็น <span class="required">*</span></label>
+          <div class="sig-box">
+            <canvas id="sigCanvas" class="sig-canvas"></canvas>
+            <span class="sig-placeholder">เซ็นที่นี่</span>
+          </div>
+          <div class="sig-actions"><span>เซ็นเพื่ออนุมัติ</span><button type="button" class="sig-clear" onclick="clearSig()">ล้าง</button></div>
+        </div>`;
+      }
+
+      html += `<div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">✅ Approve</button>
+        <button class="btn" style="flex:1;background:var(--danger);color:white;" onclick="decide('${r.ID}','Rejected')">❌ Reject</button>
       </div>`;
 
       document.getElementById('modalContent').innerHTML = html;
       document.getElementById('modal').classList.add('show');
-      setTimeout(() => {
-        const c = document.getElementById('sigCanvas');
-        if (c && typeof SignaturePad === 'function') c.__sig = new SignaturePad(c);
-      }, 100);
+      if (!mySig.hasSignature) setTimeout(initSigPad, 80);
     }
+
+    let sigPad = null;
+    function initSigPad() {
+      const c = document.getElementById('sigCanvas');
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = c.getBoundingClientRect();
+      c.width = rect.width * dpr; c.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0F172A'; ctx.lineWidth = 2.5;
+      let draw = false, empty = true;
+      const ph = c.parentElement.querySelector('.sig-placeholder');
+      const pos = e => { const r = c.getBoundingClientRect(); return { x:(e.touches?e.touches[0].clientX:e.clientX)-r.left, y:(e.touches?e.touches[0].clientY:e.clientY)-r.top }; };
+      const st = e => { draw = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+      const mv = e => { if(!draw) return; const p = pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); empty = false; if(ph) ph.style.display='none'; e.preventDefault(); };
+      const en = () => draw = false;
+      c.addEventListener('mousedown',st); c.addEventListener('mousemove',mv); c.addEventListener('mouseup',en); c.addEventListener('mouseout',en);
+      c.addEventListener('touchstart',st); c.addEventListener('touchmove',mv); c.addEventListener('touchend',en);
+      sigPad = { isEmpty:()=>empty, clear:()=>{ctx.clearRect(0,0,c.width,c.height);empty=true;if(ph)ph.style.display='block';}, toDataURL:()=>c.toDataURL('image/png') };
+    }
+    window.clearSig = () => sigPad && sigPad.clear();
 
     async function loadReceipt(id, fileIndex) {
       showLoading('โหลดใบเสร็จ...');
@@ -185,74 +218,67 @@
         hideLoading();
         if (r.error) throw new Error(r.error);
         const img = document.getElementById('rcptImg');
-        img.src = r.dataUrl;
-        img.style.display = 'block';
-        img.classList.add('zoomable');
+        img.src = r.dataUrl; img.style.display = 'block';
         img.onclick = () => openImageViewer(r.dataUrl, 'แตะ 2 ครั้งเพื่อซูม');
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-      }
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
 
     async function decide(id, decision) {
-      const remarkEl = document.getElementById('remark');
-      const remark = remarkEl ? remarkEl.value.trim() : '';
-      const canvas = document.getElementById('sigCanvas');
-      const sigPad = canvas ? canvas.__sig : null;
+      const remark = (document.getElementById('remark')?.value || '').trim();
       let signatureBase64 = '';
-      if (decision === 'Approved') {
-        if (!sigPad || sigPad.isEmpty()) return showToast('เซ็นชื่อก่อนอนุมัติ', 'error');
+      if (decision === 'Approved' && !mySig.hasSignature) {
+        if (!sigPad || sigPad.isEmpty()) return showToast('กรุณาเซ็นชื่อก่อน', 'error');
         signatureBase64 = sigPad.toDataURL();
       }
+      if (decision === 'Rejected' && !remark) return showToast('ระบุเหตุผลที่ปฏิเสธ', 'error');
       if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
-
-      showLoading(decision === 'Approved' ? 'อนุมัติ...' : 'ปฏิเสธ...');
+      showLoading(decision === 'Approved' ? 'กำลังอนุมัติ...' : 'กำลังปฏิเสธ...');
       try {
         const result = await managerApprove({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
-        if (result && result.error) throw new Error(result.error);
         hideLoading();
-        showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว — ส่งต่อ Senior' : '❌ ปฏิเสธแล้ว', 'success');
+        if (result && result.error) throw new Error(result.error);
+        showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว' : '❌ ปฏิเสธแล้ว', 'success');
         closeModal();
         load();
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-      }
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
 
     window.approveBatch = async (bid) => {
-      const itemsInBatch = pending.filter(r => (r.BatchID || r.ID) === bid);
-      if (!confirm('Approve ทั้ง ' + itemsInBatch.length + ' รายการ?\n\n⚠️ ต้องเซ็นชื่อในแต่ละรายการ — เปิดทีละอันแทน')) return;
-      showToast('กรุณาเปิดทีละรายการเพื่อเซ็นชื่อ', 'info');
-      // Open first item
-      if (itemsInBatch.length > 0) {
-        const idx = pending.indexOf(itemsInBatch[0]);
-        showDetail(idx);
+      const items = pending.filter(r => (r.BatchID || r.ID) === bid);
+      if (!mySig.hasSignature) {
+        showToast('ตั้งลายเซ็นใน Profile ก่อน เพื่อ approve ทั้งชุด', 'error');
+        return showDetail(pending.indexOf(items[0]));
       }
+      if (!confirm(`อนุมัติทั้ง ${items.length} รายการ?`)) return;
+      showLoading(`กำลังอนุมัติ ${items.length} รายการ...`);
+      try {
+        for (const r of items) {
+          await managerApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email });
+        }
+        hideLoading();
+        showToast(`✅ อนุมัติ ${items.length} รายการแล้ว`, 'success');
+        load();
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
     window.rejectBatch = async (bid) => {
-      const itemsInBatch = pending.filter(r => (r.BatchID || r.ID) === bid);
+      const items = pending.filter(r => (r.BatchID || r.ID) === bid);
       const remark = prompt('เหตุผลที่ปฏิเสธทั้งชุด:');
       if (!remark) return;
-      showLoading('กำลังปฏิเสธ ' + itemsInBatch.length + ' รายการ...');
+      showLoading(`กำลังปฏิเสธ ${items.length} รายการ...`);
       try {
-        for (const r of itemsInBatch) {
+        for (const r of items) {
           await managerApprove({ id: r.ID, decision: 'Rejected', remark, approverEmail: session.Email });
         }
         hideLoading();
         showToast('ปฏิเสธทั้งชุดแล้ว', 'success');
         load();
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-      }
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
-
+    window.showDetail = showDetail; window.loadReceipt = loadReceipt; window.decide = decide; window.closeModal = closeModal;
     if (session) load();
   </script>
 </body>
