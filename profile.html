@@ -7,94 +7,76 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
-  <style>
-    .status-pill { display:inline-block; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; }
-    .status-pending { background:#fef3c7; color:#92400e; }
-    .status-approved { background:#dcfce7; color:#166534; }
-    .status-rejected { background:#fee2e2; color:#991b1b; }
-    .status-none { background:#e5e7eb; color:#374151; }
-    .approver-chain { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
-    .approver-step { flex:1; min-width:80px; text-align:center; padding:8px; border-radius:8px; background:#f3f4f6; font-size:11px; }
-    .approver-step.done { background:#dcfce7; color:#166534; }
-    .approver-step.current { background:#fef3c7; color:#92400e; font-weight:700; }
-    .approver-step.rejected { background:#fee2e2; color:#991b1b; }
-  </style>
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>โปรไฟล์</h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">โปรไฟล์</span></h1>
   </div>
 
   <div class="container">
-    <!-- User Info -->
-    <div class="card card-elev" style="text-align:center;">
-      <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#B7081D,#7a0512);color:white;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:bold;margin:0 auto 16px;" id="avatar">?</div>
-      <h2 id="userName" style="margin:0 0 4px;color:var(--gray-900);">-</h2>
-      <p id="userPosition" style="margin:0 0 4px;color:var(--gray-600);">-</p>
-      <p id="userEmail" style="margin:0;color:var(--gray-500);font-size:13px;">-</p>
-      <p id="userDept" style="margin:8px 0 0;display:inline-block;background:var(--gray-100);padding:4px 12px;border-radius:12px;font-size:12px;color:var(--gray-700);">-</p>
+    <div class="hero" style="text-align:center;">
+      <div class="avatar-xl" id="avatar">?</div>
+      <div class="hero-name" id="userName">-</div>
+      <div class="hero-sub" id="userPosition">-</div>
+      <div class="hero-sub" id="userEmail" style="opacity:.72;font-size:12px;">-</div>
+      <span class="role-badge" id="userDept">-</span>
     </div>
 
-    <!-- Export Approval -->
-    <div class="card card-elev">
-      <h3 style="margin:0 0 12px;color:var(--gray-900);">📊 Export ใบเบิกรายเดือน</h3>
-      <p style="margin:0 0 16px;color:var(--gray-600);font-size:13px;">
-        ต้องผ่านการอนุมัติจาก <b>หัวหน้า → Senior → GM</b> ก่อนจึงจะดาวน์โหลด Excel ตัวจริงได้
-      </p>
-
-      <div class="field">
-        <label>เดือน / ปี</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <select id="exportMonth"></select>
-          <select id="exportYear"></select>
-        </div>
+    <!-- Monthly Export -->
+    <div class="card">
+      <div class="card-head"><span class="ib ib-green">📊</span>
+        <div><div class="ch-title">Export ใบเบิกรายเดือน</div>
+        <div class="ch-sub">ต้องผ่าน หัวหน้า → Senior → GM ก่อนดาวน์โหลดตัวจริง</div></div>
       </div>
-
-      <div id="exportStatusBox" style="background:#f9fafb;padding:16px;border-radius:12px;margin:12px 0;">
-        <div style="text-align:center;color:var(--gray-500);font-size:13px;">กำลังโหลด...</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+        <div class="field" style="margin:0;"><label>เดือน</label><select id="exportMonth"></select></div>
+        <div class="field" style="margin:0;"><label>ปี</label><select id="exportYear"></select></div>
       </div>
-
-      <div id="exportActions" style="display:grid;gap:8px;"></div>
+      <div id="exportStatusBox" style="margin-top:14px;"><div class="loading" style="padding:20px;"><div class="spinner"></div></div></div>
+      <div id="exportActions" style="display:grid;gap:9px;margin-top:12px;"></div>
     </div>
 
-    <!-- ✍️ My Signature -->
-    <div class="card card-elev">
-      <h3 style="margin:0 0 12px;color:var(--gray-900);">✍️ ลายเซ็นของฉัน</h3>
-      <p style="margin:0 0 16px;color:var(--gray-600);font-size:13px;">
-        เซ็นชื่อ 1 ครั้ง — เวลา Approve จะใช้ลายเซ็นนี้อัตโนมัติ
-      </p>
-
-      <div id="currentSigWrap" style="text-align:center;margin-bottom:16px;display:none;">
-        <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px;">ลายเซ็นปัจจุบัน:</div>
-        <img id="currentSig" style="max-width:280px;max-height:120px;border:1px solid var(--gray-300);border-radius:8px;background:white;padding:8px;">
+    <!-- Signature -->
+    <div class="card">
+      <div class="card-head"><span class="ib ib-purple">✍️</span>
+        <div><div class="ch-title">ลายเซ็นของฉัน</div>
+        <div class="ch-sub">เซ็น 1 ครั้ง — ใช้อัตโนมัติทุกครั้งที่อนุมัติ</div></div>
       </div>
 
-      <div style="position:relative;margin-bottom:12px;">
-        <canvas id="sigCanvas" style="width:100%;height:150px;background:white;border:2px dashed var(--gray-400);border-radius:12px;touch-action:none;"></canvas>
-        <span id="sigPlaceholder" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--gray-400);font-size:14px;pointer-events:none;">✍️ เซ็นที่นี่ด้วยนิ้ว/เมาส์</span>
+      <div id="currentSigWrap" class="saved-sig" style="display:none;">
+        <div class="ss-label">✅ ลายเซ็นที่บันทึกไว้</div>
+        <img id="currentSig" alt="signature">
       </div>
 
-      <!-- ✨ Upload image option -->
-      <label for="sigUpload" style="display:block;text-align:center;padding:10px;background:var(--gray-100);border-radius:8px;font-size:12px;color:var(--gray-600);cursor:pointer;margin-bottom:12px;">
-        📷 หรืออัปโหลดรูปลายเซ็น (PNG/JPG พื้นหลังใส)
-        <input type="file" id="sigUpload" accept="image/png,image/jpeg" style="display:none;">
+      <div class="sig-canvas-wrap">
+        <canvas id="sigCanvas" class="sig-canvas"></canvas>
+        <span id="sigPlaceholder" class="sig-ph">✍️ เซ็นที่นี่ด้วยนิ้ว / เมาส์</span>
+      </div>
+
+      <label for="sigUpload" class="upload-area" style="padding:14px;margin-top:10px;">
+        <input type="file" id="sigUpload" accept="image/png,image/jpeg">
+        <div class="icon-wrap">📷</div>
+        <div class="text">อัปโหลดรูปลายเซ็นแทน</div>
+        <div class="sub">PNG พื้นหลังใสจะสวยที่สุด · ไม่เกิน 2 MB</div>
       </label>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button class="btn btn-secondary" id="clearSigBtn">🗑 ล้าง</button>
-        <button class="btn btn-primary" id="saveSigBtn">💾 บันทึกลายเซ็น</button>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-secondary" id="clearSigBtn" style="flex:1;">🗑 ล้าง</button>
+        <button class="btn btn-primary" id="saveSigBtn" style="flex:1.4;">💾 บันทึกลายเซ็น</button>
       </div>
     </div>
 
     <!-- Account -->
-    <div class="card card-elev">
-      <h3 style="margin:0 0 12px;color:var(--gray-900);">⚙️ บัญชี</h3>
-      <button class="btn btn-secondary" onclick="location.href='index.html'" style="width:100%;margin-bottom:8px;">🔄 Reset รหัสผ่าน</button>
-      <button class="btn btn-danger" id="logoutBtn" style="width:100%;background:#dc2626;color:white;">🚪 ออกจากระบบ</button>
+    <div class="card">
+      <div class="card-head"><span class="ib ib-blue">⚙️</span><div><div class="ch-title">บัญชี</div></div></div>
+      <div style="display:grid;gap:9px;margin-top:12px;">
+        <button class="btn btn-secondary" onclick="location.href='reset-password.html'">🔑 เปลี่ยน / รีเซ็ตรหัสผ่าน</button>
+        <button class="btn btn-danger" id="logoutBtn">🚪 ออกจากระบบ</button>
+      </div>
     </div>
 
-    <p style="text-align:center;color:var(--gray-500);font-size:12px;margin-top:16px;">EXION Expense v5.0 • Exion Thailand</p>
+    <p class="footnote">EXION Expense v6.0 · EXION (Thailand) Co., Ltd.</p>
   </div>
 
   <script src="js/config.js"></script>
@@ -103,100 +85,78 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    let myExports = [];
-    let sigPad = null;
+    let myExports = [], sigPad = null;
+    const MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
     function init() {
-      document.getElementById('backBtn').innerHTML = icon('back');
-      const initial = (session.Name || '?').trim().charAt(0).toUpperCase();
-      document.getElementById('avatar').textContent = initial;
+      const bb = document.getElementById('backBtn');
+      if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+      document.getElementById('avatar').textContent = (session.Name||'?').trim().charAt(0).toUpperCase();
       document.getElementById('userName').textContent = session.Name || '-';
       document.getElementById('userPosition').textContent = session.Position || '-';
       document.getElementById('userEmail').textContent = session.Email || '-';
       document.getElementById('userDept').textContent = session.Department || '-';
 
-      const monthSel = document.getElementById('exportMonth');
-      const yearSel = document.getElementById('exportYear');
-      const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      const mSel = document.getElementById('exportMonth'), ySel = document.getElementById('exportYear');
       const now = new Date();
-      const curMonth = now.getMonth() + 1;
-      const curYear = now.getFullYear();
-      months.forEach((m, i) => {
-        const opt = document.createElement('option');
-        opt.value = i + 1; opt.textContent = m;
-        if (i + 1 === curMonth) opt.selected = true;
-        monthSel.appendChild(opt);
+      MONTHS.forEach((m,i) => { const o=document.createElement('option'); o.value=i+1; o.textContent=m; if(i+1===now.getMonth()+1) o.selected=true; mSel.appendChild(o); });
+      for (let y = now.getFullYear(); y >= now.getFullYear()-3; y--) { const o=document.createElement('option'); o.value=y; o.textContent=y; if(y===now.getFullYear()) o.selected=true; ySel.appendChild(o); }
+      mSel.addEventListener('change', refreshExportStatus);
+      ySel.addEventListener('change', refreshExportStatus);
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        if (confirm('ออกจากระบบ?')) { clearSession(); location.href = 'index.html'; }
       });
-      for (let y = curYear; y >= curYear - 3; y--) {
-        const opt = document.createElement('option');
-        opt.value = y; opt.textContent = y;
-        if (y === curYear) opt.selected = true;
-        yearSel.appendChild(opt);
-      }
-      monthSel.addEventListener('change', refreshExportStatus);
-      yearSel.addEventListener('change', refreshExportStatus);
-      document.getElementById('logoutBtn').addEventListener('click', onLogout);
     }
 
     async function loadMyExports() {
-      try {
-        const r = await apiGet('getMyExportRequests', { email: session.Email });
-        myExports = Array.isArray(r) ? r : [];
-      } catch { myExports = []; }
+      try { const r = await apiGet('getMyExportRequests', { email: session.Email }); myExports = Array.isArray(r) ? r : []; }
+      catch { myExports = []; }
       refreshExportStatus();
     }
 
     function refreshExportStatus() {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
-      const existing = myExports.find(x => Number(x.Year) === year && Number(x.Month) === month);
-      const statusBox = document.getElementById('exportStatusBox');
-      const actions = document.getElementById('exportActions');
+      const ex = myExports.find(x => Number(x.Year)===year && Number(x.Month)===month);
+      const box = document.getElementById('exportStatusBox');
+      const act = document.getElementById('exportActions');
 
-      if (!existing || existing.OverallStatus === 'Rejected') {
-        statusBox.innerHTML = existing
-          ? `<div style="text-align:center;"><span class="status-pill status-rejected">❌ ถูกปฏิเสธ</span><p style="margin:8px 0 0;font-size:13px;color:var(--gray-600);">${existing.ManagerRemark || existing.SeniorRemark || existing.GMRemark || 'ไม่มีหมายเหตุ'}</p></div>`
-          : `<div style="text-align:center;"><span class="status-pill status-none">ยังไม่ได้ขออนุมัติ</span></div>`;
-        actions.innerHTML = `
-          <button class="btn btn-primary" onclick="requestApproval()">✅ ขอ Approve เพื่อ Export</button>
-          <button class="btn btn-secondary" onclick="downloadDraft()">👀 Preview / Download Draft</button>`;
-      } else if (existing.OverallStatus === 'Approved') {
-        statusBox.innerHTML = `<div style="text-align:center;">
-          <span class="status-pill status-approved">✅ อนุมัติเรียบร้อย</span>
-          <p style="margin:8px 0 0;font-size:12px;color:var(--gray-500);">${existing.ItemCount} รายการ — ${Number(existing.TotalAmount).toLocaleString()} THB</p>
-        </div>`;
-        actions.innerHTML = `
-          <button class="btn btn-primary" onclick="downloadFinal('${existing.ID}')">📥 Download Excel (Final)</button>
-          <button class="btn btn-secondary" onclick="downloadDraft()">👀 Preview / Download Draft</button>`;
+      if (!ex || ex.OverallStatus === 'Rejected') {
+        box.innerHTML = ex
+          ? `<div class="bad-box"><b>❌ ถูกปฏิเสธ</b><br><span style="font-weight:400;">${ex.ManagerRemark || ex.SeniorRemark || ex.GMRemark || 'ไม่มีหมายเหตุ'}</span></div>`
+          : `<div class="info-box">📋 ยังไม่ได้ขออนุมัติสำหรับ <b>${MONTHS[month-1]} ${year}</b></div>`;
+        act.innerHTML = `
+          <button class="btn btn-primary" onclick="requestApproval()">✅ ขออนุมัติเพื่อ Export</button>
+          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง / โหลด Draft</button>`;
+      } else if (ex.OverallStatus === 'Approved') {
+        box.innerHTML = `<div class="ok-box"><b>✅ อนุมัติครบทุกขั้นแล้ว</b><br>
+          <span style="font-weight:400;">${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} THB</span></div>
+          ${chainHtml(ex)}`;
+        act.innerHTML = `
+          <button class="btn btn-primary" onclick="downloadFinal('${ex.ID}')">📥 ดาวน์โหลด Excel ตัวจริง</button>
+          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดู Draft</button>`;
       } else {
-        // Pending
-        const chain = renderApproverChain(existing);
-        statusBox.innerHTML = `<div><div style="text-align:center;margin-bottom:8px;"><span class="status-pill status-pending">⏳ รออนุมัติ</span></div>${chain}</div>`;
-        actions.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 Preview / Download Draft</button>`;
+        box.innerHTML = `<div class="warn-box"><b>⏳ รออนุมัติ</b></div>${chainHtml(ex)}`;
+        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง / โหลด Draft</button>`;
       }
     }
 
-    function renderApproverChain(req) {
+    function chainHtml(req) {
       const stages = [
-        { name: 'Manager', email: req.ManagerEmail, status: req.ManagerStatus },
-        { name: 'Senior', email: req.SeniorEmail, status: req.SeniorStatus },
-        { name: 'GM', email: req.GMEmail, status: req.GMStatus }
-      ];
-      const html = stages.filter(s => s.email).map(s => {
-        let cls = '';
-        if (s.status === 'Approved') cls = 'done';
-        else if (s.status === 'Rejected') cls = 'rejected';
-        else if (s.status === 'Pending') cls = 'current';
-        return `<div class="approver-step ${cls}">
-          <div style="font-size:10px;">${s.name}</div>
-          <div style="font-weight:700;margin-top:2px;">${s.email.split('@')[0]}</div>
-          <div style="margin-top:4px;">${s.status === 'Approved' ? '✅' : s.status === 'Rejected' ? '❌' : s.status === 'Pending' ? '⏳' : '⏸'}</div>
-        </div>`;
-      }).join('');
-      return `<div class="approver-chain">${html}</div>`;
+        { name:'หัวหน้า', email:req.ManagerEmail, status:req.ManagerStatus },
+        { name:'Senior',  email:req.SeniorEmail,  status:req.SeniorStatus },
+        { name:'GM',      email:req.GMEmail,      status:req.GMStatus }
+      ].filter(s => s.email);
+      return `<div class="approver-chain">` + stages.map(s => {
+        const cls = s.status==='Approved'?'done':s.status==='Rejected'?'rejected':s.status==='Pending'?'current':'';
+        const ic  = s.status==='Approved'?'✅':s.status==='Rejected'?'❌':s.status==='Pending'?'⏳':'⏸';
+        return `<div class="approver-step ${cls}"><div class="as-ic">${ic}</div>
+          <div class="as-role">${s.name}</div>
+          <div class="as-who">${String(s.email).split('@')[0]}</div></div>`;
+      }).join('') + `</div>`;
     }
 
-    async function requestApproval() {
+    window.requestApproval = async () => {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
       showLoading('กำลังส่งคำขอ...');
@@ -204,45 +164,34 @@
         const r = await apiPost('requestExportApproval', { staffEmail: session.Email, year, month });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        showToast('ส่งคำขอสำเร็จ! รอ approver อนุมัติ ✅', 'success');
+        showToast('ส่งคำขอแล้ว รออนุมัติ ✅', 'success');
         await loadMyExports();
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-      }
-    }
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
 
-    async function downloadDraft() {
+    window.downloadDraft = async () => {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
-      showLoading('กำลังสร้าง Draft Excel...');
+      showLoading('กำลังสร้าง Draft...');
       try {
         const r = await apiPost('downloadDraftExport', { staffEmail: session.Email, year, month, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        downloadBase64Excel(r);
-        showToast('Download Draft สำเร็จ (มี watermark) ✅', 'success');
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-      }
-    }
+        dl(r); showToast('โหลด Draft สำเร็จ (มีลายน้ำ) ✅', 'success');
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
 
-    async function downloadFinal(exportId) {
-      showLoading('กำลังดาวน์โหลด Excel...');
+    window.downloadFinal = async (exportId) => {
+      showLoading('กำลังดาวน์โหลด...');
       try {
         const r = await apiPost('downloadFinalExport', { exportId, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        downloadBase64Excel(r);
-        showToast('Download สำเร็จ ✅', 'success');
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-      }
-    }
+        dl(r); showToast('ดาวน์โหลดสำเร็จ ✅', 'success');
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
 
-    function downloadBase64Excel(result) {
+    function dl(result) {
       if (!result.base64) throw new Error('ไม่มีข้อมูลไฟล์');
       const bytes = atob(result.base64);
       const arr = new Uint8Array(bytes.length);
@@ -250,15 +199,12 @@
       const blob = new Blob([arr], { type: result.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename || 'export.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.href = url; a.download = result.filename || 'export.xlsx';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
 
-    // ─── Signature ───
+    // ── Signature pad ──
     async function initSignature() {
       const canvas = document.getElementById('sigCanvas');
       if (!canvas) return;
@@ -272,44 +218,41 @@
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
       ctx.scale(dpr, dpr);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.strokeStyle = '#0F172A'; ctx.lineWidth = 2.5;
       let drawing = false, empty = true;
-      const placeholder = document.getElementById('sigPlaceholder');
-      const pos = e => { const r = canvas.getBoundingClientRect(); return { x: (e.touches ? e.touches[0].clientX : e.clientX) - r.left, y: (e.touches ? e.touches[0].clientY : e.clientY) - r.top }; };
-      const start = e => { drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); };
-      const draw = e => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); empty = false; placeholder.style.display = 'none'; e.preventDefault(); };
-      const end = () => { drawing = false; };
-      canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', end); canvas.addEventListener('mouseout', end);
-      canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', draw); canvas.addEventListener('touchend', end);
+      const ph = document.getElementById('sigPlaceholder');
+      const pos = e => { const r = canvas.getBoundingClientRect(); return { x:(e.touches?e.touches[0].clientX:e.clientX)-r.left, y:(e.touches?e.touches[0].clientY:e.clientY)-r.top }; };
+      const start = e => { drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+      const draw = e => { if(!drawing) return; const p = pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); empty=false; ph.style.display='none'; e.preventDefault(); };
+      const end = () => drawing = false;
+      canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',draw);
+      canvas.addEventListener('mouseup',end); canvas.addEventListener('mouseout',end);
+      canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',draw,{passive:false}); canvas.addEventListener('touchend',end);
       sigPad = {
         isEmpty: () => empty,
-        clear: () => { ctx.clearRect(0, 0, canvas.width, canvas.height); empty = true; placeholder.style.display = 'block'; },
+        clear: () => { ctx.clearRect(0,0,canvas.width,canvas.height); empty=true; ph.style.display='block'; },
         toDataURL: () => canvas.toDataURL('image/png')
       };
       document.getElementById('clearSigBtn').addEventListener('click', () => sigPad.clear());
       document.getElementById('saveSigBtn').addEventListener('click', onSaveSignature);
-
-      // ✨ Upload image handler
-      document.getElementById('sigUpload').addEventListener('change', async (e) => {
+      document.getElementById('sigUpload').addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
-        if (file.size > 2 * 1024 * 1024) { showToast('ไฟล์ใหญ่เกิน 2 MB', 'error'); return; }
+        if (file.size > 2*1024*1024) return showToast('ไฟล์ใหญ่เกิน 2 MB', 'error');
         const reader = new FileReader();
         reader.onload = () => {
           const img = new Image();
           img.onload = () => {
             sigPad.clear();
-            const ratio = Math.min(canvas.getBoundingClientRect().width / img.width, 150 / img.height);
-            const w = img.width * ratio, h = img.height * ratio;
-            const x = (canvas.getBoundingClientRect().width - w) / 2;
-            const y = (150 - h) / 2;
-            ctx.drawImage(img, x, y, w, h);
-            empty = false;
-            placeholder.style.display = 'none';
+            const W = canvas.getBoundingClientRect().width, H = 150;
+            const ratio = Math.min(W/img.width, H/img.height);
+            const w = img.width*ratio, h = img.height*ratio;
+            ctx.drawImage(img, (W-w)/2, (H-h)/2, w, h);
+            empty = false; ph.style.display = 'none';
+            showToast('โหลดรูปแล้ว — กด "บันทึกลายเซ็น"', 'success');
           };
           img.src = reader.result;
         };
@@ -319,7 +262,7 @@
     }
 
     async function onSaveSignature() {
-      if (!sigPad || sigPad.isEmpty()) return showToast('กรุณาเซ็นก่อน', 'error');
+      if (!sigPad || sigPad.isEmpty()) return showToast('กรุณาเซ็นหรืออัปโหลดก่อน', 'error');
       const base64 = sigPad.toDataURL();
       showLoading('กำลังบันทึกลายเซ็น...');
       try {
@@ -333,16 +276,7 @@
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
 
-    function onLogout() {
-      if (confirm('ออกจากระบบ?')) { clearSession(); location.href = 'index.html'; }
-    }
-
-    if (session) {
-      init();
-      renderBottomNav('profile');
-      loadMyExports();
-      initSignature();
-    }
+    if (session) { init(); renderBottomNav('profile'); loadMyExports(); initSignature(); }
   </script>
 </body>
 </html>
