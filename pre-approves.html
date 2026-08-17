@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Pre-Approves — EXION</title>
+  <title>Pre-Approve ของฉัน — EXION</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
@@ -11,102 +11,102 @@
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>
-      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
-      <span style="font-size:14px; font-weight:600; margin-left:6px;">Pre-Approves</span>
-    </h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">Pre-Approve ของฉัน</span></h1>
   </div>
+
   <div class="container">
-    <a href="pre-approve.html" class="btn btn-primary" style="text-decoration:none; margin-bottom:16px; display:block;">
-      ➕ ขอ Pre-Approve ใหม่
-    </a>
+    <a href="pre-approve.html" class="btn btn-primary" style="text-decoration:none;margin-bottom:14px;">➕ ขอ Pre-Approve ใหม่</a>
+    <div id="kpiZone"></div>
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
+
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    let myPres = [];
+    const CAT_TH = { ENT:'🍽 ค่ารับรอง', GOLF:'⛳ กอล์ฟ' };
 
-    function setI(id, n) { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); }
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
     async function load() {
-      setI('backBtn', 'back');
       try {
         const all = await fetchMyRequests(session.Email);
-        myPres = (all || []).filter(r => r.PreApproveStatus);
+        const pres = (all || []).filter(r => r.PreApproveStatus);
         const list = document.getElementById('list');
         list.classList.remove('loading');
-        if (myPres.length === 0) {
-          list.innerHTML = `
-            <div class="empty">
-              <div class="icon-wrap">📋</div>
-              <div class="title">ยังไม่มี Pre-Approve</div>
-              <div class="sub">กดด้านบนเพื่อขอ Pre-Approve ใหม่</div>
-            </div>`;
+
+        if (!pres.length) {
+          document.getElementById('kpiZone').innerHTML = '';
+          list.innerHTML = `<div class="empty"><div class="icon-wrap">📋</div>
+            <div class="title">ยังไม่มี Pre-Approve</div>
+            <div class="sub">กดปุ่มด้านบนเพื่อขออนุมัติงบล่วงหน้า</div></div>`;
           renderBottomNav('new');
           return;
         }
-        // Group by status
-        const pending = myPres.filter(r => r.PreApproveStatus === 'Pending');
-        // ✨ ต้อง finalize = อนุมัติแล้ว + ยังไม่ finalize
-        const readyToFinalize = myPres.filter(r => r.PreApproveStatus === 'Approved' && r.Status !== 'Finalized');
-        const done = myPres.filter(r => r.Status === 'Finalized' || r.PreApproveStatus === 'Rejected');
+
+        const pending = pres.filter(r => r.PreApproveStatus === 'Pending');
+        const ready   = pres.filter(r => r.PreApproveStatus === 'Approved' && r.Status !== 'Finalized');
+        const done    = pres.filter(r => r.Status === 'Finalized' || r.PreApproveStatus === 'Rejected');
+        const budgetTotal = ready.reduce((s,r) => s + (Number(r.PreApproveBudget)||0), 0);
+
+        document.getElementById('kpiZone').innerHTML = `<div class="kpi-grid">
+          <div class="kpi warn"><div class="n">${pending.length}</div><div class="l">รออนุมัติงบ</div></div>
+          <div class="kpi ok"><div class="n">${ready.length}</div><div class="l">รอส่งบิล</div></div>
+          <div class="kpi"><div class="n">${done.length}</div><div class="l">เสร็จสิ้น</div></div>
+          <div class="kpi"><div class="n">${Math.round(budgetTotal).toLocaleString()}</div><div class="l">งบคงค้าง</div></div>
+        </div>`;
 
         let html = '';
-        if (pending.length > 0) {
-          html += `<h2 style="font-size:12px; font-weight:700; color:var(--warning); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">⏳ รอ Manager อนุมัติงบ (${pending.length})</h2>`;
-          pending.forEach(r => { html += renderRow(r, 'pending'); });
+        if (ready.length) {
+          html += `<div class="sec-label" style="color:var(--success);">✅ อนุมัติงบแล้ว — รอส่งบิล (${ready.length})</div>`;
+          ready.forEach(r => html += row(r, 'ready'));
         }
-        if (readyToFinalize.length > 0) {
-          html += `<h2 style="font-size:12px; font-weight:700; color:var(--success); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">✅ อนุมัติงบแล้ว — รอส่งบิล (${readyToFinalize.length})</h2>`;
-          readyToFinalize.forEach(r => { html += renderRow(r, 'ready'); });
+        if (pending.length) {
+          html += `<div class="sec-label" style="color:#B45309;">⏳ รอหัวหน้าอนุมัติงบ (${pending.length})</div>`;
+          pending.forEach(r => html += row(r, 'pending'));
         }
-        if (done.length > 0) {
-          html += `<h2 style="font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">เสร็จสิ้น (${done.length})</h2>`;
-          done.forEach(r => { html += renderRow(r, 'done'); });
+        if (done.length) {
+          html += `<div class="sec-label">เสร็จสิ้น (${done.length})</div>`;
+          done.forEach(r => html += row(r, 'done'));
         }
         list.innerHTML = html;
         renderBottomNav('new');
       } catch (err) {
-        document.getElementById('list').innerHTML = `<div class="empty"><div class="title">${err.message}</div></div>`;
+        const list = document.getElementById('list');
+        list.classList.remove('loading');
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">${err.message}</div></div>`;
         renderBottomNav('new');
       }
     }
 
-    function renderRow(r, state) {
-      const labels = {
-        pending: '<span class="badge pending">⏳ รอ Manager</span>',
-        ready: '<span class="badge approved">✅ พร้อมส่งบิล</span>',
-        done: r.Status === 'Finalized' ? '<span class="badge approved">✓ ส่งบิลแล้ว</span>' :
-              r.PreApproveStatus === 'Rejected' ? '<span class="badge rejected">Manager Reject</span>' :
-              statusBadge(r.Status)
-      };
-      // ✨ ปุ่ม Finalize → redirect ไปหน้า finalize-claim.html (multi-item)
-      const action = state === 'ready'
-        ? `<a href="finalize-claim.html?id=${r.ID}" class="btn btn-primary" style="text-decoration:none; margin-top:10px; padding:10px; font-size:13px; display:block; text-align:center;">📤 ส่งบิล + ยอดจริง</a>`
-        : '';
+    function row(r, state) {
+      const cls = state === 'ready' ? 'ok' : state === 'pending' ? 'warn' : '';
+      const badge = state === 'pending' ? '<span class="pill warn">⏳ รอหัวหน้า</span>'
+        : state === 'ready' ? '<span class="pill ok">✅ พร้อมส่งบิล</span>'
+        : r.Status === 'Finalized' ? '<span class="pill ok">✓ ส่งบิลแล้ว</span>'
+        : '<span class="pill bad">❌ ไม่อนุมัติ</span>';
+      const custRaw = String(r.Customer || '-');
+      const m = custRaw.match(/^\[(.+?)\]\s*(.*)$/);
+      const custTag = m ? `<span class="tag">${m[1]}</span> ${m[2]}` : custRaw;
+      const over = Number(r.Amount) > Number(r.PreApproveBudget);
 
-      return `<div class="card" style="padding:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-          <div>
-            <div style="font-weight:700;">${r.Category} — ${r.Customer || '-'}</div>
-            <div style="font-size:11px; color:var(--gray-500);">${formatDate(r.ExpenseDate)} • ${r.Venue || '-'}</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-weight:800; color:var(--brand-2);">${formatCurrency(r.PreApproveBudget)}</div>
-            <div style="font-size:10px; color:var(--gray-500);">งบ THB</div>
-          </div>
+      return `<div class="request-item ${cls}">
+        <div class="ri-top">
+          <span class="ri-cat">${CAT_TH[r.Category] || r.Category}</span>
+          ${badge}
+          <span class="ri-amt">${formatCurrency(r.PreApproveBudget)} ฿</span>
         </div>
-        <div>${labels[state]}</div>
-        ${r.Amount > 0 ? `<div style="margin-top:8px; padding:8px; background:var(--gray-50); border-radius:8px; font-size:12px;">
-          ยอดจริง: <b>${formatCurrency(r.Amount)} THB</b>
-          ${Number(r.Amount) > Number(r.PreApproveBudget) ? '<span style="color:var(--danger);"> (เกินงบ)</span>' : '<span style="color:var(--success);"> ✓ ภายในงบ</span>'}
-        </div>` : ''}
-        ${r.PreApproveBy ? `<div style="font-size:11px; color:var(--gray-500); margin-top:4px;">อนุมัติโดย: ${r.PreApproveBy}</div>` : ''}
-        ${action}
+        <div class="ri-meta">${custTag}</div>
+        <div class="ri-meta">${formatDate(r.ExpenseDate)} • ${r.Venue || '-'}</div>
+        ${r.Occasion ? `<div class="ri-meta" style="color:var(--gray-400);">💬 ${r.Occasion}</div>` : ''}
+        ${Number(r.Amount) > 0 ? `<div class="${over?'bad-box':'ok-box'}" style="margin:9px 0 0;">
+            ยอดจริง <b>${formatCurrency(r.Amount)} THB</b> ${over ? '— เกินงบ ต้องอนุมัติซ้ำ' : '— อยู่ในงบ ✓'}
+          </div>` : ''}
+        ${r.PreApproveBy ? `<div class="ri-meta" style="margin-top:6px;">อนุมัติงบโดย ${r.PreApproveBy}</div>` : ''}
+        ${state === 'ready' ? `<a href="finalize-claim.html?id=${r.ID}" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:10px;">📤 ส่งบิล + ยอดจริง</a>` : ''}
       </div>`;
     }
 
