@@ -3,99 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>All Requests — EXION Expense</title>
+  <title>All Requests — EXION</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
+  <style>
+    .flt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .flt-grid .field { margin:0; }
+    .flt-grid label { font-size:10.5px; }
+    .flt-grid select, .flt-grid input { padding:9px 11px; font-size:13px; }
+    .search-box { position:relative; margin-top:9px; }
+    .search-box input { padding-left:38px; }
+    .search-box::before { content:'🔍'; position:absolute; left:13px; top:50%; transform:translateY(-50%); font-size:14px; opacity:.5; }
+  </style>
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>
-      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
-      <span style="font-size:14px; font-weight:600; margin-left:6px;">All Requests</span>
-    </h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">All Requests</span></h1>
   </div>
 
   <div class="container">
     <!-- Filters -->
-    <div class="card" style="padding:16px;">
-      <h2>Filters</h2>
-      <h3 style="margin-bottom:12px;">กรองรายการ</h3>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <div class="field" style="margin:0;">
-          <label style="font-size:11px;">สถานะ</label>
-          <select id="fStatus">
-            <option value="">ทั้งหมด</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-          </select>
+    <div class="card">
+      <div class="sec-label" style="margin:0 0 10px;">🔎 กรองรายการ</div>
+      <div class="flt-grid">
+        <div class="field"><label>สถานะ</label>
+          <select id="fStatus"><option value="">ทั้งหมด</option><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select>
         </div>
-        <div class="field" style="margin:0;">
-          <label style="font-size:11px;">แผนก</label>
-          <select id="fDept"><option value="">ทั้งหมด</option></select>
-        </div>
-        <div class="field" style="margin:0;">
-          <label style="font-size:11px;">พนักงาน</label>
-          <select id="fStaff"><option value="">ทั้งหมด</option></select>
-        </div>
-        <div class="field" style="margin:0;">
-          <label style="font-size:11px;">ประเภท</label>
-          <select id="fCategory"><option value="">ทั้งหมด</option></select>
-        </div>
-        <div class="field" style="margin:0;">
-          <label style="font-size:11px;">ปี</label>
-          <select id="fYear"><option value="">ทั้งหมด</option></select>
-        </div>
-        <div class="field" style="margin:0;">
-          <label style="font-size:11px;">เดือน</label>
-          <select id="fMonth">
-            <option value="">ทั้งหมด</option>
-            <option value="01">ม.ค.</option><option value="02">ก.พ.</option>
-            <option value="03">มี.ค.</option><option value="04">เม.ย.</option>
-            <option value="05">พ.ค.</option><option value="06">มิ.ย.</option>
-            <option value="07">ก.ค.</option><option value="08">ส.ค.</option>
-            <option value="09">ก.ย.</option><option value="10">ต.ค.</option>
-            <option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
+        <div class="field"><label>แผนก</label><select id="fDept"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label>พนักงาน</label><select id="fStaff"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label>ประเภท</label><select id="fCategory"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label>ปี</label><select id="fYear"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label>เดือน</label>
+          <select id="fMonth"><option value="">ทั้งหมด</option>
+            <option value="01">ม.ค.</option><option value="02">ก.พ.</option><option value="03">มี.ค.</option>
+            <option value="04">เม.ย.</option><option value="05">พ.ค.</option><option value="06">มิ.ย.</option>
+            <option value="07">ก.ค.</option><option value="08">ส.ค.</option><option value="09">ก.ย.</option>
+            <option value="10">ต.ค.</option><option value="11">พ.ย.</option><option value="12">ธ.ค.</option>
           </select>
         </div>
       </div>
-
-      <div class="field" style="margin:10px 0 0;">
-        <input type="text" id="fSearch" placeholder="🔍 ค้นหา ชื่อพนักงาน, สถานที่, ID..." style="font-size:14px;">
-      </div>
-
-      <button class="btn btn-secondary" id="clearBtn" style="width:100%; margin-top:8px; font-size:13px;">ล้างฟิลเตอร์ทั้งหมด</button>
+      <div class="search-box"><input type="text" id="fSearch" placeholder="ค้นหา ชื่อ / สถานที่ / ID..."></div>
+      <button class="btn btn-secondary btn-sm" id="clearBtn" style="width:100%;margin-top:9px;">🗑 ล้างฟิลเตอร์</button>
     </div>
 
-    <!-- Stats summary -->
-    <div class="card" id="statsCard" style="display:none;">
-      <h2>สรุปผลลัพธ์</h2>
-      <h3 id="statsLabel" style="margin-bottom:12px;">—</h3>
-      <div class="stats-grid">
-        <div class="stat warning"><div class="value" id="cntPending">0</div><div class="label">รออนุมัติ</div></div>
-        <div class="stat success"><div class="value" id="cntApproved">0</div><div class="label">อนุมัติ</div></div>
-        <div class="stat"><div class="value" id="cntRejected" style="color:var(--danger);">0</div><div class="label">ปฏิเสธ</div></div>
-      </div>
-      <div style="text-align:center; margin-top:14px; padding-top:14px; border-top:1px solid var(--gray-100);">
-        <div style="font-size:11px; color:var(--gray-500); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">รวมมูลค่า</div>
-        <div style="font-size:26px; font-weight:800; color:var(--brand-2); letter-spacing:-0.02em; margin-top:4px;" id="totalAmount">0.00 THB</div>
-      </div>
-    </div>
-
-    <!-- List -->
+    <div id="statsZone"></div>
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
 
-  <!-- Detail modal -->
   <div id="modal" class="modal">
     <div class="modal-content">
-      <div class="modal-head">
-        <h3 id="modalTitle">รายละเอียดคำขอ</h3>
-        <button class="modal-close" onclick="closeModal()" id="closeBtn"></button>
-      </div>
+      <div class="modal-head"><h3 id="modalTitle">รายละเอียด</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
       <div id="modalContent"></div>
     </div>
   </div>
@@ -108,10 +67,13 @@
     const session = requireLogin();
     let allRequests = [];
 
-    async function load() {
-      document.getElementById('backBtn').innerHTML = icon('back');
-      document.getElementById('closeBtn').innerHTML = icon('x');
+    const CAT_TH = { FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม', ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ', CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทร ตปท.', APT:'ที่พัก' };
+    const CAT_IC = { FUEL:'⛽', EXPRESS:'🛣️', PARK:'🅿️', HOTEL:'🏨', ENT:'🍽️', GOLF:'⛳', TRAVEL:'✈️', OTHER:'📦', CAR:'🚗', MOBILE:'📱', OVERSEAS:'☎️', APT:'🏠' };
 
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    async function load() {
       try {
         const result = await fetchAllRequests(session.Email);
         if (result && result.error) throw new Error(result.error);
@@ -120,144 +82,112 @@
         applyFilters();
         renderBottomNav('home');
       } catch (err) {
-        document.getElementById('list').innerHTML =
-          `<div class="empty"><div class="title">${err.message}</div></div>`;
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">${err.message}</div></div>`;
         renderBottomNav('home');
       }
-
-      // Filter listeners
-      ['fStatus','fDept','fStaff','fCategory','fYear','fMonth','fSearch'].forEach(id => {
-        document.getElementById(id).addEventListener('change', applyFilters);
-        document.getElementById(id).addEventListener('input', applyFilters);
-      });
+      ['fStatus','fDept','fStaff','fCategory','fYear','fMonth'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
+      document.getElementById('fSearch').addEventListener('input', applyFilters);
       document.getElementById('clearBtn').addEventListener('click', clearFilters);
     }
 
     function populateFilters() {
-      const depts = new Set(), staffs = new Set(), cats = new Set(), years = new Set();
+      const depts=new Set(), staffs=new Set(), cats=new Set(), years=new Set();
       allRequests.forEach(r => {
         if (r.Department) depts.add(r.Department);
         if (r.StaffName) staffs.add(r.StaffName);
         if (r.Category) cats.add(r.Category);
-        const d = r.ExpenseDate || r.Timestamp;
-        if (d) {
-          const y = String(d).substring(0, 4);
-          if (/^\d{4}$/.test(y)) years.add(y);
-        }
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        if (!isNaN(d)) years.add(String(d.getFullYear()));
       });
       fill('fDept', [...depts].sort());
       fill('fStaff', [...staffs].sort());
-      fill('fCategory', [...cats].sort());
+      fill('fCategory', [...cats].sort(), CAT_TH);
       fill('fYear', [...years].sort().reverse());
     }
 
-    function fill(id, items) {
+    function fill(id, items, labelMap) {
       const sel = document.getElementById(id);
       const first = sel.options[0];
-      sel.innerHTML = '';
-      sel.appendChild(first);
-      items.forEach(v => {
-        const o = document.createElement('option');
-        o.value = v; o.textContent = v;
-        sel.appendChild(o);
-      });
+      sel.innerHTML = ''; sel.appendChild(first);
+      items.forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=(labelMap&&labelMap[v])||v; sel.appendChild(o); });
     }
 
     function clearFilters() {
-      ['fStatus','fDept','fStaff','fCategory','fYear','fMonth','fSearch'].forEach(id => {
-        document.getElementById(id).value = '';
-      });
+      ['fStatus','fDept','fStaff','fCategory','fYear','fMonth','fSearch'].forEach(id => document.getElementById(id).value = '');
       applyFilters();
     }
 
     function applyFilters() {
-      const status = document.getElementById('fStatus').value;
-      const dept = document.getElementById('fDept').value;
-      const staff = document.getElementById('fStaff').value;
-      const cat = document.getElementById('fCategory').value;
-      const year = document.getElementById('fYear').value;
-      const month = document.getElementById('fMonth').value;
-      const search = document.getElementById('fSearch').value.trim().toLowerCase();
+      const g = id => document.getElementById(id).value;
+      const status=g('fStatus'), dept=g('fDept'), staff=g('fStaff'), cat=g('fCategory'), year=g('fYear'), month=g('fMonth');
+      const search = g('fSearch').trim().toLowerCase();
 
       const filtered = allRequests.filter(r => {
         if (status && r.Status !== status) return false;
         if (dept && r.Department !== dept) return false;
         if (staff && r.StaffName !== staff) return false;
         if (cat && r.Category !== cat) return false;
-        const d = String(r.ExpenseDate || r.Timestamp || '');
-        if (year && !d.startsWith(year)) return false;
-        if (month && d.substring(5, 7) !== month) return false;
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        if (year && (isNaN(d) || String(d.getFullYear()) !== year)) return false;
+        if (month && (isNaN(d) || String(d.getMonth()+1).padStart(2,'0') !== month)) return false;
         if (search) {
-          const blob = `${r.StaffName} ${r.Venue} ${r.ID} ${r.Occasion}`.toLowerCase();
+          const blob = `${r.StaffName} ${r.Venue} ${r.ID} ${r.Occasion} ${r.Customer}`.toLowerCase();
           if (!blob.includes(search)) return false;
         }
         return true;
       });
-
       renderStats(filtered);
       renderList(filtered);
     }
 
     function renderStats(items) {
-      const card = document.getElementById('statsCard');
-      card.style.display = 'block';
-      card.classList.remove('loading');
-      document.getElementById('statsLabel').textContent = items.length + ' รายการ';
-
-      const cntP = items.filter(r => r.Status === 'Pending').length;
-      const cntA = items.filter(r => r.Status === 'Approved').length;
-      const cntR = items.filter(r => r.Status === 'Rejected').length;
-      const total = items.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
-
-      document.getElementById('cntPending').textContent = cntP;
-      document.getElementById('cntApproved').textContent = cntA;
-      document.getElementById('cntRejected').textContent = cntR;
-      document.getElementById('totalAmount').textContent = formatCurrency(total) + ' THB';
+      const p = items.filter(r => r.Status==='Pending').length;
+      const a = items.filter(r => r.Status==='Approved').length;
+      const rj = items.filter(r => r.Status==='Rejected').length;
+      const total = items.reduce((s,r) => s+(Number(r.Amount)||0), 0);
+      document.getElementById('statsZone').innerHTML = `
+        <div class="kpi-grid">
+          <div class="kpi red"><div class="label">💰 รวม</div><div class="value">${Math.round(total).toLocaleString()}</div><div class="delta">THB • ${items.length} รายการ</div></div>
+          <div class="kpi green"><div class="label">✅ Approved</div><div class="value">${a}</div><div class="delta">รายการ</div></div>
+          <div class="kpi orange"><div class="label">⏳ Pending</div><div class="value">${p}</div><div class="delta">รายการ</div></div>
+          <div class="kpi blue" style="background:linear-gradient(135deg,#64748B,#475569);"><div class="label">❌ Rejected</div><div class="value">${rj}</div><div class="delta">รายการ</div></div>
+        </div>`;
     }
 
     function renderList(items) {
       const list = document.getElementById('list');
       list.classList.remove('loading');
-
       if (items.length === 0) {
-        list.innerHTML = `
-          <div class="empty">
-            <div class="icon-wrap">${icon('inbox')}</div>
-            <div class="title">ไม่พบรายการ</div>
-            <div class="sub">ลองปรับฟิลเตอร์</div>
-          </div>`;
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">🔍</div><div class="title">ไม่พบรายการ</div><div class="sub">ลองปรับฟิลเตอร์</div></div>`;
         return;
       }
-
-      // Group by month
       const byMonth = {};
-      items.forEach((r, idx) => {
+      items.forEach(r => {
         const d = new Date(r.ExpenseDate || r.Timestamp);
-        const key = d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
-        if (!byMonth[key]) byMonth[key] = [];
-        byMonth[key].push({...r, _idx: allRequests.indexOf(r)});
+        const key = isNaN(d) ? 'ไม่ระบุ' : d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
+        (byMonth[key] = byMonth[key] || []).push(r);
       });
 
       let html = '';
       Object.entries(byMonth).forEach(([month, reqs]) => {
-        html += `<h2 style="font-size:12px; font-weight:700; color:var(--gray-500); letter-spacing:0.06em; text-transform:uppercase; margin:20px 4px 10px;">${month}</h2>`;
+        const sub = reqs.reduce((s,r)=>s+(Number(r.Amount)||0),0);
+        html += `<div class="sec-label">${month} · ${reqs.length} รายการ · ${Math.round(sub).toLocaleString()} ฿</div>`;
         reqs.forEach(r => {
-          const statusColor = r.Status === 'Pending' ? '#FEF3C7' :
-                             r.Status === 'Approved' ? '#D1FAE5' : '#FEE2E2';
-          const textColor = r.Status === 'Pending' ? '#92400E' :
-                           r.Status === 'Approved' ? '#065F46' : '#991B1B';
-          html += `
-            <div class="request-item" onclick="showDetail(${r._idx})">
-              <div class="cat-icon" style="background:${statusColor}; color:${textColor};">${categoryIcon(r.Category)}</div>
-              <div class="info">
-                <div class="title">${r.StaffName} — ${r.Category}</div>
-                <div class="meta">${formatDate(r.ExpenseDate || r.Timestamp)}${r.Venue ? ' • ' + r.Venue : ''}</div>
-              </div>
-              <div class="right">
-                <div class="amount">${formatCurrency(r.Amount)}</div>
-                ${statusBadge(r.Status)}
-              </div>
-            </div>`;
+          const idx = allRequests.indexOf(r);
+          const bg = r.Status==='Pending' ? '#FEF3C7' : r.Status==='Approved' ? '#DCFCE7' : '#FEE2E2';
+          const fg = r.Status==='Pending' ? '#92400E' : r.Status==='Approved' ? '#065F46' : '#991B1B';
+          const badgeCls = 'badge-' + String(r.Status||'').toLowerCase();
+          html += `<div class="request-item" onclick="showDetail(${idx})">
+            <div class="cat-icon" style="background:${bg};color:${fg};">${CAT_IC[r.Category]||'📦'}</div>
+            <div class="info">
+              <div class="title">${r.StaffName} · ${CAT_TH[r.Category]||r.Category}</div>
+              <div class="meta">${formatDate(r.ExpenseDate || r.Timestamp)}${r.Venue ? ' • ' + r.Venue : ''}</div>
+            </div>
+            <div class="right">
+              <div class="amount">${Math.round(Number(r.Amount)||0).toLocaleString()}</div>
+              <span class="badge-pill ${badgeCls}" style="font-size:9.5px;">${r.Status||'-'}</span>
+            </div>
+          </div>`;
         });
       });
       list.innerHTML = html;
@@ -265,87 +195,50 @@
 
     function showDetail(idx) {
       const r = allRequests[idx];
-      document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + r.Category;
-
+      document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + (CAT_TH[r.Category]||r.Category);
+      const badgeCls = 'badge-' + String(r.Status||'').toLowerCase();
       const rows = [
-        ['Request ID', r.ID],
-        ['พนักงาน', r.StaffName + ' (' + r.Department + ')'],
-        ['Email', r.StaffEmail],
-        ['ประเภท', r.Category],
-        ['วันที่', formatDate(r.ExpenseDate)],
-        ['สถานที่', r.Venue || '-'],
-        ['โอกาส', r.Occasion || '-'],
-        ['ผู้ร่วม', r.Attendees || '-']
+        ['ID', r.ID], ['พนักงาน', r.StaffName + ' (' + r.Department + ')'], ['Email', r.StaffEmail],
+        ['ประเภท', CAT_TH[r.Category]||r.Category], ['วันที่', formatDate(r.ExpenseDate)],
+        ['สถานที่', r.Venue || '-'], ['โอกาส', r.Occasion || '-'], ['ผู้ร่วม', r.Attendees || '-']
       ];
+      if (r.Customer) rows.push(['ลูกค้า', r.Customer]);
+      if (r.Mileage_KM) rows.push(['ระยะทาง', r.Mileage_KM + ' กม.']);
+      if (r.ApprovedBy) rows.push(['ผู้อนุมัติ', r.ApprovedBy]);
+      if (r.ApprovedAt) rows.push(['อนุมัติเมื่อ', formatDate(r.ApprovedAt)]);
+      if (r.Remark) rows.push(['หมายเหตุ', String(r.Remark).split(' sig:')[0]]);
 
-      let html = `
-        <div class="detail-row">
-          <div class="key">จำนวนเงิน</div>
-          <div class="val big">${formatCurrency(r.Amount)} <span style="font-size:13px; color:var(--gray-500); font-weight:600;">THB</span></div>
-        </div>
-        <div class="detail-row">
-          <div class="key">สถานะ</div>
-          <div class="val">${statusBadge(r.Status)}</div>
-        </div>` + rows.map(([k, v]) =>
-          `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`
-        ).join('');
+      let html = `<div class="detail-row"><div class="key">จำนวนเงิน</div><div class="val big">${Math.round(Number(r.Amount)||0).toLocaleString()} <span style="font-size:13px;color:var(--gray-500);font-weight:600;">THB</span></div></div>
+        <div class="detail-row"><div class="key">สถานะ</div><div class="val"><span class="badge-pill ${badgeCls}">${r.Status}</span></div></div>`
+        + rows.map(([k,v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
 
-      if (r.ApprovedBy) html += `<div class="detail-row"><div class="key">ผู้อนุมัติ</div><div class="val">${r.ApprovedBy}</div></div>`;
-      if (r.ApprovedAt) html += `<div class="detail-row"><div class="key">เวลาอนุมัติ</div><div class="val">${formatDate(r.ApprovedAt)}</div></div>`;
-      if (r.Remark) html += `<div class="detail-row"><div class="key">หมายเหตุ</div><div class="val">${r.Remark}</div></div>`;
-
-      if (r.ReceiptURL) {
-        html += `<div style="margin-top:16px;">
-          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ใบเสร็จ</div>
-          <div class="locked-box" id="rcptLocked">
-            <div class="lock-icon">${icon('lock')}</div>
-            <button class="btn btn-secondary" onclick="loadReceipt('${r.ID}')" id="rcptBtn">${icon('lock')} ดูใบเสร็จ</button>
-          </div>
-          <img id="rcptImg" class="preview-img" style="display:none;">
-        </div>`;
+      let urls = [];
+      try { urls = JSON.parse(r.ReceiptURLs || '[]'); } catch {}
+      if (urls.length === 0 && r.ReceiptURL) urls = [r.ReceiptURL];
+      if (urls.length > 0) {
+        html += `<div style="margin-top:16px;"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">📎 ใบเสร็จ (${urls.length})</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+        for (let i=0;i<urls.length;i++) html += `<button class="btn btn-secondary btn-sm" onclick="loadReceipt('${r.ID}',${i})">🔒 ไฟล์ ${i+1}</button>`;
+        html += `</div><img id="rcptImg" class="preview-img" style="display:none;"></div>`;
       }
-
-      if (r.Signature) {
-        html += `<div style="margin-top:14px;">
-          <div style="font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:8px;">ลายเซ็น GM</div>
-          <a href="${r.Signature}" target="_blank" style="color:var(--accent); font-size:12px;">เปิดดูในแท็บใหม่ →</a>
-        </div>`;
-      }
-
       document.getElementById('modalContent').innerHTML = html;
       document.getElementById('modal').classList.add('show');
     }
 
-    async function loadReceipt(id) {
-      const btn = document.getElementById('rcptBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
-      showLoading('กำลังโหลดใบเสร็จ...');
+    async function loadReceipt(id, fileIndex) {
+      showLoading('โหลดใบเสร็จ...');
       try {
-        const r = await fetchReceiptImage(id, session.Email);
+        const r = await fetchReceiptImage(id, session.Email, fileIndex);
+        hideLoading();
         if (r.error) throw new Error(r.error);
-        hideLoading();
         const img = document.getElementById('rcptImg');
-        img.src = r.dataUrl;
-        img.style.display = 'block';
-        img.classList.add('zoomable');
+        img.src = r.dataUrl; img.style.display = 'block';
         img.onclick = () => openImageViewer(r.dataUrl, 'แตะ 2 ครั้งเพื่อซูม');
-        document.getElementById('rcptLocked').style.display = 'none';
-      } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
-      }
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
 
-    function closeModal() {
-      document.getElementById('modal').classList.remove('show');
-    }
-    document.getElementById('modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') closeModal();
-    });
-
+    function closeModal() { document.getElementById('modal').classList.remove('show'); }
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+    window.showDetail = showDetail; window.loadReceipt = loadReceipt; window.closeModal = closeModal;
     if (session) load();
   </script>
 </body>
