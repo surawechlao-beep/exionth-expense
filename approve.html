@@ -3,73 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>อนุมัติคำขอ — Exionth Expense</title>
+  <title>อนุมัติคำขอ — EXION Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
 </head>
 <body>
   <div class="header">
-   <div class="header">
-    <h1>
-      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
-      <span style="font-size:14px; font-weight:600; margin-left:6px;">อนุมัติคำขอ</span>
-    </h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">อนุมัติคำขอ</span></h1>
   </div>
 
   <div class="container">
     <div id="loading" class="loading"><div class="spinner"></div></div>
+
     <div id="content" style="display:none;">
-      <!-- Summary card -->
-      <div class="card card-elev">
-        <h2 id="requestCategory">—</h2>
-        <h3 style="margin-bottom:16px;"><span id="requestAmount">—</span> <span style="font-size:14px; color:var(--gray-500); font-weight:600;">THB</span></h3>
-        <div id="details"></div>
+      <div class="count-hero">
+        <div class="lbl" id="reqCat">—</div>
+        <div class="num" id="reqAmount">—</div>
+        <div class="sub">THB</div>
       </div>
 
-      <!-- Receipt card -->
+      <div class="card">
+        <div class="sec-label" style="margin:0 0 8px;">รายละเอียด</div>
+        <div class="detail-list" id="details"></div>
+      </div>
+
       <div class="card" id="receiptBlock" style="display:none;">
-        <h2>ใบเสร็จ</h2>
-        <h3 style="margin-bottom:14px;">Receipt</h3>
-        <div class="locked-box" id="receiptLocked">
-          <div class="lock-icon" id="lockIcon"></div>
-          <div class="text">ใบเสร็จเก็บแบบ Private<br>ใส่ email GM ด้านล่างแล้วกดดูได้</div>
-          <button class="btn btn-secondary" id="viewReceiptBtn">
-            <span id="lockBtnIcon"></span> เปิดดูใบเสร็จ
-          </button>
+        <div class="card-head"><span class="ib ib-blue">🧾</span>
+          <div><div class="ch-title">ใบเสร็จ</div><div class="ch-sub">เก็บแบบส่วนตัว — ต้องยืนยันตัวตน</div></div>
         </div>
-        <img id="receiptImg" class="preview-img" style="display:none;">
+        <div id="receiptLocked" style="margin-top:14px;">
+          <div class="info-box">🔒 ใส่อีเมลของคุณในกล่องด้านล่างก่อน แล้วกดเปิดดู</div>
+          <button class="btn btn-secondary" id="viewReceiptBtn">🔓 เปิดดูใบเสร็จ</button>
+        </div>
+        <img id="receiptImg" class="preview-img" style="display:none;margin-top:12px;">
       </div>
 
-      <!-- Action card -->
-      <div class="card" id="actionsBlock">
-        <h2>ตัดสินใจ</h2>
-        <h3 style="margin-bottom:16px;">Approve / Reject</h3>
-        <div class="field">
-          <label>Email ของคุณ (GM) <span class="required">*</span></label>
-          <input type="email" id="approverEmail" placeholder="gm@exionth.com">
-          <div class="hint">ระบบ verify ก่อนแสดงใบเสร็จและบันทึกการอนุมัติ</div>
+      <div class="card decide-card" id="actionsBlock">
+        <div class="card-head"><span class="ib ib-red">✅</span>
+          <div><div class="ch-title">ตัดสินใจ</div><div class="ch-sub">อนุมัติ หรือ ไม่อนุมัติ</div></div>
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label>อีเมลของคุณ <span class="required">*</span></label>
+          <input type="email" id="approverEmail" placeholder="you@exionth.com" inputmode="email">
+          <div class="hint">ระบบตรวจสอบสิทธิ์ก่อนแสดงใบเสร็จและบันทึกผล</div>
         </div>
         <div class="field">
-          <label>หมายเหตุ <span style="color:var(--gray-400); font-weight:400;">(optional)</span></label>
-          <textarea id="remark" placeholder="เช่น Approved ภายในงบ Q2"></textarea>
+          <label>หมายเหตุ (ถ้ามี)</label>
+          <textarea id="remark" rows="2" placeholder="เช่น อนุมัติ ภายในงบ Q2"></textarea>
         </div>
-        <div class="field">
-          <label>ลายเซ็น <span style="color:var(--gray-400); font-weight:400;">(สำหรับ Approve)</span></label>
-          <div id="sigContainer"></div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-success" id="approveBtn"><span id="okIcon"></span> Approve</button>
-          <button class="btn btn-danger" id="rejectBtn"><span id="xIcon"></span> Reject</button>
+
+        <div id="sigZone"></div>
+
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn btn-danger" id="rejectBtn" style="flex:1;">❌ ไม่อนุมัติ</button>
+          <button class="btn btn-primary" id="approveBtn" style="flex:1.4;">✅ อนุมัติ</button>
         </div>
       </div>
 
-      <!-- Done state -->
-      <div class="card" id="doneBlock" style="display:none; text-align:center; padding:48px 24px;">
-        <div id="doneIcon" style="font-size:64px; line-height:1; margin-bottom:12px;"></div>
-        <h3 id="doneText" style="font-size:22px;"></h3>
-        <p style="color:var(--gray-500); margin:8px 0 24px;">พนักงานได้รับ email แจ้งผลแล้ว</p>
-        <button class="btn btn-secondary" onclick="window.close() || (location.href='index.html')">ปิดหน้านี้</button>
+      <div class="card" id="doneBlock" style="display:none;">
+        <div class="success-screen">
+          <div class="big-ic" id="doneIcon">✅</div>
+          <h2 id="doneText">อนุมัติเรียบร้อย</h2>
+          <p>พนักงานได้รับอีเมลแจ้งผลแล้ว</p>
+          <a href="index.html" class="btn btn-primary" style="display:inline-flex;text-decoration:none;max-width:240px;margin:0 auto;">กลับหน้าแรก →</a>
+        </div>
       </div>
     </div>
   </div>
@@ -79,135 +77,167 @@
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
-    const urlParams = new URLSearchParams(location.search);
-    const requestId = urlParams.get('id');
+    const requestId = new URLSearchParams(location.search).get('id');
+    const CAT_TH = { FUEL:'⛽ น้ำมัน', ENT:'🍽 รับรอง', GOLF:'⛳ กอล์ฟ', TOLL:'🛣 ทางด่วน', PARK:'🅿️ จอดรถ', HOTEL:'🏨 ที่พัก', EXPRESS:'📦 ขนส่ง', MILE:'🚗 เบี้ยเลี้ยงรถ', OTHER:'📄 อื่นๆ' };
+    let savedSig = null, sigPad = null;
 
     async function load() {
-      document.getElementById('lockIcon').innerHTML = icon('lock');
-      document.getElementById('lockBtnIcon').innerHTML = icon('lock');
-      document.getElementById('okIcon').innerHTML = icon('check');
-      document.getElementById('xIcon').innerHTML = icon('x');
-
-      if (!requestId) {
-        document.getElementById('loading').innerHTML =
-          '<div class="empty"><div class="title">ไม่พบ Request ID</div></div>';
-        return;
-      }
+      if (!requestId) return fail('ไม่พบรหัสคำขอ');
       try {
         const r = await fetchRequest(requestId);
-        if (!r) throw new Error('ไม่พบคำขอนี้');
+        if (!r || r.error) throw new Error((r && r.error) || 'ไม่พบคำขอนี้');
 
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
-        document.getElementById('requestCategory').textContent = r.Category;
-        document.getElementById('requestAmount').textContent = formatCurrency(r.Amount);
+        document.getElementById('reqCat').textContent = CAT_TH[r.Category] || r.Category;
+        document.getElementById('reqAmount').textContent = Number(r.Amount||0).toLocaleString();
+
+        const st = String(r.Status||'Pending');
+        const stPill = st === 'Approved' ? '<span class="pill ok">✅ อนุมัติ</span>'
+          : st === 'Rejected' ? '<span class="pill bad">❌ ไม่อนุมัติ</span>'
+          : '<span class="pill warn">⏳ รออนุมัติ</span>';
 
         const rows = [
-          ['Request ID', r.ID],
-          ['พนักงาน', r.StaffName + ' (' + r.Department + ')'],
-          ['Email', r.StaffEmail],
+          ['รหัส', r.ID],
+          ['พนักงาน', (r.StaffName||'-') + (r.Department ? ' · ' + r.Department : '')],
+          ['อีเมล', r.StaffEmail || '-'],
           ['วันที่', formatDate(r.ExpenseDate)],
           ['สถานที่', r.Venue || '-'],
+          ['ลูกค้า', r.Customer || '-'],
           ['โอกาส', r.Occasion || '-'],
           ['ผู้ร่วม', r.Attendees || '-'],
-          ['สถานะ', statusBadge(r.Status)]
+          ['สถานะ', stPill]
         ];
-        document.getElementById('details').innerHTML = rows.map(([k, v]) =>
-          `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`
-        ).join('');
+        document.getElementById('details').innerHTML = rows.map(([k,v]) =>
+          `<div class="dl-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 
         if (r.ReceiptURL) {
           document.getElementById('receiptBlock').style.display = 'block';
           document.getElementById('viewReceiptBtn').addEventListener('click', viewReceipt);
         }
 
-        // Inject signature pad
-        document.getElementById('sigContainer').innerHTML = signaturePadHtml('sigCanvas');
-        setTimeout(() => {
-          const canvas = document.getElementById('sigCanvas');
-          if (canvas) canvas.__sig = new SignaturePad(canvas);
-        }, 50);
-
-        if (r.Status !== 'Pending') {
+        if (st !== 'Pending') {
           document.getElementById('actionsBlock').innerHTML =
-            `<div class="empty">
-              <div class="icon-wrap">${icon('check')}</div>
-              <div class="title">คำขอนี้ ${r.Status} แล้ว</div>
-              <div class="sub">โดย: ${r.ApprovedBy || '-'}</div>
-            </div>`;
-        } else {
-          document.getElementById('approveBtn').addEventListener('click', () => decide('Approved'));
-          document.getElementById('rejectBtn').addEventListener('click', () => decide('Rejected'));
+            `<div class="empty"><div class="icon-wrap">${st === 'Approved' ? '✅' : '❌'}</div>
+              <div class="title">คำขอนี้${st === 'Approved' ? 'อนุมัติ' : 'ปฏิเสธ'}ไปแล้ว</div>
+              <div class="sub">โดย ${r.ApprovedBy || '-'}</div></div>`;
+          return;
         }
-      } catch (err) {
-        document.getElementById('loading').innerHTML =
-          `<div class="empty"><div class="title">${err.message}</div></div>`;
-      }
+
+        document.getElementById('approveBtn').addEventListener('click', () => decide('Approved'));
+        document.getElementById('rejectBtn').addEventListener('click', () => decide('Rejected'));
+
+        // Email → check for a saved signature
+        document.getElementById('approverEmail').addEventListener('blur', checkSavedSig);
+      } catch (err) { fail(err.message); }
+    }
+
+    function fail(msg) {
+      const l = document.getElementById('loading');
+      l.classList.remove('loading');
+      l.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">เปิดไม่ได้</div><div class="sub">${msg}</div></div>`;
+    }
+
+    async function checkSavedSig() {
+      const email = document.getElementById('approverEmail').value.trim();
+      if (!email || email.indexOf('@') < 0) return;
+      try {
+        const r = await getMySignature(email);
+        if (r && r.hasSignature && r.dataUrl) {
+          savedSig = r.dataUrl;
+          document.getElementById('sigZone').innerHTML =
+            `<div class="saved-sig"><div class="ss-label">✅ ใช้ลายเซ็นที่บันทึกไว้อัตโนมัติ</div>
+              <img src="${r.dataUrl}" alt="signature"></div>`;
+          return;
+        }
+      } catch {}
+      renderSigPad();
+    }
+
+    function renderSigPad() {
+      if (sigPad) return;
+      document.getElementById('sigZone').innerHTML = `
+        <div class="field" style="margin-bottom:0;">
+          <label>ลายเซ็น <span class="required">*</span></label>
+          <div class="sig-canvas-wrap">
+            <canvas id="sigCanvas" class="sig-canvas"></canvas>
+            <span id="sigPh" class="sig-ph">✍️ เซ็นที่นี่</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="sigPad.clear()">🗑 ล้าง</button>
+          <div class="hint">💡 บันทึกลายเซ็นในหน้าโปรไฟล์ เพื่อไม่ต้องเซ็นซ้ำทุกครั้ง</div>
+        </div>`;
+      const canvas = document.getElementById('sigCanvas');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0F172A'; ctx.lineWidth=2.5;
+      let drawing=false, empty=true;
+      const ph = document.getElementById('sigPh');
+      const pos = e => { const r=canvas.getBoundingClientRect(); return { x:(e.touches?e.touches[0].clientX:e.clientX)-r.left, y:(e.touches?e.touches[0].clientY:e.clientY)-r.top }; };
+      const start = e => { drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); e.preventDefault(); };
+      const draw = e => { if(!drawing) return; const p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); empty=false; ph.style.display='none'; e.preventDefault(); };
+      const end = () => drawing=false;
+      canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',draw);
+      canvas.addEventListener('mouseup',end); canvas.addEventListener('mouseout',end);
+      canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',draw,{passive:false}); canvas.addEventListener('touchend',end);
+      sigPad = {
+        isEmpty: () => empty,
+        clear: () => { ctx.clearRect(0,0,canvas.width,canvas.height); empty=true; ph.style.display='block'; },
+        toDataURL: () => canvas.toDataURL('image/png')
+      };
     }
 
     async function viewReceipt() {
       const email = document.getElementById('approverEmail').value.trim();
-      if (!email) return showToast('ใส่ email GM ในช่องด้านล่างก่อน', 'error');
+      if (!email) return showToast('ใส่อีเมลของคุณก่อน', 'error');
       const btn = document.getElementById('viewReceiptBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> กำลังโหลด...';
-      showLoading('กำลังโหลดใบเสร็จ...');
+      btn.disabled = true; btn.textContent = 'กำลังโหลด...';
       try {
         const result = await fetchReceiptImage(requestId, email);
         if (result.error) throw new Error(result.error);
         if (!result.dataUrl) throw new Error('ไม่มีใบเสร็จ');
-        hideLoading();
         const img = document.getElementById('receiptImg');
-        img.src = result.dataUrl;
-        img.style.display = 'block';
-        img.classList.add('zoomable');
-        img.onclick = () => openImageViewer(result.dataUrl, 'แตะ 2 ครั้งเพื่อซูม');
+        img.src = result.dataUrl; img.style.display = 'block';
         document.getElementById('receiptLocked').style.display = 'none';
       } catch (err) {
-        hideLoading();
         showToast(err.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = icon('lock') + ' ลองอีกครั้ง';
+        btn.disabled = false; btn.textContent = '🔓 ลองอีกครั้ง';
       }
     }
 
     async function decide(decision) {
       const approverEmail = document.getElementById('approverEmail').value.trim();
-      if (!approverEmail) return showToast('ใส่ email GM', 'error');
+      if (!approverEmail) return showToast('ใส่อีเมลของคุณ', 'error');
       const remark = document.getElementById('remark').value.trim();
-
-      const canvas = document.getElementById('sigCanvas');
-      const sigPad = canvas ? canvas.__sig : null;
-      let signatureBase64 = '';
-      if (decision === 'Approved') {
-        if (!sigPad || sigPad.isEmpty()) {
-          return showToast('กรุณาเซ็นชื่อก่อนอนุมัติ', 'error');
-        }
-        signatureBase64 = sigPad.toDataURL();
-      }
-
-      if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
-
       const isApprove = decision === 'Approved';
-      const btn = isApprove ? document.getElementById('approveBtn') : document.getElementById('rejectBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>';
-      showLoading(isApprove ? 'กำลังอนุมัติ...' : 'กำลังปฏิเสธ...');
 
+      let signatureBase64 = '';
+      if (isApprove) {
+        if (savedSig) signatureBase64 = savedSig;
+        else {
+          if (!sigPad) renderSigPad();
+          if (!sigPad || sigPad.isEmpty()) return showToast('กรุณาเซ็นชื่อก่อนอนุมัติ', 'error');
+          signatureBase64 = sigPad.toDataURL();
+        }
+      }
+      if (!confirm(isApprove ? 'ยืนยันอนุมัติ?' : 'ยืนยันไม่อนุมัติ?')) return;
+
+      const btn = document.getElementById(isApprove ? 'approveBtn' : 'rejectBtn');
+      btn.disabled = true;
+      showLoading('กำลังบันทึก...');
       try {
         const result = await approveRequest({ id: requestId, decision, remark, approverEmail, signatureBase64 });
-        if (result.error) throw new Error(result.error);
         hideLoading();
+        if (result.error) throw new Error(result.error);
         document.getElementById('actionsBlock').style.display = 'none';
         document.getElementById('receiptBlock').style.display = 'none';
         document.getElementById('doneBlock').style.display = 'block';
         document.getElementById('doneIcon').textContent = isApprove ? '✅' : '❌';
-        document.getElementById('doneText').textContent = isApprove ? 'อนุมัติเรียบร้อย' : 'ปฏิเสธเรียบร้อย';
+        document.getElementById('doneText').textContent = isApprove ? 'อนุมัติเรียบร้อย' : 'บันทึกเรียบร้อย';
       } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = (isApprove ? icon('check') + ' Approve' : icon('x') + ' Reject');
+        hideLoading(); showToast(err.message, 'error'); btn.disabled = false;
       }
     }
 
