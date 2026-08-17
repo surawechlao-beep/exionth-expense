@@ -7,97 +7,54 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
-  <style>
-    .filter-card { background:white; padding:12px; border-radius:12px; margin-bottom:12px; border:1px solid var(--gray-200); }
-    .filter-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
-    .filter-grid select, .filter-grid input { padding:8px; border:1px solid var(--gray-300); border-radius:8px; font-size:13px; width:100%; }
-    .summary-row { display:flex; gap:8px; margin-bottom:12px; }
-    .summary-cell { flex:1; background:linear-gradient(135deg,#B7081D,#7a0512); color:white; padding:10px; border-radius:10px; text-align:center; }
-    .summary-cell .value { font-size:18px; font-weight:800; }
-    .summary-cell .label { font-size:10px; opacity:0.9; }
-    .req-item { background:white; border:1px solid var(--gray-200); border-radius:12px; padding:12px; margin-bottom:8px; }
-    .req-head { display:flex; align-items:center; gap:10px; }
-    .req-head .cat { font-weight:700; }
-    .req-head .amount { margin-left:auto; font-weight:800; color:#B7081D; }
-    .req-meta { font-size:12px; color:var(--gray-600); margin-top:4px; }
-    .req-actions { display:flex; gap:6px; margin-top:8px; }
-    .req-actions button { flex:1; padding:6px; font-size:11px; border-radius:6px; border:1px solid var(--gray-300); background:white; cursor:pointer; }
-    .req-actions .edit { color:#0891b2; border-color:#0891b2; }
-    .req-actions .del { color:#dc2626; border-color:#dc2626; }
-    .req-actions .view { color:var(--gray-700); }
-    .badge-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; }
-    .badge-pending { background:#fef3c7; color:#92400e; }
-    .badge-approved { background:#dcfce7; color:#166534; }
-    .badge-rejected { background:#fee2e2; color:#991b1b; }
-    .badge-preapprove { background:#e0e7ff; color:#3730a3; }
-  </style>
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>คำขอของฉัน</h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">คำขอของฉัน</span></h1>
   </div>
 
   <div class="container">
-    <!-- Filter -->
-    <div class="filter-card">
-      <div class="filter-grid">
-        <div>
-          <label style="font-size:11px;color:var(--gray-600);">ตั้งแต่วันที่</label>
-          <input type="date" id="dateFrom">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--gray-600);">ถึงวันที่</label>
-          <input type="date" id="dateTo">
-        </div>
+    <div class="card">
+      <div class="sec-label" style="margin:0 0 10px;">ตัวกรอง</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field" style="margin:0;"><label>ตั้งแต่</label><input type="date" id="dateFrom"></div>
+        <div class="field" style="margin:0;"><label>ถึง</label><input type="date" id="dateTo"></div>
       </div>
-      <div class="filter-grid">
-        <div>
-          <label style="font-size:11px;color:var(--gray-600);">ประเภท</label>
-          <select id="filterCat"><option value="">ทั้งหมด</option></select>
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--gray-600);">สถานะ</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div class="field" style="margin:0;"><label>ประเภท</label><select id="filterCat"><option value="">ทั้งหมด</option></select></div>
+        <div class="field" style="margin:0;"><label>สถานะ</label>
           <select id="filterStatus">
             <option value="">ทั้งหมด</option>
-            <option value="Pending">Pending</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-            <option value="PreApprove">PreApprove</option>
+            <option value="Pending">⏳ รออนุมัติ</option>
+            <option value="Approved">✅ อนุมัติแล้ว</option>
+            <option value="Rejected">❌ ไม่อนุมัติ</option>
           </select>
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="btn btn-secondary" onclick="clearFilters()" style="flex:1;padding:8px;font-size:12px;">🗑 Clear</button>
-        <button class="btn btn-primary" onclick="applyFilters()" style="flex:1;padding:8px;font-size:12px;">🔍 Filter</button>
+      <div class="field" style="margin:10px 0 0;">
+        <input type="search" id="search" placeholder="🔍 ค้นหา ลูกค้า / สถานที่ / ID">
+      </div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="clearFilters()">🗑 ล้าง</button>
+        <button class="btn btn-primary btn-sm" style="flex:1;" onclick="applyFilters()">🔍 กรอง</button>
       </div>
     </div>
 
-    <!-- Summary -->
-    <div class="summary-row" id="summaryRow" style="display:none;"></div>
-
-    <!-- List -->
+    <div id="kpiZone"></div>
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
 
-  <!-- Edit Modal -->
   <div id="editModal" class="modal">
     <div class="modal-content">
-      <div class="modal-head">
-        <h3>✏️ แก้ไขคำขอ</h3>
-        <button class="modal-close" onclick="closeEdit()">✕</button>
-      </div>
+      <div class="modal-head"><h3>✏️ แก้ไขคำขอ</h3><button class="modal-close" onclick="closeEdit()">✕</button></div>
       <div id="editContent"></div>
     </div>
   </div>
 
-  <!-- Detail Modal -->
   <div id="detailModal" class="modal">
     <div class="modal-content">
-      <div class="modal-head">
-        <h3 id="detailTitle">รายละเอียด</h3>
-        <button class="modal-close" onclick="closeDetail()">✕</button>
-      </div>
+      <div class="modal-head"><h3 id="detailTitle">รายละเอียด</h3><button class="modal-close" onclick="closeDetail()">✕</button></div>
       <div id="detailContent"></div>
     </div>
   </div>
@@ -108,31 +65,26 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    let allReqs = [];
-    let categories = [];
-    let filteredReqs = [];
+    let allReqs = [], categories = [], filteredReqs = [];
+
+    const CAT_TH = { FUEL:'⛽ น้ำมัน', ENT:'🍽 รับรอง', GOLF:'⛳ กอล์ฟ', TOLL:'🛣 ทางด่วน', PARK:'🅿️ ที่จอดรถ', HOTEL:'🏨 ที่พัก', EXPRESS:'📦 ขนส่ง', MILE:'🚗 เบี้ยเลี้ยงรถ', OTHER:'📄 อื่นๆ' };
+    const catLabel = c => CAT_TH[c] || ('📄 ' + (c||'-'));
+
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
     async function load() {
-      document.getElementById('backBtn').innerHTML = icon('back');
       try {
-        const [reqs, cats] = await Promise.all([
-          fetchMyRequests(session.Email),
-          fetchCategories()
-        ]);
+        const [reqs, cats] = await Promise.all([fetchMyRequests(session.Email), fetchCategories()]);
         allReqs = Array.isArray(reqs) ? reqs : [];
         categories = Array.isArray(cats) ? cats : [];
-
-        // Populate category filter
-        const catSel = document.getElementById('filterCat');
-        categories.forEach(c => {
-          const opt = document.createElement('option');
-          opt.value = c.Code; opt.textContent = c.NameTH || c.Code;
-          catSel.appendChild(opt);
-        });
-
+        const sel = document.getElementById('filterCat');
+        sel.innerHTML = '<option value="">ทั้งหมด</option>';
+        categories.forEach(c => { const o=document.createElement('option'); o.value=c.Code; o.textContent=catLabel(c.Code); sel.appendChild(o); });
         applyFilters();
       } catch (err) {
-        document.getElementById('list').innerHTML = `<div class="empty"><div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        document.getElementById('list').classList.remove('loading');
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
       }
     }
 
@@ -140,7 +92,8 @@
       const from = document.getElementById('dateFrom').value;
       const to = document.getElementById('dateTo').value;
       const cat = document.getElementById('filterCat').value;
-      const status = document.getElementById('filterStatus').value;
+      const st = document.getElementById('filterStatus').value;
+      const q = document.getElementById('search').value.trim().toLowerCase();
 
       filteredReqs = allReqs.filter(r => {
         const d = r.ExpenseDate || r.Timestamp;
@@ -149,120 +102,131 @@
         if (from && rd < new Date(from)) return false;
         if (to) { const t = new Date(to); t.setHours(23,59,59,999); if (rd > t) return false; }
         if (cat && r.Category !== cat) return false;
-        if (status && r.Status !== status) return false;
+        if (st && r.Status !== st) return false;
+        if (q) {
+          const hay = [r.ID, r.Customer, r.Venue, r.CustomerContact, r.Occasion, r.Destination].join(' ').toLowerCase();
+          if (hay.indexOf(q) < 0) return false;
+        }
         return true;
-      });
+      }).sort((a,b) => new Date(b.ExpenseDate||b.Timestamp) - new Date(a.ExpenseDate||a.Timestamp));
       renderList();
     }
+    window.applyFilters = applyFilters;
 
     function clearFilters() {
-      document.getElementById('dateFrom').value = '';
-      document.getElementById('dateTo').value = '';
-      document.getElementById('filterCat').value = '';
-      document.getElementById('filterStatus').value = '';
+      ['dateFrom','dateTo','filterCat','filterStatus','search'].forEach(id => document.getElementById(id).value = '');
       applyFilters();
     }
+    window.clearFilters = clearFilters;
+
+    document.getElementById('search').addEventListener('input', applyFilters);
+    ['filterCat','filterStatus'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
 
     function renderList() {
       const list = document.getElementById('list');
       list.classList.remove('loading');
-      const summary = document.getElementById('summaryRow');
+      const kpi = document.getElementById('kpiZone');
 
-      if (filteredReqs.length === 0) {
-        list.innerHTML = `<div class="empty"><div class="title">ยังไม่มีคำขอ</div><div class="sub">ลอง clear filter ดู</div></div>`;
-        summary.style.display = 'none';
+      if (!filteredReqs.length) {
+        kpi.innerHTML = '';
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">📭</div><div class="title">ไม่พบคำขอ</div><div class="sub">ลองล้างตัวกรองดู</div></div>`;
         return;
       }
 
-      // Summary
-      const total = filteredReqs.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+      const total = filteredReqs.reduce((s,r) => s + (Number(r.Amount)||0), 0);
       const pending = filteredReqs.filter(r => r.Status === 'Pending').length;
       const approved = filteredReqs.filter(r => r.Status === 'Approved').length;
-      summary.style.display = 'flex';
-      summary.innerHTML = `
-        <div class="summary-cell"><div class="value">${filteredReqs.length}</div><div class="label">รายการ</div></div>
-        <div class="summary-cell" style="background:linear-gradient(135deg,#f59e0b,#d97706);"><div class="value">${pending}</div><div class="label">รอ</div></div>
-        <div class="summary-cell" style="background:linear-gradient(135deg,#16a34a,#15803d);"><div class="value">${approved}</div><div class="label">อนุมัติ</div></div>
-        <div class="summary-cell" style="background:linear-gradient(135deg,#7a0512,#450a0a);"><div class="value">${Math.round(total).toLocaleString()}</div><div class="label">THB</div></div>
-      `;
+      const rejected = filteredReqs.filter(r => r.Status === 'Rejected').length;
 
-      // Group by month
+      kpi.innerHTML = `<div class="kpi-grid">
+        <div class="kpi"><div class="n">${filteredReqs.length}</div><div class="l">รายการ</div></div>
+        <div class="kpi warn"><div class="n">${pending}</div><div class="l">รออนุมัติ</div></div>
+        <div class="kpi ok"><div class="n">${approved}</div><div class="l">อนุมัติแล้ว</div></div>
+        <div class="kpi ${rejected?'bad':''}"><div class="n">${Math.round(total).toLocaleString()}</div><div class="l">THB รวม</div></div>
+      </div>`;
+
       const byMonth = {};
-      filteredReqs.forEach((r, idx) => {
+      filteredReqs.forEach(r => {
         const d = new Date(r.ExpenseDate || r.Timestamp);
-        const key = d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
-        if (!byMonth[key]) byMonth[key] = [];
-        byMonth[key].push({...r, _idx: idx});
+        const key = isNaN(d) ? 'ไม่ระบุ' : d.toLocaleDateString('th-TH', {year:'numeric', month:'long'});
+        (byMonth[key] = byMonth[key] || []).push(r);
       });
 
       let html = '';
       Object.entries(byMonth).forEach(([month, reqs]) => {
-        html += `<h4 style="font-size:11px;color:var(--gray-500);text-transform:uppercase;margin:16px 4px 8px;font-weight:700;">${month}</h4>`;
+        const sub = reqs.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+        html += `<div class="sec-label" style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span>${month}</span><span style="color:var(--accent);font-weight:800;">${Math.round(sub).toLocaleString()} ฿</span></div>`;
         reqs.forEach(r => html += renderItem(r));
       });
       list.innerHTML = html;
     }
 
     function renderItem(r) {
-      const badgeCls = 'badge-' + (r.Status || 'pending').toLowerCase().replace(/\s/g, '');
-      const date = r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('th-TH', {day:'numeric', month:'short'}) : '-';
-      return `<div class="req-item">
-        <div class="req-head">
-          <span class="cat">${r.Category}</span>
-          <span class="badge-pill ${badgeCls}">${r.Status || '-'}</span>
-          <span class="amount">${Number(r.Amount || 0).toLocaleString()} ฿</span>
+      const st = String(r.Status||'Pending');
+      const cls = st === 'Approved' ? 'ok' : st === 'Rejected' ? 'bad' : 'warn';
+      const stTH = st === 'Approved' ? '✅ อนุมัติ' : st === 'Rejected' ? '❌ ไม่อนุมัติ' : '⏳ รออนุมัติ';
+      const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
+      const date = d && !isNaN(d) ? d.toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+      const meta = [date, r.Venue, r.Customer].filter(Boolean).join(' • ');
+      return `<div class="request-item ${cls}">
+        <div class="ri-top">
+          <span class="ri-cat">${catLabel(r.Category)}</span>
+          <span class="pill ${cls}">${stTH}</span>
+          <span class="ri-amt">${Number(r.Amount||0).toLocaleString()} ฿</span>
         </div>
-        <div class="req-meta">${date}${r.Venue ? ' • ' + r.Venue : ''}${r.Customer ? ' • ' + r.Customer : ''}</div>
-        <div class="req-actions">
-          <button class="view" onclick="viewDetail('${r.ID}')">👁 ดู</button>
-          <button class="edit" onclick="openEdit('${r.ID}')">✏️ แก้</button>
-          <button class="del" onclick="deleteReq('${r.ID}')">🗑 ลบ</button>
+        <div class="ri-meta">${meta}</div>
+        ${r.Remark ? `<div class="ri-meta" style="color:var(--gray-400);">💬 ${r.Remark}</div>` : ''}
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewDetail('${r.ID}')">👁 ดู</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;color:#0891b2;border-color:#a5e5f0;" onclick="openEdit('${r.ID}')">✏️ แก้ไข</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;color:#dc2626;border-color:#fca5a5;" onclick="deleteReq('${r.ID}')">🗑 ลบ</button>
         </div>
       </div>`;
     }
 
-    function viewDetail(id) {
+    window.viewDetail = (id) => {
       const r = allReqs.find(x => x.ID === id);
       if (!r) return;
-      document.getElementById('detailTitle').textContent = r.Category + ' — ' + Number(r.Amount).toLocaleString() + ' THB';
+      document.getElementById('detailTitle').textContent = catLabel(r.Category) + ' — ' + Number(r.Amount||0).toLocaleString() + ' ฿';
       const rows = [
-        ['ID', r.ID], ['วันที่', r.ExpenseDate], ['ประเภท', r.Category],
-        ['สถานะ', r.Status], ['สถานที่', r.Venue || '-'],
-        ['ลูกค้า', r.Customer || '-'], ['Contact', r.CustomerContact || '-'],
+        ['รหัส', r.ID], ['วันที่', r.ExpenseDate ? String(r.ExpenseDate).substr(0,10) : '-'],
+        ['สถานะ', r.Status], ['สถานที่ / รายละเอียด', r.Venue || '-'],
+        ['ลูกค้า', r.Customer || '-'], ['ผู้ติดต่อ', r.CustomerContact || '-'],
         ['ต้นทาง', r.Origin || '-'], ['ปลายทาง', r.Destination || '-'],
+        ['ระยะทาง', r.MileageKm ? r.MileageKm + ' กม.' : '-'],
         ['โอกาส', r.Occasion || '-'], ['ผู้ร่วม', r.Attendees || '-'],
-        ['หมายเหตุ', r.Remark || '-'], ['Approved by', r.ApprovedBy || '-']
+        ['หมายเหตุ', r.Remark || '-'], ['ผู้อนุมัติ', r.ApprovedBy || '-']
       ];
-      document.getElementById('detailContent').innerHTML = rows.map(([k,v]) =>
-        `<div style="padding:8px 0;border-bottom:1px solid var(--gray-100);"><b style="color:var(--gray-500);font-size:12px;">${k}:</b> ${v}</div>`
-      ).join('');
+      document.getElementById('detailContent').innerHTML =
+        `<div class="detail-list">` + rows.map(([k,v]) =>
+          `<div class="dl-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') + `</div>`;
       document.getElementById('detailModal').classList.add('show');
-    }
-    function closeDetail() { document.getElementById('detailModal').classList.remove('show'); }
+    };
+    window.closeDetail = () => document.getElementById('detailModal').classList.remove('show');
 
-    function openEdit(id) {
+    window.openEdit = (id) => {
       const r = allReqs.find(x => x.ID === id);
       if (!r) return;
-      const catOptions = categories.map(c => `<option value="${c.Code}" ${r.Category === c.Code ? 'selected' : ''}>${c.NameTH}</option>`).join('');
+      const opts = categories.map(c => `<option value="${c.Code}" ${r.Category===c.Code?'selected':''}>${catLabel(c.Code)}</option>`).join('');
       document.getElementById('editContent').innerHTML = `
-        <p style="font-size:12px;color:var(--gray-600);background:#fef3c7;padding:8px;border-radius:8px;margin-bottom:12px;">
-          ⚠️ ถ้าประเภทนี้ต้อง approve → หลังแก้ไข จะกลับเป็น Pending รอ Manager approve ใหม่
-        </p>
-        <div class="field"><label>ประเภท</label><select id="e_cat">${catOptions}</select></div>
+        <div class="warn-box">⚠️ ถ้าประเภทนี้ต้องอนุมัติ — หลังแก้ไขจะกลับเป็น <b>รออนุมัติ</b> ให้หัวหน้าอนุมัติใหม่</div>
+        <div class="field"><label>ประเภท</label><select id="e_cat">${opts}</select></div>
         <div class="field"><label>วันที่</label><input type="date" id="e_date" value="${r.ExpenseDate ? String(r.ExpenseDate).substr(0,10) : ''}"></div>
-        <div class="field"><label>จำนวนเงิน (THB)</label><input type="number" id="e_amount" step="0.01" value="${r.Amount || ''}"></div>
+        <div class="field"><label>จำนวนเงิน (THB)</label><input type="number" id="e_amount" step="0.01" inputmode="decimal" value="${r.Amount || ''}"></div>
         <div class="field"><label>สถานที่ / รายละเอียด</label><input type="text" id="e_venue" value="${r.Venue || ''}"></div>
         <div class="field"><label>ลูกค้า</label><input type="text" id="e_customer" value="${r.Customer || ''}"></div>
         <div class="field"><label>ผู้ติดต่อ</label><input type="text" id="e_contact" value="${r.CustomerContact || ''}"></div>
-        <div class="field"><label>ต้นทาง</label><input type="text" id="e_origin" value="${r.Origin || ''}"></div>
-        <div class="field"><label>ปลายทาง</label><input type="text" id="e_dest" value="${r.Destination || ''}"></div>
-        <button class="btn btn-primary" onclick="saveEdit('${r.ID}')" style="width:100%;margin-top:8px;">💾 บันทึก</button>
-      `;
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field"><label>ต้นทาง</label><input type="text" id="e_origin" value="${r.Origin || ''}"></div>
+          <div class="field"><label>ปลายทาง</label><input type="text" id="e_dest" value="${r.Destination || ''}"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveEdit('${r.ID}')" style="margin-top:6px;">💾 บันทึกการแก้ไข</button>`;
       document.getElementById('editModal').classList.add('show');
-    }
-    function closeEdit() { document.getElementById('editModal').classList.remove('show'); }
+    };
+    window.closeEdit = () => document.getElementById('editModal').classList.remove('show');
 
-    async function saveEdit(id) {
+    window.saveEdit = async (id) => {
       const updates = {
         Category: document.getElementById('e_cat').value,
         ExpenseDate: document.getElementById('e_date').value,
@@ -279,22 +243,20 @@
         hideLoading();
         if (r.error) throw new Error(r.error);
         showToast('แก้ไขสำเร็จ ✅', 'success');
-        closeEdit();
-        load();
+        closeEdit(); load();
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
-    }
+    };
 
-    async function deleteReq(id) {
-      if (!confirm('ลบคำขอนี้? การกระทำนี้ไม่สามารถย้อนกลับ')) return;
+    window.deleteReq = async (id) => {
+      if (!confirm('ลบคำขอนี้? ย้อนกลับไม่ได้')) return;
       showLoading('กำลังลบ...');
       try {
         const r = await apiPost('deleteRequest', { id, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        showToast('ลบสำเร็จ', 'success');
-        load();
+        showToast('ลบแล้ว', 'success'); load();
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
-    }
+    };
 
     if (session) { load(); renderBottomNav('status'); }
   </script>
