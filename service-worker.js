@@ -2,7 +2,7 @@
  * Service Worker for PWA offline cache
  * Strategy: Network First for JS/HTML (always fresh) + Cache First for static assets
  */
-const CACHE_NAME = 'exionth-expense-v5';
+const CACHE_NAME = 'exionth-expense-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -18,6 +18,9 @@ const STATIC_ASSETS = [
   './my-team.html',
   './all-requests.html',
   './reset-password.html',
+  './summary.html',
+  './finalize-claim.html',
+  './export-review.html',
   './manifest.json',
   './css/style.css',
   './js/config.js',
@@ -55,7 +58,7 @@ self.addEventListener('fetch', event => {
   }
 
   // ✨ Network First for JS + HTML — ensures users always get latest code
-  const isJsOrHtml = /\.(js|html)$/.test(url.pathname) || url.pathname.endsWith('/');
+  const isJsOrHtml = /\.(js|html|css)$/.test(url.pathname) || url.pathname.endsWith('/');
   if (isJsOrHtml) {
     event.respondWith(
       fetch(event.request).then(response => {
