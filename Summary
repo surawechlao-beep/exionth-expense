@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Summary — EXION Expense</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+  <style>
+    .ctrl-card { background:white; border:1px solid var(--gray-200); border-radius:12px; padding:12px; margin-bottom:12px; }
+    .ctrl-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .ctrl-grid select, .ctrl-grid input { padding:9px; border:1px solid var(--gray-300); border-radius:8px; font-size:13px; width:100%; font-family:inherit; }
+    .chips { display:flex; gap:6px; margin-top:8px; }
+    .chips button { flex:1; padding:7px; border:1px solid var(--gray-300); background:white; border-radius:999px; font-size:12px; font-weight:600; color:var(--gray-600); cursor:pointer; }
+    .chips button.active { background:#B7081D; color:white; border-color:#B7081D; }
+
+    .kpi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+    .kpi { padding:14px; border-radius:14px; color:white; }
+    .kpi.red { background:linear-gradient(135deg,#B7081D,#7a0512); }
+    .kpi.green { background:linear-gradient(135deg,#16a34a,#15803d); }
+    .kpi.orange { background:linear-gradient(135deg,#f59e0b,#d97706); }
+    .kpi.blue { background:linear-gradient(135deg,#0891b2,#0e7490); }
+    .kpi .label { font-size:11px; opacity:0.9; text-transform:uppercase; }
+    .kpi .value { font-size:24px; font-weight:800; margin-top:2px; }
+    .kpi .delta { font-size:11px; opacity:0.85; }
+
+    .card-sec { background:white; border-radius:14px; padding:16px; margin-bottom:12px; border:1px solid var(--gray-200); }
+    .card-sec h3 { margin:0 0 4px; font-size:15px; color:var(--gray-900); }
+    .card-sec .sub { font-size:12px; color:var(--gray-500); margin-bottom:12px; }
+
+    .bar-row { display:grid; grid-template-columns:90px 1fr 70px; gap:8px; align-items:center; margin-bottom:7px; font-size:12px; }
+    .bar-row .name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bar-track { background:var(--gray-100); border-radius:999px; height:12px; overflow:hidden; }
+    .bar-fill { background:linear-gradient(90deg,#B7081D,#f59e0b); height:100%; border-radius:999px; }
+    .bar-row .val { text-align:right; font-weight:700; color:#B7081D; }
+
+    /* Excel-style table */
+    .xl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--gray-300); border-radius:10px; }
+    table.xl { border-collapse:collapse; width:100%; min-width:900px; font-size:11px; }
+    table.xl th { background:#FCE4E7; color:#7a0512; font-weight:700; padding:8px 6px; border:1px solid #e5c9cd; text-align:center; white-space:nowrap; position:sticky; top:0; z-index:1; }
+    table.xl td { padding:7px 6px; border:1px solid var(--gray-200); }
+    table.xl td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    table.xl td.ctr { text-align:center; }
+    table.xl tbody tr:nth-child(even) { background:#fafafa; }
+    table.xl tbody tr.warn { background:#fffbeb; }
+    table.xl tbody tr.warn td:first-child::before { content:'⚠️ '; }
+    table.xl tr.person-hdr td { background:linear-gradient(90deg,#B7081D,#7a0512); color:white; font-weight:700; padding:8px; font-size:12px; }
+    table.xl tfoot td { background:#FFE4E6; font-weight:800; padding:9px 6px; border:1px solid #e5c9cd; }
+
+    .warn-box { background:#fffbeb; border:1px solid #fbbf24; border-radius:10px; padding:12px; margin-bottom:12px; }
+    .warn-box .t { font-weight:700; color:#92400e; font-size:13px; margin-bottom:6px; }
+    .warn-box ul { margin:0; padding-left:18px; font-size:12px; color:#78350f; }
+    .ok-box { background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px; margin-bottom:12px; text-align:center; color:#166534; font-weight:600; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1>Summary</h1>
+  </div>
+
+  <div class="container">
+    <!-- Controls -->
+    <div class="ctrl-card">
+      <div class="ctrl-grid">
+        <div>
+          <label style="font-size:11px;color:var(--gray-600);">เดือน</label>
+          <select id="fMonth"></select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--gray-600);">ปี</label>
+          <select id="fYear"></select>
+        </div>
+      </div>
+      <div style="margin-top:8px;" id="personWrap" style="display:none;">
+        <label style="font-size:11px;color:var(--gray-600);">ดูข้อมูลของ</label>
+        <select id="fPerson"><option value="__self__">ตัวเอง</option></select>
+      </div>
+      <div class="chips">
+        <button data-st="" class="active" onclick="setStatus('', this)">ทั้งหมด</button>
+        <button data-st="Approved" onclick="setStatus('Approved', this)">✅ Approved</button>
+        <button data-st="Pending" onclick="setStatus('Pending', this)">⏳ Pending</button>
+      </div>
+    </div>
+
+    <div id="loading" class="loading"><div class="spinner"></div></div>
+    <div id="content" style="display:none;"></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    document.getElementById('backBtn').innerHTML = icon('back');
+
+    let raw = { scope:'self', myName:'', staffList:[], items:[] };
+    let fStatus = '';
+
+    const CAT_TH = {
+      FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม',
+      ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ',
+      CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทรตปท.', APT:'ที่พัก'
+    };
+
+    async function load() {
+      // Populate month/year
+      const mSel = document.getElementById('fMonth'), ySel = document.getElementById('fYear');
+      const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      const now = new Date();
+      months.forEach((m,i) => { const o=document.createElement('option'); o.value=i+1; o.textContent=m; if(i+1===now.getMonth()+1) o.selected=true; mSel.appendChild(o); });
+      for (let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=document.createElement('option'); o.value=y; o.textContent=y; if(y===now.getFullYear()) o.selected=true; ySel.appendChild(o); }
+      mSel.addEventListener('change', render);
+      ySel.addEventListener('change', render);
+
+      try {
+        const r = await apiGet('getVisibleRequests', { email: session.Email });
+        if (r.error) throw new Error(r.error);
+        raw = r;
+
+        // Person dropdown (only if team/all scope)
+        if (raw.scope === 'team' || raw.scope === 'all') {
+          const wrap = document.getElementById('personWrap');
+          wrap.style.display = 'block';
+          const pSel = document.getElementById('fPerson');
+          pSel.innerHTML = '<option value="__self__">👤 ตัวเอง</option><option value="__all__">👥 ทุกคนที่ดูแล</option>';
+          raw.staffList.forEach(n => { const o=document.createElement('option'); o.value=n; o.textContent=n; pSel.appendChild(o); });
+          pSel.addEventListener('change', render);
+        }
+        render();
+      } catch (err) {
+        document.getElementById('loading').innerHTML = `<div class="empty"><div class="title">Error</div><div class="sub">${err.message}</div></div>`;
+      }
+    }
+
+    function setStatus(st, btn) {
+      fStatus = st;
+      document.querySelectorAll('.chips button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render();
+    }
+
+    function getFiltered() {
+      const y = parseInt(document.getElementById('fYear').value);
+      const m = parseInt(document.getElementById('fMonth').value);
+      const pSel = document.getElementById('fPerson');
+      const person = pSel ? pSel.value : '__self__';
+
+      return raw.items.filter(r => {
+        // month
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        if (isNaN(d) || d.getFullYear() !== y || d.getMonth()+1 !== m) return false;
+        // status
+        if (fStatus && r.Status !== fStatus) return false;
+        // person
+        if (person === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
+        if (person === '__all__') return true;
+        return r.StaffName === person;
+      }).sort((a,b) => new Date(a.ExpenseDate||a.Timestamp) - new Date(b.ExpenseDate||b.Timestamp));
+    }
+
+    function checkQuality(items) {
+      const issues = [];
+      items.forEach((r, i) => {
+        const n = i + 1;
+        const probs = [];
+        if (!r.Customer && ['FUEL','ENT','GOLF','TRAVEL'].includes(r.Category)) probs.push('ไม่มีชื่อลูกค้า');
+        if (!r.CustomerContact && ['ENT','GOLF'].includes(r.Category)) probs.push('ไม่มีผู้ติดต่อ');
+        let hasReceipt = false;
+        try { hasReceipt = (JSON.parse(r.ReceiptURLs||'[]')||[]).length > 0; } catch {}
+        if (!hasReceipt && !r.ReceiptURL && !['CAR','MOBILE','APT','OVERSEAS'].includes(r.Category)) probs.push('ไม่มีใบเสร็จ');
+        if (!r.Amount || Number(r.Amount) <= 0) probs.push('ยอดเงินเป็น 0');
+        if (probs.length) issues.push({ n, cat: r.Category, date: r.ExpenseDate, probs, id: r.ID });
+      });
+      return issues;
+    }
+
+    function render() {
+      document.getElementById('loading').style.display = 'none';
+      const c = document.getElementById('content');
+      c.style.display = 'block';
+
+      const items = getFiltered();
+      const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const approved = items.filter(r => r.Status === 'Approved');
+      const pending = items.filter(r => r.Status === 'Pending');
+      const issues = checkQuality(items);
+
+      // by category
+      const byCat = {};
+      items.forEach(r => {
+        const k = r.Category || 'OTHER';
+        if (!byCat[k]) byCat[k] = { cat:k, amt:0, cnt:0 };
+        byCat[k].amt += Number(r.Amount)||0; byCat[k].cnt++;
+      });
+      const cats = Object.values(byCat).sort((a,b) => b.amt - a.amt);
+      const catMax = Math.max(...cats.map(x => x.amt), 1);
+
+      // by person (for grouped table)
+      const pSel = document.getElementById('fPerson');
+      const groupByPerson = pSel && pSel.value === '__all__';
+
+      let html = `
+        <div class="kpi-grid">
+          <div class="kpi red"><div class="label">💰 รวม</div><div class="value">${Math.round(total).toLocaleString()}</div><div class="delta">THB • ${items.length} รายการ</div></div>
+          <div class="kpi green"><div class="label">✅ Approved</div><div class="value">${approved.length}</div><div class="delta">${Math.round(approved.reduce((s,r)=>s+(Number(r.Amount)||0),0)).toLocaleString()} THB</div></div>
+          <div class="kpi orange"><div class="label">⏳ Pending</div><div class="value">${pending.length}</div><div class="delta">${Math.round(pending.reduce((s,r)=>s+(Number(r.Amount)||0),0)).toLocaleString()} THB</div></div>
+          <div class="kpi blue"><div class="label">${issues.length ? '⚠️ ต้องแก้' : '✓ ครบถ้วน'}</div><div class="value">${issues.length}</div><div class="delta">รายการมีปัญหา</div></div>
+        </div>`;
+
+      // Quality check
+      if (issues.length) {
+        html += `<div class="warn-box">
+          <div class="t">⚠️ พบ ${issues.length} รายการที่ข้อมูลไม่ครบ</div>
+          <ul>${issues.slice(0,8).map(x => `<li>รายการ #${x.n} (${CAT_TH[x.cat]||x.cat}) — ${x.probs.join(', ')}</li>`).join('')}
+          ${issues.length > 8 ? `<li>...และอีก ${issues.length-8} รายการ</li>` : ''}</ul>
+          <div style="margin-top:8px;"><a href="status.html" style="color:#B7081D;font-weight:700;font-size:12px;">→ ไปแก้ไขในหน้า "คำขอ"</a></div>
+        </div>`;
+      } else if (items.length) {
+        html += `<div class="ok-box">✅ ข้อมูลครบถ้วน พร้อม Export</div>`;
+      }
+
+      // Category chart
+      if (cats.length) {
+        html += `<div class="card-sec">
+          <h3>📊 แยกตามประเภท</h3><div class="sub">${cats.length} ประเภท</div>
+          ${cats.map(x => `<div class="bar-row">
+            <div class="name">${CAT_TH[x.cat]||x.cat}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(x.amt/catMax*100).toFixed(0)}%;"></div></div>
+            <div class="val">${Math.round(x.amt).toLocaleString()}</div>
+          </div>`).join('')}
+        </div>`;
+      }
+
+      // ═══ Excel-style preview table ═══
+      html += `<div class="card-sec">
+        <h3>📋 Preview ข้อมูล (แบบ Excel)</h3>
+        <div class="sub">${items.length} รายการ — เลื่อนซ้าย-ขวาเพื่อดูคอลัมน์เพิ่ม</div>
+        ${items.length === 0 ? '<p style="text-align:center;color:var(--gray-500);padding:24px;">ไม่มีข้อมูลในเดือนนี้</p>' : renderTable(items, groupByPerson, issues)}
+      </div>`;
+
+      c.innerHTML = html;
+    }
+
+    function renderTable(items, groupByPerson, issues) {
+      const issueIds = new Set(issues.map(x => x.id));
+      const th = `<tr>
+        <th>No.</th><th>วันที่</th><th>ประเภท</th><th>Customer</th><th>Contact</th>
+        <th>Distance</th><th>Mile ฿</th><th>Express ฿</th><th>Ent ฿</th><th>Job</th>
+        <th>Hotel ฿</th><th>Park ฿</th><th>Remark</th><th>Status</th>
+      </tr>`;
+
+      const rowHtml = (r, n) => {
+        const cat = r.Category;
+        const amt = Number(r.Amount)||0;
+        const d = r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '-';
+        const km = cat==='FUEL' ? (Number(r.Mileage_KM)||0) : '';
+        const cell = (v) => v ? Math.round(v).toLocaleString() : '';
+        const job = ['TRAVEL','OTHER','CAR','MOBILE','OVERSEAS','APT'].includes(cat)
+          ? ((r.Origin && r.Destination) ? `${r.Origin}→${r.Destination}` : (r.Occasion||r.Venue||CAT_TH[cat]||cat)) + ' ' + Math.round(amt).toLocaleString()
+          : '';
+        const stColor = r.Status==='Approved'?'#16a34a':r.Status==='Rejected'?'#dc2626':'#f59e0b';
+        return `<tr class="${issueIds.has(r.ID)?'warn':''}">
+          <td class="ctr">${n}</td>
+          <td class="ctr">${d}</td>
+          <td class="ctr">${CAT_TH[cat]||cat}</td>
+          <td>${r.Customer||'-'}</td>
+          <td>${r.CustomerContact||'-'}</td>
+          <td class="num">${km||''}</td>
+          <td class="num">${cat==='FUEL'?cell(amt):''}</td>
+          <td class="num">${cat==='EXPRESS'?cell(amt):''}</td>
+          <td class="num">${(cat==='ENT'||cat==='GOLF')?cell(amt):''}</td>
+          <td style="font-size:10px;">${job}</td>
+          <td class="num">${cat==='HOTEL'?cell(amt):''}</td>
+          <td class="num">${cat==='PARK'?cell(amt):''}</td>
+          <td style="font-size:10px;">${r.Venue||''}</td>
+          <td class="ctr" style="color:${stColor};font-weight:700;font-size:10px;">${r.Status||'-'}</td>
+        </tr>`;
+      };
+
+      let body = '';
+      if (groupByPerson) {
+        const groups = {};
+        items.forEach(r => { const k = r.StaffName||'?'; (groups[k]=groups[k]||[]).push(r); });
+        Object.entries(groups).forEach(([name, rows]) => {
+          const sub = rows.reduce((s,r)=>s+(Number(r.Amount)||0),0);
+          body += `<tr class="person-hdr"><td colspan="14">👤 ${name} — ${rows.length} รายการ — ${Math.round(sub).toLocaleString()} THB</td></tr>`;
+          rows.forEach((r,i) => body += rowHtml(r, i+1));
+        });
+      } else {
+        items.forEach((r,i) => body += rowHtml(r, i+1));
+      }
+
+      const grand = items.reduce((s,r)=>s+(Number(r.Amount)||0),0);
+      return `<div class="xl-wrap"><table class="xl">
+        <thead>${th}</thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td colspan="12" style="text-align:right;">รวมทั้งหมด</td><td class="num" colspan="2" style="text-align:right;color:#B7081D;">${Math.round(grand).toLocaleString()} THB</td></tr></tfoot>
+      </table></div>`;
+    }
+
+    window.setStatus = setStatus;
+    if (session) { load(); renderBottomNav('status'); }
+  </script>
+</body>
+</html>
