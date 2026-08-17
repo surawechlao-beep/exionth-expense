@@ -3,56 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Finalize Pre-Approve — EXION Expense</title>
+  <title>ส่งบิลใช้จริง — EXION Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
-  <style>
-    .info-card { background:linear-gradient(135deg,#B7081D,#7a0512); color:white; padding:16px; border-radius:14px; margin-bottom:12px; }
-    .info-card .lbl { font-size:11px; opacity:0.85; }
-    .info-card .val { font-size:16px; font-weight:700; margin-bottom:6px; }
-    .item-card { background:white; border:1.5px solid var(--gray-200); border-radius:14px; padding:16px; margin-bottom:12px; position:relative; }
-    .item-card .item-num { position:absolute; top:-10px; left:14px; background:#B7081D; color:white; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
-    .item-card .remove-item { position:absolute; top:10px; right:10px; background:none; border:none; color:#dc2626; cursor:pointer; font-size:18px; }
-    .file-chip { display:inline-flex; align-items:center; gap:6px; background:#fef3c7; color:#B7081D; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; margin:4px 4px 0 0; }
-    .file-chip button { background:none; border:none; color:#B7081D; cursor:pointer; padding:0 4px; }
-    .add-item-btn { width:100%; padding:14px; background:#fee2e2; color:#B7081D; border:2px dashed #B7081D; border-radius:12px; font-weight:700; cursor:pointer; }
-    .summary { background:linear-gradient(135deg,#B7081D,#7a0512); color:white; padding:14px; border-radius:12px; text-align:center; margin-bottom:12px; }
-    .over-budget { background:#fef3c7; color:#92400e; padding:10px; border-radius:8px; margin-top:8px; font-size:13px; text-align:center; }
-  </style>
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='pre-approves.html'" id="backBtn"></button>
-    <h1>ส่งบิลใช้จริง</h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ส่งบิลใช้จริง</span></h1>
   </div>
 
   <div class="container">
     <div id="loading" class="loading"><div class="spinner"></div></div>
-    <div id="main" style="display:none;">
-      <!-- Pre-approve info -->
-      <div class="info-card" id="preInfo"></div>
 
-      <!-- Summary -->
-      <div class="summary">
-        <div style="font-size:11px;opacity:0.9;text-transform:uppercase;">รวมทั้งหมด</div>
-        <div style="font-size:28px;font-weight:800;" id="totalAmount">0.00 THB</div>
-        <div style="font-size:12px;opacity:0.85;" id="itemCount">0 รายการ</div>
-        <div id="overBudgetMsg" style="display:none;"></div>
+    <div id="main" style="display:none;">
+      <div class="card" id="preInfo"></div>
+
+      <div class="batch-summary" id="sumBox">
+        <div style="font-size:11px;opacity:.9;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">ยอดใช้จริงรวม</div>
+        <div style="font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:2px;" id="totalAmount">0.00</div>
+        <div style="font-size:13px;opacity:.88;margin-top:2px;" id="itemCount">0 รายการ</div>
+        <div id="overBudgetMsg"></div>
       </div>
 
-      <p style="background:#fef3c7;padding:10px;border-radius:8px;font-size:13px;margin-bottom:12px;color:#92400e;">
-        ⚠️ หลังส่ง Manager ต้อง approve อีกครั้ง (แม้ยอดไม่เกินงบ)
-      </p>
+      <div class="info-box">ℹ️ หลังส่ง หัวหน้าต้องอนุมัติอีกครั้งเสมอ — แม้ยอดจะไม่เกินงบ</div>
 
-      <!-- Items -->
       <div id="itemsContainer"></div>
 
-      <button class="add-item-btn" id="addBtn">➕ เพิ่มรายการ / บิล</button>
-
-      <button class="btn btn-primary" id="submitBtn" style="margin-top:16px;width:100%;">
-        ✅ ส่งเพื่ออนุมัติทั้งหมด
-      </button>
+      <button class="add-item-btn" id="addBtn" type="button">➕ เพิ่มบิล</button>
+      <button class="btn btn-primary" id="submitBtn" style="margin-top:16px;">✅ ส่งเพื่ออนุมัติทั้งหมด</button>
     </div>
   </div>
 
@@ -62,75 +42,121 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    document.getElementById('backBtn').innerHTML = icon('back');
-    const params = new URLSearchParams(location.search);
-    const preId = params.get('id');
-    let preApprove = null;
-    let items = [];
-    let itemSeq = 0;
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    const preId = new URLSearchParams(location.search).get('id');
+    let preApprove = null, items = [], itemSeq = 0;
+    const CAT_TH = { ENT:'🍽 ค่ารับรอง', GOLF:'⛳ กอล์ฟ' };
 
     async function load() {
-      if (!preId) { document.getElementById('loading').innerHTML = '<div class="empty"><div class="title">❌ Missing ID</div></div>'; return; }
+      if (!preId) return fail('ไม่พบรหัส Pre-Approve');
       try {
         const r = await fetchRequest(preId);
-        if (!r || r.error) throw new Error((r && r.error) || 'ไม่พบ Pre-approve');
+        if (!r || r.error) throw new Error((r && r.error) || 'ไม่พบ Pre-Approve');
+        if (r.PreApproveStatus !== 'Approved') throw new Error('Pre-Approve ยังไม่ได้อนุมัติงบ');
+        if (r.Status === 'Finalized') throw new Error('Pre-Approve นี้ส่งบิลไปแล้ว');
         preApprove = r;
-        if (preApprove.PreApproveStatus !== 'Approved') throw new Error('Pre-approve ยังไม่ได้อนุมัติ');
-        if (preApprove.Status === 'Finalized') throw new Error('Pre-approve นี้ finalize ไปแล้ว');
-
         document.getElementById('loading').style.display = 'none';
         document.getElementById('main').style.display = 'block';
         renderInfo();
-        addItem();  // เริ่ม 1 รายการ
+        addItem();
         document.getElementById('addBtn').addEventListener('click', addItem);
         document.getElementById('submitBtn').addEventListener('click', onSubmit);
-      } catch (err) {
-        document.getElementById('loading').innerHTML = `<div class="empty"><div class="title">Error</div><div class="sub">${err.message}</div></div>`;
-      }
+      } catch (err) { fail(err.message); }
+    }
+
+    function fail(msg) {
+      document.getElementById('loading').classList.remove('loading');
+      document.getElementById('loading').innerHTML =
+        `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">เปิดไม่ได้</div><div class="sub">${msg}</div>
+         <a href="pre-approves.html" class="btn btn-secondary btn-sm" style="margin-top:14px;text-decoration:none;max-width:200px;">← กลับ</a></div>`;
     }
 
     function renderInfo() {
       const p = preApprove;
       const budget = Number(p.PreApproveBudget) || 0;
+      const cust = String(p.Customer||'-').replace(/^\[(.+?)\]\s*/, '<span class="tag">$1</span> ');
       document.getElementById('preInfo').innerHTML = `
-        <div class="lbl">Category</div><div class="val">${p.Category}</div>
-        <div class="lbl">โอกาส</div><div class="val" style="font-size:14px;">${p.Occasion || '-'}</div>
-        <div class="lbl">ลูกค้า / สถานที่</div><div class="val" style="font-size:14px;">${p.Customer || '-'} / ${p.Venue || '-'}</div>
-        <div class="lbl">งบที่อนุมัติ</div><div class="val" style="font-size:22px;">${budget.toLocaleString()} THB</div>
-      `;
+        <div class="card-head"><span class="ib ib-orange">📋</span>
+          <div><div class="ch-title">${CAT_TH[p.Category] || p.Category}</div>
+          <div class="ch-sub">งบที่อนุมัติไว้แล้ว</div></div>
+          <div style="margin-left:auto;text-align:right;">
+            <div style="font-size:19px;font-weight:800;color:var(--accent);">${budget.toLocaleString()}</div>
+            <div style="font-size:10px;color:var(--gray-400);">THB</div>
+          </div>
+        </div>
+        <div class="detail-list" style="margin-top:10px;">
+          <div class="dl-row"><span class="k">ลูกค้า</span><span class="v">${cust}</span></div>
+          <div class="dl-row"><span class="k">สถานที่</span><span class="v">${p.Venue || '-'}</span></div>
+          <div class="dl-row"><span class="k">โอกาส</span><span class="v">${p.Occasion || '-'}</span></div>
+          <div class="dl-row"><span class="k">อนุมัติโดย</span><span class="v">${p.PreApproveBy || '-'}</span></div>
+        </div>`;
+    }
+
+    function syncDom() {
+      items.forEach(it => {
+        const d = document.getElementById(it.id + '_date');
+        const s = document.getElementById(it.id + '_desc');
+        const a = document.getElementById(it.id + '_amount');
+        if (d && d.value) it.date = d.value;
+        if (s) it.description = s.value;
+        if (a) it.amount = parseFloat(a.value) || 0;
+      });
     }
 
     function addItem() {
+      syncDom();
       itemSeq++;
-      const id = 'item_' + itemSeq;
-      const today = new Date().toISOString().split('T')[0];
-      items.push({ id, date: today, description: '', amount: 0, receipts: [] });
-      renderItems();
+      const prev = items.length ? items[items.length-1] : null;
+      const it = {
+        id: 'item_' + itemSeq,
+        date: prev ? prev.date : new Date().toISOString().split('T')[0],
+        description: '', amount: 0, receipts: [], _dup: !!prev
+      };
+      items.push(it);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = itemHtml(it, items.length);
+      const card = wrap.firstElementChild;
+      document.getElementById('itemsContainer').appendChild(card);
+      attach(it);
+      renumber();
       updateSummary();
+      setTimeout(() => card.scrollIntoView({behavior:'smooth', block:'center'}), 100);
     }
 
     function removeItem(id) {
-      if (items.length === 1) return showToast('ต้องมีอย่างน้อย 1 รายการ', 'error');
-      items = items.filter(i => i.id !== id);
-      renderItems();
-      updateSummary();
+      if (items.length === 1) return showToast('ต้องมีอย่างน้อย 1 บิล', 'error');
+      syncDom();
+      const idx = items.findIndex(i => i.id === id);
+      if (idx < 0) return;
+      items.splice(idx, 1);
+      const cards = document.querySelectorAll('#itemsContainer .item-card');
+      if (cards[idx]) cards[idx].remove();
+      renumber(); updateSummary();
     }
+    window.removeItem = removeItem;
 
-    function renderItems() {
-      const c = document.getElementById('itemsContainer');
-      c.innerHTML = items.map((it, i) => itemHtml(it, i + 1)).join('');
-      items.forEach(it => attachListeners(it));
+    function renumber() {
+      document.querySelectorAll('#itemsContainer .item-card').forEach((card, i) => {
+        const n = card.querySelector('.item-num');
+        if (n) n.textContent = 'บิล ' + (i+1);
+        const old = card.querySelector('.remove-item');
+        if (old) old.remove();
+        if (items.length > 1 && items[i]) {
+          const b = document.createElement('button');
+          b.className = 'remove-item'; b.type = 'button'; b.textContent = '✕';
+          b.addEventListener('click', () => removeItem(items[i].id));
+          card.appendChild(b);
+        }
+      });
     }
 
     function itemHtml(it, num) {
-      const chips = it.receipts.map((f, i) => `
-        <span class="file-chip">📎 ${f.name.length > 15 ? f.name.substr(0,12) + '...' : f.name}
-          <button onclick="removeFile('${it.id}', ${i})">✕</button>
-        </span>`).join('');
       return `<div class="item-card">
         <span class="item-num">บิล ${num}</span>
-        ${items.length > 1 ? `<button class="remove-item" onclick="removeItem('${it.id}')">✕</button>` : ''}
-        <div class="field" style="margin-top:8px;">
+        ${it._dup && num > 1 ? '<div class="dup-hint">📋 คัดลอกวันที่จากบิลก่อน</div>' : ''}
+        <div class="field" style="margin-top:10px;">
           <label>วันที่บิล <span class="required">*</span></label>
           <input type="date" id="${it.id}_date" value="${it.date}">
         </div>
@@ -140,29 +166,34 @@
         </div>
         <div class="field">
           <label>จำนวนเงิน (THB) <span class="required">*</span></label>
-          <input type="number" id="${it.id}_amount" step="0.01" min="0" value="${it.amount || ''}" placeholder="0.00">
+          <input type="number" id="${it.id}_amount" step="0.01" min="0" inputmode="decimal" value="${it.amount||''}" placeholder="0.00">
         </div>
-        <div class="field">
+        <div class="field" style="margin-bottom:0;">
           <label>ใบเสร็จ <span class="required">*</span></label>
           <label for="${it.id}_files" class="upload-area">
             <input type="file" id="${it.id}_files" accept="image/*,application/pdf" multiple>
-            <div class="icon-wrap" style="color:#B7081D;">📎</div>
+            <div class="icon-wrap">📎</div>
             <div class="text">แตะเพื่อแนบไฟล์</div>
-            <div class="sub">ภาพ/PDF — แนบได้หลายไฟล์</div>
+            <div class="sub">ภาพ / PDF · แนบได้หลายไฟล์</div>
           </label>
-          <div id="${it.id}_chips" style="margin-top:8px;">${chips}</div>
+          <div id="${it.id}_chips" style="margin-top:8px;">${chips(it)}</div>
         </div>
       </div>`;
     }
 
-    function attachListeners(it) {
-      ['date','desc','amount'].forEach(f => {
-        const el = document.getElementById(it.id + '_' + f);
-        if (el) el.addEventListener('input', e => {
-          if (f === 'desc') it.description = e.target.value;
-          else if (f === 'amount') { it.amount = parseFloat(e.target.value) || 0; updateSummary(); }
-          else it[f] = e.target.value;
-        });
+    function chips(it) {
+      return it.receipts.map((f,i) => `<span class="file-chip">📎 ${f.name.length>18?f.name.substr(0,15)+'...':f.name}<button type="button" onclick="removeFile('${it.id}',${i})">✕</button></span>`).join('');
+    }
+
+    function attach(it) {
+      [['date','date'],['desc','description'],['amount','amount']].forEach(([sfx, field]) => {
+        const el = document.getElementById(it.id + '_' + sfx);
+        if (!el) return;
+        const h = e => {
+          it[field] = field === 'amount' ? (parseFloat(e.target.value)||0) : e.target.value;
+          if (field === 'amount') updateSummary();
+        };
+        el.addEventListener('input', h); el.addEventListener('change', h); el.addEventListener('blur', h);
       });
       const fi = document.getElementById(it.id + '_files');
       if (fi) fi.addEventListener('change', e => onFiles(it.id, e));
@@ -171,14 +202,12 @@
     async function onFiles(itemId, e) {
       const it = items.find(x => x.id === itemId);
       if (!it) return;
-      const files = Array.from(e.target.files);
-      for (const file of files) {
-        if (file.size > 5 * 1024 * 1024) { showToast(file.name + ' > 5MB', 'error'); continue; }
+      for (const file of Array.from(e.target.files)) {
+        if (file.size > 5*1024*1024) { showToast(file.name + ' > 5MB', 'error'); continue; }
         it.receipts.push({ name: file.name, base64: await fileToBase64(file) });
       }
-      document.getElementById(itemId + '_chips').innerHTML = it.receipts.map((f, i) =>
-        `<span class="file-chip">📎 ${f.name.length > 15 ? f.name.substr(0,12) + '...' : f.name}<button onclick="removeFile('${itemId}', ${i})">✕</button></span>`
-      ).join('');
+      const c = document.getElementById(itemId + '_chips');
+      if (c) c.innerHTML = chips(it);
       e.target.value = '';
     }
 
@@ -186,34 +215,34 @@
       const it = items.find(i => i.id === itemId);
       if (!it) return;
       it.receipts.splice(idx, 1);
-      document.getElementById(itemId + '_chips').innerHTML = it.receipts.map((f, i) =>
-        `<span class="file-chip">📎 ${f.name.length > 15 ? f.name.substr(0,12) + '...' : f.name}<button onclick="removeFile('${itemId}', ${i})">✕</button></span>`
-      ).join('');
+      const c = document.getElementById(itemId + '_chips');
+      if (c) c.innerHTML = chips(it);
     };
-    window.removeItem = removeItem;
 
     function updateSummary() {
-      const total = items.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+      const total = items.reduce((s,it) => s + (parseFloat(it.amount)||0), 0);
       const budget = Number(preApprove.PreApproveBudget) || 0;
-      document.getElementById('totalAmount').textContent = total.toLocaleString(undefined, {minimumFractionDigits:2}) + ' THB';
-      document.getElementById('itemCount').textContent = items.length + ' รายการ • งบ ' + budget.toLocaleString() + ' THB';
+      document.getElementById('totalAmount').textContent = formatCurrency(total) + ' THB';
+      document.getElementById('itemCount').textContent = items.length + ' บิล • งบ ' + budget.toLocaleString() + ' THB';
       const msg = document.getElementById('overBudgetMsg');
       if (total > budget && budget > 0) {
-        msg.className = 'over-budget';
-        msg.style.display = 'block';
-        msg.innerHTML = `⚠️ เกินงบ ${(total - budget).toLocaleString(undefined,{minimumFractionDigits:2})} THB`;
-      } else msg.style.display = 'none';
+        msg.innerHTML = `<div class="over-flag">⚠️ เกินงบ ${formatCurrency(total-budget)} THB</div>`;
+      } else if (total > 0) {
+        msg.innerHTML = `<div class="under-flag">✓ เหลืองบ ${formatCurrency(budget-total)} THB</div>`;
+      } else msg.innerHTML = '';
     }
 
     async function onSubmit() {
-      // Validate
+      syncDom();
       for (const it of items) {
         if (!it.date) return showToast('ใส่วันที่ให้ครบ', 'error');
         if (!it.description || !it.description.trim()) return showToast('ใส่รายละเอียดให้ครบ', 'error');
-        if (!it.amount || it.amount <= 0) return showToast('ใส่จำนวนเงิน', 'error');
-        if (it.receipts.length === 0) return showToast('แนบใบเสร็จทุกรายการ', 'error');
+        if (!it.amount || it.amount <= 0) return showToast('ใส่จำนวนเงินให้ครบ', 'error');
+        if (!it.receipts.length) return showToast('แนบใบเสร็จทุกบิล', 'error');
       }
-      showLoading('กำลังส่ง...');
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      showLoading('กำลังส่ง ' + items.length + ' บิล...');
       try {
         const r = await apiPost('finalizeClaim', {
           preApproveId: preId,
@@ -221,12 +250,12 @@
         });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        showToast(`ส่งสำเร็จ ${r.itemsCreated} รายการ ✅`, 'success');
-        setTimeout(() => location.href = 'status.html', 1500);
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+        showToast('ส่งสำเร็จ ' + (r.itemsCreated || items.length) + ' รายการ ✅', 'success');
+        setTimeout(() => location.href = 'status.html', 1400);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); btn.disabled = false; }
     }
 
-    if (session) load();
+    if (session) { load(); renderBottomNav('new'); }
   </script>
 </body>
 </html>
