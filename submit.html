@@ -7,309 +7,219 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
-  <style>
-    .item-card { background:white; border:1.5px solid var(--gray-200); border-radius:14px; padding:16px; margin-bottom:12px; position:relative; }
-    .item-card .item-num { position:absolute; top:-10px; left:14px; background:var(--brand-2); color:white; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; }
-    .item-card .remove-item { position:absolute; top:10px; right:10px; background:none; border:none; color:var(--danger); cursor:pointer; font-size:18px; }
-    .file-chip { display:inline-flex; align-items:center; gap:6px; background:var(--accent-light); color:var(--brand-2); padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; margin:4px 4px 0 0; }
-    .file-chip button { background:none; border:none; color:var(--brand-2); cursor:pointer; padding:0 4px; font-size:14px; }
-    .add-item-btn { width:100%; padding:14px; background:var(--accent-light); color:var(--brand-2); border:2px dashed var(--brand-2); border-radius:12px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; }
-    .add-item-btn:active { background:var(--brand-2); color:white; }
-    .batch-summary { background:linear-gradient(135deg,var(--accent-dark),var(--brand-2)); color:white; padding:14px; border-radius:12px; text-align:center; margin-bottom:12px; }
-    .dup-hint { background:#e0f2fe; color:#075985; padding:6px 10px; border-radius:8px; font-size:11px; margin-top:6px; }
-  </style>
 </head>
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1>
-      <img src="icons/logo.png" alt="EXION" class="logo" style="height:28px;">
-      <span style="font-size:14px; font-weight:600; margin-left:6px;">ขอเบิกใหม่</span>
-    </h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ขอเบิกใหม่</span></h1>
   </div>
+
   <div class="container">
-    <div class="batch-summary" id="batchSummary">
-      <div style="font-size:11px; opacity:0.9; font-weight:600; text-transform:uppercase;">รายการในชุดนี้</div>
-      <div style="font-size:28px; font-weight:800; letter-spacing:-0.02em;" id="batchCount">1 รายการ</div>
-      <div style="font-size:13px; opacity:0.85; margin-top:2px;" id="batchTotal">รวม 0.00 THB</div>
+    <div class="batch-summary">
+      <div style="font-size:11px;opacity:.9;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">รายการในชุดนี้</div>
+      <div style="font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:2px;" id="batchCount">1 รายการ</div>
+      <div style="font-size:13px;opacity:.88;margin-top:2px;" id="batchTotal">รวม 0.00 THB</div>
     </div>
+
     <div id="itemsContainer"></div>
-    <button class="add-item-btn" id="addItemBtn" type="button">➕ เพิ่มรายการ (คัดลอกข้อมูลเดิม)</button>
-    <button class="btn btn-primary" id="submitBtn" style="margin-top:16px;">
-      <span id="iconCheck"></span> ส่งคำขอทั้งหมด
-    </button>
+
+    <button class="add-item-btn" id="addItemBtn" type="button">➕ เพิ่มรายการ <span style="font-size:11px;opacity:.75;">(คัดลอกข้อมูลเดิม)</span></button>
+
+    <button class="btn btn-primary" id="submitBtn" style="margin-top:16px;">✅ ส่งคำขอทั้งหมด</button>
   </div>
+
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    const HIDDEN_CATEGORIES = ['ENT', 'GOLF'];
-    let categories = [];
-    let currentFuelRate = null;
-    let customerHistory = [];
-    let items = [];
-    let itemSeq = 0;
+    const HIDDEN = ['ENT','GOLF'];
+    let categories = [], currentFuelRate = null, items = [], itemSeq = 0;
+
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
     async function init() {
-      const setI = (id, n) => { const el = document.getElementById(id); if (el && typeof icon === 'function') el.innerHTML = icon(n); };
-      setI('backBtn', 'back');
-      setI('iconCheck', 'check');
-
       try {
-        const result = await fetchCategories();
-        const all = Array.isArray(result) ? result : [];
-        categories = all.filter(c => !HIDDEN_CATEGORIES.includes(c.Code));
-        if (categories.length === 0) throw new Error('ไม่มีประเภท');
-      } catch (err) {
-        showToast('โหลดประเภทไม่สำเร็จ: ' + err.message, 'error');
-        return;
-      }
+        const all = await fetchCategories();
+        categories = (Array.isArray(all) ? all : []).filter(c => !HIDDEN.includes(c.Code));
+        if (!categories.length) throw new Error('ไม่มีประเภท');
+      } catch (err) { return showToast('โหลดประเภทไม่สำเร็จ: ' + err.message, 'error'); }
 
-      // ✨ Pre-fetch fuel rate + customers ล่วงหน้า (ไม่ block ตอนเพิ่มรายการ)
-      fetchFuelRate(session.Email).then(r => { if (r && !r.error) currentFuelRate = r; }).catch(() => {});
+      fetchFuelRate(session.Email).then(r => { if (r && !r.error) currentFuelRate = r; }).catch(()=>{});
       fetchCustomerHistory(session.Email).then(ch => {
-        customerHistory = Array.isArray(ch) ? ch : [];
         const dl = document.getElementById('customerList');
-        if (dl) customerHistory.forEach(c => { const o = document.createElement('option'); o.value = c; dl.appendChild(o); });
-      }).catch(() => {});
+        (Array.isArray(ch)?ch:[]).forEach(c => { const o=document.createElement('option'); o.value=c; dl.appendChild(o); });
+      }).catch(()=>{});
 
       addItem();
       document.getElementById('addItemBtn').addEventListener('click', addItem);
       document.getElementById('submitBtn').addEventListener('click', onSubmit);
     }
 
-    // ═══════════════════════════════════════════
-    // ✨ CRITICAL FIX: sync DOM → model ก่อน re-render
-    // ป้องกัน iOS date picker ไม่ fire input event
-    // ═══════════════════════════════════════════
-    function syncDomToModel() {
+    // sync DOM → model (fix iOS date picker)
+    function syncDom() {
       items.forEach(it => {
-        ['expenseDate','venue','occasion','attendees','amount','mileageKm','origin','destination','customer','customerContact'].forEach(field => {
-          const el = document.getElementById(it.id + '_' + field);
-          if (el && el.value !== undefined && el.value !== '') {
-            it[field] = el.value;
-          }
+        ['expenseDate','venue','occasion','attendees','amount','mileageKm','origin','destination','customer','customerContact'].forEach(f => {
+          const el = document.getElementById(it.id + '_' + f);
+          if (el && el.value !== undefined && el.value !== '') it[f] = el.value;
         });
       });
     }
 
     function addItem() {
-      syncDomToModel();  // ← เก็บค่าปัจจุบันก่อน
-
+      syncDom();
       itemSeq++;
       const id = 'item_' + itemSeq;
       const today = new Date().toISOString().split('T')[0];
-
-      // ✨ Duplicate จากรายการล่าสุด (ถ้ามี)
-      const prev = items.length > 0 ? items[items.length - 1] : null;
-      const newItem = {
+      const prev = items.length ? items[items.length-1] : null;
+      const ni = {
         id,
         category: prev ? prev.category : '',
-        expenseDate: prev && prev.expenseDate ? prev.expenseDate : today,
-        venue: prev ? (prev.venue || '') : '',
-        occasion: prev ? (prev.occasion || '') : '',
-        attendees: prev ? (prev.attendees || '') : '',
-        amount: 0,                                    // ← ไม่ copy ยอดเงิน
-        mileageKm: prev ? (prev.mileageKm || 0) : 0,  // ← copy ระยะทาง
-        origin: prev ? (prev.origin || '') : '',
-        destination: prev ? (prev.destination || '') : '',
-        customer: prev ? (prev.customer || '') : '',
-        customerContact: prev ? (prev.customerContact || '') : '',
-        receipts: [],                                 // ← ไม่ copy ไฟล์
-        _duplicated: !!prev
+        expenseDate: prev?.expenseDate || today,
+        venue: prev?.venue || '', occasion: prev?.occasion || '', attendees: prev?.attendees || '',
+        amount: 0, mileageKm: prev?.mileageKm || 0,
+        origin: prev?.origin || '', destination: prev?.destination || '',
+        customer: prev?.customer || '', customerContact: prev?.customerContact || '',
+        receipts: [], _dup: !!prev
       };
-      items.push(newItem);
-
-      const container = document.getElementById('itemsContainer');
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = itemCardHtml(newItem, items.length);
-      const card = wrapper.firstElementChild;
-      container.appendChild(card);
-      attachItemListeners(newItem);
-      updateRemoveButtonVisibility();
-      updateBatchNumbers();
-      updateBatchSummary();
-
-      // Scroll ไปที่ card ใหม่
-      setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      items.push(ni);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = cardHtml(ni, items.length);
+      const card = wrap.firstElementChild;
+      document.getElementById('itemsContainer').appendChild(card);
+      attach(ni);
+      refreshNums();
+      updateSummary();
+      setTimeout(() => card.scrollIntoView({behavior:'smooth',block:'center'}), 100);
     }
 
     function removeItem(id) {
       if (items.length === 1) return showToast('ต้องมีอย่างน้อย 1 รายการ', 'error');
-      syncDomToModel();
+      syncDom();
       const idx = items.findIndex(i => i.id === id);
       if (idx < 0) return;
       items.splice(idx, 1);
       const cards = document.querySelectorAll('#itemsContainer .item-card');
       if (cards[idx]) cards[idx].remove();
-      updateRemoveButtonVisibility();
-      updateBatchNumbers();
-      updateBatchSummary();
+      refreshNums();
+      updateSummary();
     }
+    window.removeItem = removeItem;
 
-    function updateBatchNumbers() {
-      document.querySelectorAll('#itemsContainer .item-num').forEach((el, i) => {
-        el.textContent = 'รายการ ' + (i + 1);
-      });
-    }
-
-    function updateRemoveButtonVisibility() {
-      document.querySelectorAll('#itemsContainer .item-card').forEach((card, idx) => {
-        const existing = card.querySelector('.remove-item');
-        if (existing) existing.remove();
-        if (items.length > 1 && items[idx]) {
-          const btn = document.createElement('button');
-          btn.className = 'remove-item';
-          btn.type = 'button';
-          btn.textContent = '✕';
-          btn.addEventListener('click', () => removeItem(items[idx].id));
-          card.appendChild(btn);
+    function refreshNums() {
+      document.querySelectorAll('#itemsContainer .item-card').forEach((card, i) => {
+        const n = card.querySelector('.item-num');
+        if (n) n.textContent = 'รายการ ' + (i+1);
+        const old = card.querySelector('.remove-item');
+        if (old) old.remove();
+        if (items.length > 1 && items[i]) {
+          const b = document.createElement('button');
+          b.className = 'remove-item'; b.type = 'button'; b.textContent = '✕';
+          b.addEventListener('click', () => removeItem(items[i].id));
+          card.appendChild(b);
         }
       });
     }
 
-    function rerenderCard(it) {
-      syncDomToModel();  // ← เก็บค่าทุก card ก่อน re-render
+    function rerender(it) {
+      syncDom();
       const idx = items.findIndex(i => i.id === it.id);
       if (idx < 0) return;
       const cards = document.querySelectorAll('#itemsContainer .item-card');
-      const oldCard = cards[idx];
-      if (!oldCard) return;
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = itemCardHtml(it, idx + 1);
-      const newCard = wrapper.firstElementChild;
-      oldCard.replaceWith(newCard);
-      attachItemListeners(it);
-      updateRemoveButtonVisibility();
+      if (!cards[idx]) return;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = cardHtml(it, idx+1);
+      cards[idx].replaceWith(wrap.firstElementChild);
+      attach(it);
+      refreshNums();
     }
 
-    function attachItemListeners(it) {
+    function attach(it) {
       const sel = document.getElementById(it.id + '_cat');
-      if (sel) sel.addEventListener('change', e => onCategoryChange(it.id, e.target.value));
-
-      ['expenseDate','venue','occasion','attendees','amount','mileageKm','origin','destination','customer','customerContact'].forEach(field => {
-        const el = document.getElementById(it.id + '_' + field);
+      if (sel) sel.addEventListener('change', e => onCatChange(it.id, e.target.value));
+      ['expenseDate','venue','occasion','attendees','amount','mileageKm','origin','destination','customer','customerContact'].forEach(f => {
+        const el = document.getElementById(it.id + '_' + f);
         if (!el) return;
-        // ✨ FIX: ฟังทั้ง input + change + blur (iOS date picker ต้องใช้ change)
-        const handler = e => {
-          it[field] = e.target.value;
-          if (field === 'mileageKm') updateFuelPreview(it.id);
-          if (field === 'amount') updateBatchSummary();
+        const h = e => {
+          it[f] = e.target.value;
+          if (f === 'mileageKm') updateFuel(it.id);
+          if (f === 'amount') updateSummary();
         };
-        el.addEventListener('input', handler);
-        el.addEventListener('change', handler);
-        el.addEventListener('blur', handler);
+        el.addEventListener('input', h); el.addEventListener('change', h); el.addEventListener('blur', h);
       });
-
-      const fileInput = document.getElementById(it.id + '_files');
-      if (fileInput) fileInput.addEventListener('change', e => onFilesSelected(it.id, e));
+      const fi = document.getElementById(it.id + '_files');
+      if (fi) fi.addEventListener('change', e => onFiles(it.id, e));
     }
 
-    function itemCardHtml(it, num) {
-      const catList = categories.map(c => `<option value="${c.Code}" ${it.category === c.Code ? 'selected' : ''}>${c.NameTH} — ${c.NameEN}</option>`).join('');
+    function cardHtml(it, num) {
+      const opts = categories.map(c => `<option value="${c.Code}" ${it.category===c.Code?'selected':''}>${c.NameTH} — ${c.NameEN}</option>`).join('');
       const cat = categories.find(c => c.Code === it.category);
       const isFuel = it.category === 'FUEL';
       const isEnt = cat && cat.NeedClaimForm === 'YES';
-      const needReceipt = cat && cat.NeedReceipt === 'YES';
+      const needRcpt = cat && cat.NeedReceipt === 'YES';
       const needTravel = cat && cat.NeedTravelInfo === 'YES';
-      const dupHint = it._duplicated && num > 1
-        ? `<div class="dup-hint">📋 คัดลอกข้อมูลจากรายการก่อนหน้า — แก้ไขได้ตามต้องการ</div>` : '';
+      const dup = it._dup && num > 1 ? `<div class="dup-hint">📋 คัดลอกข้อมูลจากรายการก่อน — แก้ไขได้</div>` : '';
 
       return `<div class="item-card">
         <span class="item-num">รายการ ${num}</span>
-        ${dupHint}
-        <div class="field" style="margin-top:8px;">
+        ${dup}
+        <div class="field" style="margin-top:10px;">
           <label>ประเภท <span class="required">*</span></label>
-          <select id="${it.id}_cat">
-            <option value="">— เลือก —</option>
-            ${catList}
-          </select>
-          <div class="hint">${cat ? cat.Notes || '' : ''}</div>
+          <select id="${it.id}_cat"><option value="">— เลือกประเภท —</option>${opts}</select>
+          ${cat && cat.Notes ? `<div class="hint">${cat.Notes}</div>` : ''}
         </div>
         <div class="field">
           <label>วันที่ <span class="required">*</span></label>
           <input type="date" id="${it.id}_expenseDate" value="${it.expenseDate}">
         </div>
-        ${isFuel ? `
-        <div class="field">
-          <label>กิโลเมตร <span class="required">*</span></label>
-          <input type="number" id="${it.id}_mileageKm" step="0.1" min="0" value="${it.mileageKm || ''}" placeholder="เช่น 45.5" inputmode="decimal">
-          <div class="hint">คำนวณ: <b id="${it.id}_fuelPreview">0 THB</b></div>
+        ${isFuel ? `<div class="field">
+          <label>ระยะทาง (กม.) <span class="required">*</span></label>
+          <input type="number" id="${it.id}_mileageKm" step="0.1" min="0" value="${it.mileageKm||''}" placeholder="เช่น 45.5" inputmode="decimal">
+          <div class="hint">💰 คำนวณ: <b id="${it.id}_fuelPreview">0 THB</b></div>
         </div>` : ''}
         ${isEnt ? `
-        <div class="field">
-          <label>สถานที่ <span class="required">*</span></label>
-          <input type="text" id="${it.id}_venue" value="${it.venue}" placeholder="ชื่อร้าน">
-        </div>
-        <div class="field">
-          <label>โอกาส <span class="required">*</span></label>
-          <textarea id="${it.id}_occasion" placeholder="เช่น Meeting Q3">${it.occasion}</textarea>
-        </div>
-        <div class="field">
-          <label>ผู้ร่วม <span class="required">*</span></label>
-          <textarea id="${it.id}_attendees" placeholder="ชื่อ + บริษัท">${it.attendees}</textarea>
-        </div>` : ''}
+        <div class="field"><label>สถานที่ <span class="required">*</span></label><input type="text" id="${it.id}_venue" value="${it.venue}" placeholder="ชื่อร้าน"></div>
+        <div class="field"><label>โอกาส <span class="required">*</span></label><textarea id="${it.id}_occasion" rows="2" placeholder="เช่น Meeting Q3">${it.occasion}</textarea></div>
+        <div class="field"><label>ผู้ร่วม <span class="required">*</span></label><textarea id="${it.id}_attendees" rows="2" placeholder="ชื่อ + บริษัท">${it.attendees}</textarea></div>` : ''}
         ${needTravel ? `
-        <div class="field">
-          <label>ต้นทาง</label>
-          <input type="text" id="${it.id}_origin" value="${it.origin}" placeholder="เช่น ออฟฟิศ กทม">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field"><label>ต้นทาง</label><input type="text" id="${it.id}_origin" value="${it.origin}" placeholder="ออฟฟิศ"></div>
+          <div class="field"><label>ปลายทาง</label><input type="text" id="${it.id}_destination" value="${it.destination}" placeholder="ระยอง"></div>
         </div>
-        <div class="field">
-          <label>ปลายทาง</label>
-          <input type="text" id="${it.id}_destination" value="${it.destination}" placeholder="เช่น โรงงาน ABC ระยอง">
-        </div>
-        <div class="field">
-          <label>ลูกค้า</label>
-          <input type="text" id="${it.id}_customer" value="${it.customer}" placeholder="ชื่อบริษัท" list="customerList">
-        </div>
-        <div class="field">
-          <label>ผู้ติดต่อ</label>
-          <input type="text" id="${it.id}_customerContact" value="${it.customerContact}" placeholder="ชื่อ ตำแหน่ง">
-        </div>` : ''}
-        ${(!isFuel && !isEnt) ? `
-        <div class="field">
-          <label>รายละเอียด</label>
-          <input type="text" id="${it.id}_venue" value="${it.venue}" placeholder="เช่น ค่าทางด่วน">
-        </div>` : ''}
-        ${!isFuel ? `
-        <div class="field">
-          <label>จำนวนเงิน (THB) <span class="required">*</span></label>
-          <input type="number" id="${it.id}_amount" step="0.01" min="0" value="${it.amount || ''}" placeholder="0.00" inputmode="decimal">
-        </div>` : ''}
-        ${needReceipt ? `
-        <div class="field">
-          <label>ใบเสร็จ (แนบได้หลายไฟล์) <span class="required">*</span></label>
+        <div class="field"><label>ลูกค้า</label><input type="text" id="${it.id}_customer" value="${it.customer}" placeholder="ชื่อบริษัท" list="customerList"></div>
+        <div class="field"><label>ผู้ติดต่อ</label><input type="text" id="${it.id}_customerContact" value="${it.customerContact}" placeholder="ชื่อ ตำแหน่ง"></div>` : ''}
+        ${(!isFuel && !isEnt) ? `<div class="field"><label>รายละเอียด</label><input type="text" id="${it.id}_venue" value="${it.venue}" placeholder="เช่น ค่าทางด่วน"></div>` : ''}
+        ${!isFuel ? `<div class="field"><label>จำนวนเงิน (THB) <span class="required">*</span></label><input type="number" id="${it.id}_amount" step="0.01" min="0" value="${it.amount||''}" placeholder="0.00" inputmode="decimal"></div>` : ''}
+        ${needRcpt ? `<div class="field">
+          <label>ใบเสร็จ <span class="required">*</span></label>
           <label for="${it.id}_files" class="upload-area">
             <input type="file" id="${it.id}_files" accept="image/*,application/pdf" multiple>
-            <div class="icon-wrap" style="color:var(--accent);">📎</div>
+            <div class="icon-wrap">📎</div>
             <div class="text">แตะเพื่อแนบไฟล์</div>
-            <div class="sub">ภาพ/PDF — สูงสุด 10 ไฟล์ × 5 MB</div>
+            <div class="sub">ภาพ/PDF · สูงสุด 10 ไฟล์ × 5 MB</div>
           </label>
-          <div id="${it.id}_filesList" style="margin-top:8px;">${renderFileChips(it)}</div>
+          <div id="${it.id}_chips" style="margin-top:8px;">${chips(it)}</div>
         </div>` : ''}
       </div>`;
     }
 
-    function renderFileChips(it) {
-      return it.receipts.map((f, i) => `
-        <span class="file-chip">📎 ${f.name.length > 20 ? f.name.substr(0,17) + '...' : f.name}
-          <button type="button" onclick="removeFile('${it.id}', ${i})">✕</button>
-        </span>`).join('');
+    function chips(it) {
+      return it.receipts.map((f,i) => `<span class="file-chip">📎 ${f.name.length>18?f.name.substr(0,15)+'...':f.name}<button type="button" onclick="removeFile('${it.id}',${i})">✕</button></span>`).join('');
     }
 
-    async function onFilesSelected(itemId, e) {
+    async function onFiles(itemId, e) {
       const it = items.find(i => i.id === itemId);
       if (!it) return;
       const files = Array.from(e.target.files);
       if (it.receipts.length + files.length > 10) return showToast('ไฟล์เกิน 10', 'error');
-      for (const file of files) {
-        if (file.size > 5 * 1024 * 1024) { showToast(file.name + ' > 5MB', 'error'); continue; }
-        it.receipts.push({ name: file.name, base64: await fileToBase64(file) });
+      for (const f of files) {
+        if (f.size > 5*1024*1024) { showToast(f.name + ' > 5MB', 'error'); continue; }
+        it.receipts.push({ name: f.name, base64: await fileToBase64(f) });
       }
-      const list = document.getElementById(itemId + '_filesList');
-      if (list) list.innerHTML = renderFileChips(it);
+      const c = document.getElementById(itemId + '_chips');
+      if (c) c.innerHTML = chips(it);
       e.target.value = '';
     }
 
@@ -317,93 +227,71 @@
       const it = items.find(i => i.id === itemId);
       if (!it) return;
       it.receipts.splice(idx, 1);
-      const list = document.getElementById(itemId + '_filesList');
-      if (list) list.innerHTML = renderFileChips(it);
+      const c = document.getElementById(itemId + '_chips');
+      if (c) c.innerHTML = chips(it);
     };
 
-    async function onCategoryChange(itemId, code) {
+    async function onCatChange(itemId, code) {
       const it = items.find(i => i.id === itemId);
       if (!it) return;
       it.category = code;
-      // ✨ ไม่ block — fuel rate โหลดไว้แล้วตอน init
       if (code === 'FUEL' && !currentFuelRate) {
-        fetchFuelRate(session.Email).then(r => {
-          if (r && !r.error) { currentFuelRate = r; updateFuelPreview(itemId); }
-        }).catch(() => {});
+        fetchFuelRate(session.Email).then(r => { if (r && !r.error) { currentFuelRate = r; updateFuel(itemId); } }).catch(()=>{});
       }
-      rerenderCard(it);
-      updateBatchSummary();
+      rerender(it);
+      updateSummary();
     }
 
-    function updateFuelPreview(itemId) {
+    function updateFuel(itemId) {
       const it = items.find(i => i.id === itemId);
       if (!it || !currentFuelRate) return;
       const km = parseFloat(it.mileageKm) || 0;
-      const amount = km * currentFuelRate.rate;
-      it.amount = amount;
-      const preview = document.getElementById(itemId + '_fuelPreview');
-      if (preview) preview.textContent = formatCurrency(amount) + ' THB (' + km + ' × ' + currentFuelRate.rate + ')';
-      updateBatchSummary();
+      it.amount = km * currentFuelRate.rate;
+      const p = document.getElementById(itemId + '_fuelPreview');
+      if (p) p.textContent = formatCurrency(it.amount) + ' THB (' + km + ' กม. × ' + currentFuelRate.rate + ')';
+      updateSummary();
     }
 
-    function updateBatchSummary() {
+    function updateSummary() {
       document.getElementById('batchCount').textContent = items.length + ' รายการ';
-      const total = items.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
-      document.getElementById('batchTotal').textContent = 'รวม ' + formatCurrency(total) + ' THB';
+      const t = items.reduce((s,it) => s + (parseFloat(it.amount)||0), 0);
+      document.getElementById('batchTotal').textContent = 'รวม ' + formatCurrency(t) + ' THB';
     }
 
     async function onSubmit() {
-      syncDomToModel();  // ← ✨ CRITICAL: อ่านค่าล่าสุดจาก DOM ก่อนส่ง
-
+      syncDom();
       for (const it of items) {
         if (!it.category) return showToast('เลือกประเภทให้ครบ', 'error');
         if (!it.expenseDate) return showToast('ใส่วันที่ให้ครบ', 'error');
         const cat = categories.find(c => c.Code === it.category);
         const isFuel = it.category === 'FUEL';
-        const isEnt = cat.NeedClaimForm === 'YES';
-        if (isFuel && (!it.mileageKm || it.mileageKm <= 0)) return showToast('ใส่กิโลเมตร', 'error');
+        if (isFuel && (!it.mileageKm || it.mileageKm <= 0)) return showToast('ใส่ระยะทาง', 'error');
         if (!isFuel && (!it.amount || it.amount <= 0)) return showToast('ใส่จำนวนเงิน', 'error');
-        if (isEnt && (!it.venue || !it.occasion || !it.attendees)) return showToast('กรอกข้อมูลรับรองให้ครบ', 'error');
-        if (cat.NeedReceipt === 'YES' && it.receipts.length === 0) return showToast('แนบใบเสร็จ', 'error');
+        if (cat.NeedClaimForm === 'YES' && (!it.venue || !it.occasion || !it.attendees)) return showToast('กรอกข้อมูลรับรองให้ครบ', 'error');
+        if (cat.NeedReceipt === 'YES' && !it.receipts.length) return showToast('แนบใบเสร็จ', 'error');
       }
-
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
-      btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> กำลังส่ง...';
-      showLoading('กำลังส่งคำขอ ' + items.length + ' รายการ...');
-
+      showLoading('กำลังส่ง ' + items.length + ' รายการ...');
       try {
-        const payload = {
+        const result = await submitBatch({
           staffEmail: session.Email,
           items: items.map(it => ({
-            category: it.category,
-            expenseDate: it.expenseDate,
-            venue: it.venue,
-            occasion: it.occasion,
-            attendees: it.attendees,
-            amount: it.amount,
-            mileageKm: it.mileageKm,
-            origin: it.origin,
-            destination: it.destination,
-            customer: it.customer,
-            customerContact: it.customerContact,
-            receipts: it.receipts
+            category: it.category, expenseDate: it.expenseDate, venue: it.venue,
+            occasion: it.occasion, attendees: it.attendees, amount: it.amount,
+            mileageKm: it.mileageKm, origin: it.origin, destination: it.destination,
+            customer: it.customer, customerContact: it.customerContact, receipts: it.receipts
           }))
-        };
-        const result = await submitBatch(payload);
+        });
+        hideLoading();
         if (result.error) throw new Error(result.error);
-        hideLoading();
-        showToast('ส่งสำเร็จ! ' + result.items.length + ' รายการ', 'success');
-        setTimeout(() => location.href = 'status.html', 1500);
+        showToast('✅ ส่งสำเร็จ ' + result.items.length + ' รายการ', 'success');
+        setTimeout(() => location.href = 'status.html', 1400);
       } catch (err) {
-        hideLoading();
-        showToast(err.message, 'error');
+        hideLoading(); showToast(err.message, 'error');
         btn.disabled = false;
-        btn.innerHTML = (typeof icon === 'function' ? icon('check') : '✓') + ' ส่งคำขอทั้งหมด';
       }
     }
-
-    window.removeItem = removeItem;
 
     if (session) { init(); renderBottomNav('new'); }
   </script>
