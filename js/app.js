@@ -125,6 +125,7 @@ async function renderBottomNav(active) {
     { key: 'status',  href: 'status.html',       label: 'คำขอ',    icon: 'list' },
     { key: 'summary', href: 'summary.html',      label: 'สรุป',    emoji: '📊' }
   ];
+  // v6.1 ผู้บริหารที่ดูอย่างเดียว (isViewer) ไม่มีกล่องรออนุมัติ
   // GM = full inbox / Senior = senior-inbox / Manager = manager-inbox
   if (isGM) {
     items.push({ key: 'inbox', href: 'inbox.html', label: 'รออนุมัติ', icon: 'bell' });
