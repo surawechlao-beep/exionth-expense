@@ -10,6 +10,7 @@
 </head>
 <body>
   <div class="header">
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">อนุมัติคำขอ</span></h1>
   </div>
 
@@ -43,11 +44,12 @@
         <div class="card-head"><span class="ib ib-red">✅</span>
           <div><div class="ch-title">ตัดสินใจ</div><div class="ch-sub">อนุมัติ หรือ ไม่อนุมัติ</div></div>
         </div>
-        <div class="field" style="margin-top:14px;">
+        <div class="field" style="margin-top:14px;" id="emailField">
           <label>อีเมลของคุณ <span class="required">*</span></label>
           <input type="email" id="approverEmail" placeholder="you@exionth.com" inputmode="email">
           <div class="hint">ระบบตรวจสอบสิทธิ์ก่อนแสดงใบเสร็จและบันทึกผล</div>
         </div>
+        <div id="asWho" class="ok-box" style="display:none;margin-top:14px;"></div>
         <div class="field">
           <label>หมายเหตุ (ถ้ามี)</label>
           <textarea id="remark" rows="2" placeholder="เช่น อนุมัติ ภายในงบ Q2"></textarea>
@@ -78,6 +80,9 @@
   <script src="js/app.js"></script>
   <script>
     const requestId = new URLSearchParams(location.search).get('id');
+    const me = (typeof getSession === 'function') ? getSession() : null;   // ไม่บังคับล็อกอิน (เปิดจากลิงก์ในอีเมลได้)
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
     const CAT_TH = { FUEL:'⛽ น้ำมัน', ENT:'🍽 รับรอง', GOLF:'⛳ กอล์ฟ', TOLL:'🛣 ทางด่วน', PARK:'🅿️ จอดรถ', HOTEL:'🏨 ที่พัก', EXPRESS:'📦 ขนส่ง', MILE:'🚗 เบี้ยเลี้ยงรถ', OTHER:'📄 อื่นๆ' };
     let savedSig = null, sigPad = null;
 
@@ -120,14 +125,26 @@
           document.getElementById('actionsBlock').innerHTML =
             `<div class="empty"><div class="icon-wrap">${st === 'Approved' ? '✅' : '❌'}</div>
               <div class="title">คำขอนี้${st === 'Approved' ? 'อนุมัติ' : 'ปฏิเสธ'}ไปแล้ว</div>
-              <div class="sub">โดย ${r.ApprovedBy || '-'}</div></div>`;
+              <div class="sub">โดย ${r.ApprovedBy || '-'}</div>
+              <a href="index.html" class="btn btn-primary btn-sm" style="margin-top:16px;max-width:220px;text-decoration:none;">→ ไปหน้าแรก</a></div>`;
+          if (typeof renderBottomNav === 'function' && me) renderBottomNav('inbox');
           return;
         }
 
         document.getElementById('approveBtn').addEventListener('click', () => decide('Approved'));
         document.getElementById('rejectBtn').addEventListener('click', () => decide('Rejected'));
 
-        // Email → check for a saved signature
+        // ล็อกอินอยู่แล้ว → เติมอีเมลให้เลย ไม่ต้องพิมพ์เองบนมือถือ
+        if (me && me.Email) {
+          document.getElementById('approverEmail').value = me.Email;
+          document.getElementById('emailField').style.display = 'none';
+          const w = document.getElementById('asWho');
+          w.style.display = 'block';
+          w.innerHTML = `👤 อนุมัติในนาม <b>${me.Name || me.Email}</b>
+            <button type="button" onclick="switchUser()" style="background:none;border:none;color:#166534;text-decoration:underline;font-size:11.5px;cursor:pointer;font-family:inherit;">ไม่ใช่ฉัน</button>`;
+          checkSavedSig();
+        }
+
         document.getElementById('approverEmail').addEventListener('blur', checkSavedSig);
       } catch (err) { fail(err.message); }
     }
@@ -135,8 +152,19 @@
     function fail(msg) {
       const l = document.getElementById('loading');
       l.classList.remove('loading');
-      l.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">เปิดไม่ได้</div><div class="sub">${msg}</div></div>`;
+      l.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+        <div class="title">เปิดไม่ได้</div><div class="sub">${msg}</div>
+        <a href="index.html" class="btn btn-primary btn-sm" style="margin-top:16px;max-width:220px;text-decoration:none;">→ ไปหน้าแรก</a></div>`;
     }
+
+    window.switchUser = () => {
+      document.getElementById('emailField').style.display = '';
+      document.getElementById('asWho').style.display = 'none';
+      document.getElementById('approverEmail').value = '';
+      savedSig = null;
+      document.getElementById('sigZone').innerHTML = '';
+      renderSigPad();
+    };
 
     async function checkSavedSig() {
       const email = document.getElementById('approverEmail').value.trim();
@@ -242,6 +270,7 @@
     }
 
     load();
+    if (me && typeof renderBottomNav === 'function') renderBottomNav('inbox');
   </script>
 </body>
 </html>
