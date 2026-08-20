@@ -43,10 +43,35 @@ function formatDate(d) {
   });
 }
 
+/** ชื่อสถานะภาษาไทย — ใช้ร่วมกันทุกหน้า */
+const STATUS_TH = {
+  pending:    '⏳ รออนุมัติ',
+  approved:   '✅ อนุมัติแล้ว',
+  rejected:   '❌ ไม่อนุมัติ',
+  finalized:  '✓ ส่งบิลแล้ว',
+  preapprove: '📋 รออนุมัติงบ'
+};
+function statusTH(status) {
+  return STATUS_TH[String(status || '').toLowerCase()] || (status || '-');
+}
+
 function statusBadge(status) {
   const cls = (status || '').toLowerCase();
-  const labels = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
-  return `<span class="badge ${cls}">${labels[cls] || status}</span>`;
+  return `<span class="badge ${cls}">${statusTH(status)}</span>`;
+}
+
+/**
+ * ตัดลายเซ็น base64 ที่ต่อท้ายหมายเหตุออก
+ * backend เก็บเป็น "อนุมัติแล้ว sig:data:image/png;base64,iVBOR..."
+ * ถ้าไม่ตัด พนักงานจะเห็นข้อความขยะยาวเป็นหน้าจอ
+ */
+function cleanRemark(remark) {
+  return String(remark || '').split(' sig:')[0].trim();
+}
+
+/** ตัวเลขระยะทาง — backend เขียนชื่อฟิลด์ไม่ตรงกันในบางที่ */
+function mileageOf(r) {
+  return Number(r.Mileage_KM || r.MileageKm || r.mileageKm || 0) || 0;
 }
 
 function showToast(msg, type = 'info') {
@@ -90,27 +115,29 @@ async function renderBottomNav(active) {
   }
 
   document.body.classList.add('has-bottom-nav');
+  try { renderNotifBell(); } catch (e) {}
   const nav = document.createElement('nav');
   nav.className = 'bottom-nav';
 
   const items = [
-    { key: 'home',   href: 'index.html',  label: 'Home',    icon: 'home' },
-    { key: 'new',    href: 'submit.html', label: 'ขอเบิก',  icon: 'plus' },
-    { key: 'status', href: 'status.html', label: 'คำขอ',   icon: 'list' }
+    { key: 'home',    href: 'index.html',        label: 'หน้าแรก', icon: 'home' },
+    { key: 'new',     href: 'submit.html',       label: 'ขอเบิก',  icon: 'plus' },
+    { key: 'status',  href: 'status.html',       label: 'คำขอ',    icon: 'list' },
+    { key: 'summary', href: 'summary.html',      label: 'สรุป',    emoji: '📊' }
   ];
   // GM = full inbox / Senior = senior-inbox / Manager = manager-inbox
   if (isGM) {
-    items.push({ key: 'inbox', href: 'inbox.html', label: 'Inbox', icon: 'bell' });
+    items.push({ key: 'inbox', href: 'inbox.html', label: 'รออนุมัติ', icon: 'bell' });
   } else if (isSenior) {
-    items.push({ key: 'inbox', href: 'senior-inbox.html', label: 'Inbox', icon: 'bell' });
+    items.push({ key: 'inbox', href: 'senior-inbox.html', label: 'รออนุมัติ', icon: 'bell' });
   } else if (isManager) {
-    items.push({ key: 'inbox', href: 'manager-inbox.html', label: 'Inbox', icon: 'bell' });
+    items.push({ key: 'inbox', href: 'manager-inbox.html', label: 'รออนุมัติ', icon: 'bell' });
   }
-  items.push({ key: 'profile', href: 'profile.html', label: 'Profile', icon: 'user' });
+  items.push({ key: 'profile', href: 'profile.html', label: 'โปรไฟล์', icon: 'user' });
 
   nav.innerHTML = items.map(it => `
     <a href="${it.href}" class="nav-item ${it.key === active ? 'active' : ''}">
-      ${icon(it.icon)}
+      ${it.emoji ? `<span style="font-size:20px;line-height:1;">${it.emoji}</span>` : icon(it.icon)}
       <span>${it.label}</span>
     </a>`).join('');
   document.body.appendChild(nav);
@@ -210,9 +237,25 @@ function showLoading(text = 'กำลังประมวลผล...') {
   overlay.innerHTML = `
     <div class="loader-card">
       <div class="spinner"></div>
-      <div class="loader-text">${text}</div>
+      <div class="loader-text" id="__loaderText">${text}</div>
+      <button type="button" class="loader-cancel" id="__loaderCancel">ยกเลิก</button>
     </div>`;
   document.body.appendChild(overlay);
+
+  // ปุ่มยกเลิกโผล่หลัง 8 วิ — ถ้าเร็วกว่านั้นไม่ต้องรบกวนสายตา
+  const btn = overlay.querySelector('#__loaderCancel');
+  setTimeout(() => { if (btn && btn.isConnected) btn.classList.add('show'); }, 8000);
+  btn.addEventListener('click', () => {
+    if (window.__apiAbort) { try { window.__apiAbort.abort('user'); } catch (e) {} }
+    hideLoading();
+    showToast('ยกเลิกแล้ว — ข้อมูลที่กรอกยังอยู่', 'error');
+  });
+}
+
+/** อัปเดตข้อความบน loading overlay ที่เปิดอยู่ (เช่น "กำลังอนุมัติ 4/9") */
+function setLoadingText(text) {
+  const el = document.getElementById('__loaderText');
+  if (el) el.textContent = text;
 }
 function hideLoading() {
   const o = document.getElementById('__loadingOverlay');
@@ -349,6 +392,118 @@ function openImageViewer(src, hint = '') {
 function closeImageViewer() {
   const lb = document.getElementById('__lightbox');
   if (lb) lb.remove();
+}
+
+/**
+ * อนุมัติ/ปฏิเสธหลายรายการ — บอกความคืบหน้าและสรุปผลตอนจบ
+ * ถ้าพังกลางทาง ผู้ใช้ต้องรู้ว่าอันไหนผ่านอันไหนไม่ผ่าน
+ * @param {Array} rows   รายการที่จะทำ
+ * @param {Function} fn  async (row) => result
+ * @param {string} verb  'อนุมัติ' / 'ปฏิเสธ'
+ */
+async function runBatch(rows, fn, verb) {
+  let ok = 0;
+  const failed = [];
+  showLoading(`กำลัง${verb} 0/${rows.length}...`);
+  for (let i = 0; i < rows.length; i++) {
+    setLoadingText(`กำลัง${verb} ${i + 1}/${rows.length}...`);
+    try {
+      const res = await fn(rows[i]);
+      if (res && res.error) throw new Error(res.error);
+      ok++;
+    } catch (err) {
+      failed.push({ row: rows[i], msg: err.message });
+    }
+  }
+  hideLoading();
+  if (!failed.length) {
+    showToast(`✅ ${verb}ครบ ${ok} รายการ`, 'success');
+  } else if (ok) {
+    showToast(`${verb}สำเร็จ ${ok} · ไม่สำเร็จ ${failed.length} — ${failed[0].msg}`, 'error');
+  } else {
+    showToast(`${verb}ไม่สำเร็จ — ${failed[0].msg}`, 'error');
+  }
+  return { ok, failed };
+}
+
+/**
+ * v6.0 — กระดิ่งแจ้งเตือนใน header
+ * ระบบไม่ส่งอีเมลแล้ว ทุกอย่างมาที่นี่ ต้องเห็นชัดและกดง่าย
+ */
+async function renderNotifBell() {
+  const session = getSession();
+  if (!session) return;
+  const header = document.querySelector('.header');
+  if (!header || header.querySelector('.notif-bell')) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'notif-bell';
+  wrap.innerHTML = '<button type="button" aria-label="แจ้งเตือน">🔔<span class="nb-count" style="display:none;">0</span></button>';
+  header.appendChild(wrap);
+
+  const panel = document.createElement('div');
+  panel.className = 'notif-panel';
+  panel.innerHTML = '<div class="np-head"><span>แจ้งเตือน</span><button type="button" class="np-all">อ่านทั้งหมด</button></div><div class="np-body"><div class="np-empty">กำลังโหลด...</div></div>';
+  document.body.appendChild(panel);
+
+  const btn = wrap.querySelector('button');
+  const badge = wrap.querySelector('.nb-count');
+  const body = panel.querySelector('.np-body');
+  let data = { unread: 0, items: [] };
+
+  function paint() {
+    badge.style.display = data.unread > 0 ? 'flex' : 'none';
+    badge.textContent = data.unread > 99 ? '99+' : data.unread;
+    if (!data.items.length) {
+      body.innerHTML = '<div class="np-empty">🎉 ไม่มีแจ้งเตือน</div>';
+      return;
+    }
+    body.innerHTML = data.items.map(function (n) {
+      const when = n.CreatedAt ? timeAgo(new Date(n.CreatedAt)) : '';
+      const href = n.Link || '';
+      return '<a class="np-item ' + (n.Unread ? 'unread' : '') + '" ' +
+        (href ? 'href="' + href + '"' : 'href="javascript:void(0)"') + ' data-id="' + n.ID + '">' +
+        '<div class="np-t">' + (n.Title || '') + '</div>' +
+        '<div class="np-b">' + (n.Body || '') + '</div>' +
+        '<div class="np-w">' + when + '</div></a>';
+    }).join('');
+  }
+
+  function timeAgo(d) {
+    const mins = Math.round((Date.now() - d.getTime()) / 60000);
+    if (mins < 1) return 'เมื่อครู่';
+    if (mins < 60) return mins + ' นาทีที่แล้ว';
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + ' ชั่วโมงที่แล้ว';
+    const days = Math.round(hrs / 24);
+    if (days < 7) return days + ' วันที่แล้ว';
+    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+  }
+
+  btn.addEventListener('click', function () {
+    panel.classList.toggle('show');
+    if (panel.classList.contains('show')) load();
+  });
+  document.addEventListener('click', function (e) {
+    if (!panel.contains(e.target) && !wrap.contains(e.target)) panel.classList.remove('show');
+  });
+  panel.querySelector('.np-all').addEventListener('click', async function () {
+    try { await markAllNotifRead(session.Email); } catch (err) {}
+    data.items.forEach(function (n) { n.Unread = false; });
+    data.unread = 0; paint();
+  });
+  body.addEventListener('click', function (e) {
+    const a = e.target.closest('.np-item');
+    if (a && a.dataset.id) { try { markNotifRead(session.Email, a.dataset.id); } catch (err) {} }
+  });
+
+  async function load() {
+    try {
+      const r = await fetchNotifications(session.Email);
+      if (r && !r.error) { data = r; paint(); }
+    } catch (err) { body.innerHTML = '<div class="np-empty">โหลดแจ้งเตือนไม่สำเร็จ</div>'; }
+  }
+  load();
 }
 
 function signaturePadHtml(id) {
