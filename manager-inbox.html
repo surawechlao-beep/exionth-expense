@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Manager Inbox — EXION</title>
+  <title>รออนุมัติ — EXION</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
@@ -11,10 +11,21 @@
 <body>
   <div class="header">
     <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
-    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">Manager Inbox</span></h1>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">รออนุมัติ (หัวหน้า)</span></h1>
   </div>
 
+  <div id="stickyBar" class="sticky-bar" style="display:none;"></div>
+
   <div class="container">
+    <div id="filterCard" class="card" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field" style="margin:0;"><label>พนักงาน</label><select id="fStaff"><option value="">ทุกคน</option></select></div>
+        <div class="field" style="margin:0;"><label>ประเภท</label><select id="fCat"><option value="">ทุกประเภท</option></select></div>
+      </div>
+      <div class="field" style="margin:10px 0 0;">
+        <input type="search" id="fSearch" placeholder="🔍 ค้นหา ชื่อ / ลูกค้า / สถานที่">
+      </div>
+    </div>
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
 
@@ -35,6 +46,7 @@
   <script>
     const session = requireLogin();
     let pending = [];
+    let exportPending = [];
     let mySig = null;
 
     const CAT_TH = { FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม', ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ', CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทร ตปท.', APT:'ที่พัก' };
@@ -45,10 +57,12 @@
     async function load() {
       setI('backBtn', 'back');
       try {
-        const [result, sig] = await Promise.all([
+        const [result, sig, exps] = await Promise.all([
           fetchManagerInbox(session.Email),
-          getMySignature(session.Email).catch(() => ({ hasSignature: false }))
+          getMySignature(session.Email).catch(() => ({ hasSignature: false })),
+          apiGet('getExportApprovalInbox', { email: session.Email }).catch(() => [])
         ]);
+        exportPending = Array.isArray(exps) ? exps : [];
         mySig = sig;
         if (result && result.error) throw new Error(result.error);
         pending = Array.isArray(result) ? result : [];
@@ -59,32 +73,101 @@
       }
     }
 
+    /** เติมตัวเลือกในดรอปดาวน์จากข้อมูลจริง — โชว์เฉพาะตอนมีของเยอะพอ */
+    function buildFilters() {
+      const card = document.getElementById('filterCard');
+      if (pending.length < 6) { card.style.display = 'none'; return; }
+      card.style.display = 'block';
+
+      const sSel = document.getElementById('fStaff'), cSel = document.getElementById('fCat');
+      if (sSel.dataset.built) return;
+      sSel.dataset.built = '1';
+
+      const staff = [...new Set(pending.map(r => r.StaffName).filter(Boolean))].sort();
+      staff.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sSel.appendChild(o); });
+
+      const cats = [...new Set(pending.map(r => r.Category).filter(Boolean))].sort();
+      cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = (CAT_IC[c]||'') + ' ' + (CAT_TH[c]||c); cSel.appendChild(o); });
+
+      ['fStaff','fCat'].forEach(id => document.getElementById(id).addEventListener('change', render));
+      document.getElementById('fSearch').addEventListener('input', render);
+    }
+
+    function getVisible() {
+      const st = (document.getElementById('fStaff')||{}).value || '';
+      const ct = (document.getElementById('fCat')||{}).value || '';
+      const q  = ((document.getElementById('fSearch')||{}).value || '').trim().toLowerCase();
+      return pending.filter(r => {
+        if (st && r.StaffName !== st) return false;
+        if (ct && r.Category !== ct) return false;
+        if (q) {
+          const hay = [r.StaffName, r.Customer, r.Venue, r.Occasion, r.Department].join(' ').toLowerCase();
+          if (hay.indexOf(q) < 0) return false;
+        }
+        return true;
+      });
+    }
+
     function render() {
       const list = document.getElementById('list');
       list.classList.remove('loading');
+      buildFilters();
 
-      if (pending.length === 0) {
+      if (pending.length === 0 && exportPending.length === 0) {
         list.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div><div class="title">เคลียร์แล้ว!</div><div class="sub">ไม่มีคำขอรออนุมัติ</div></div>`;
+        document.getElementById('stickyBar').style.display = 'none';
+        document.getElementById('filterCard').style.display = 'none';
         renderBottomNav('inbox');
         return;
       }
 
-      const total = pending.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
+      const shown = getVisible();
+      const total = shown.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
+
+      if (shown.length === 0) {
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">🔍</div>
+          <div class="title">ไม่พบรายการที่ตรงกับตัวกรอง</div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:14px;max-width:200px;" onclick="clearInboxFilters()">🗑 ล้างตัวกรอง</button></div>`;
+        renderBottomNav('inbox');
+        return;
+      }
 
       // Group by batch
       const batches = {};
-      pending.forEach((r, idx) => {
+      shown.forEach(r => {
+        const idx = pending.indexOf(r);   // index ของรายการจริง ไม่ใช่ index หลังกรอง
         const bid = r.BatchID || r.ID;
         if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, isPre: !!r.PreApproveBudget };
         batches[bid].items.push({ ...r, _idx: idx });
         batches[bid].total += Number(r.Amount) || Number(r.PreApproveBudget) || 0;
       });
 
+      document.getElementById('stickyBar').innerHTML =
+        `เหลือ <b>${shown.length}</b> รายการ · รวม <b>${Math.round(total).toLocaleString()}</b> บาท`;
+      document.getElementById('stickyBar').style.display = 'block';
+
       let html = `<div class="count-hero">
         <div class="lbl">รออนุมัติ</div>
-        <div class="num">${pending.length}</div>
+        <div class="num">${shown.length}</div>
         <div class="sub">${Object.keys(batches).length} ชุด • รวม ${Math.round(total).toLocaleString()} THB</div>
       </div>`;
+
+      // ✨ v6.0 คำขอ Export เคยแจ้งทางอีเมลอย่างเดียว หัวหน้าเปิดแอปแล้วไม่เห็นอะไรเลย
+      if (exportPending.length) {
+        html += `<div class="sec-label" style="color:var(--accent);">📊 คำขอ Export รออนุมัติ (${exportPending.length})</div>`;
+        exportPending.forEach(ex => {
+          const days = Math.floor((Date.now() - new Date(ex.RequestedAt).getTime()) / 86400000);
+          html += `<a href="export-review.html?id=${ex.ID}" class="req-card warn" style="text-decoration:none;display:block;">
+            <div class="ri-top">
+              <span class="ri-cat">📊 ${ex.StaffName}</span>
+              ${days >= 2 ? `<span class="pill bad">ค้าง ${days} วัน</span>` : '<span class="pill warn">ใหม่</span>'}
+              <span class="ri-amt">${Number(ex.TotalAmount||0).toLocaleString()} ฿</span>
+            </div>
+            <div class="ri-meta">ใบเบิกเดือน ${ex.Month}/${ex.Year} · ${ex.ItemCount} รายการ · แตะเพื่อตรวจสอบ</div>
+          </a>`;
+        });
+        html += `<div class="sec-label">คำขอเบิกรายรายการ</div>`;
+      }
 
       if (!mySig.hasSignature) {
         html += `<div class="warn-box"><div class="t">✍️ ยังไม่มีลายเซ็นบันทึกไว้</div>
@@ -113,8 +196,8 @@
           </div>`;
         });
         html += `<div class="btn-row" style="margin-top:10px;">
-          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="approveBatch('${bid}')">✅ Approve ทั้งชุด</button>
-          <button class="btn btn-sm" style="flex:1;background:var(--danger);color:white;" onclick="rejectBatch('${bid}')">❌ Reject</button>
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="approveBatch('${bid}')">✅ อนุมัติทั้งชุด</button>
+          <button class="btn btn-sm" style="flex:1;background:var(--danger);color:white;" onclick="rejectBatch('${bid}')">❌ ไม่อนุมัติ</button>
         </div></div>`;
       });
 
@@ -181,7 +264,7 @@
 
       html += `<div class="btn-row" style="margin-top:14px;">
         <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">✅ Approve</button>
-        <button class="btn" style="flex:1;background:var(--danger);color:white;" onclick="decide('${r.ID}','Rejected')">❌ Reject</button>
+        <button class="btn" style="flex:1;background:var(--danger);color:white;" onclick="decide('${r.ID}','Rejected')">❌ ไม่อนุมัติ</button>
       </div>`;
 
       document.getElementById('modalContent').innerHTML = html;
@@ -245,40 +328,56 @@
 
     window.approveBatch = async (bid) => {
       const items = pending.filter(r => (r.BatchID || r.ID) === bid);
+      // ✨ v6.0 คำขอ Export เคยแจ้งทางอีเมลอย่างเดียว หัวหน้าเปิดแอปแล้วไม่เห็นอะไรเลย
+      if (exportPending.length) {
+        html += `<div class="sec-label" style="color:var(--accent);">📊 คำขอ Export รออนุมัติ (${exportPending.length})</div>`;
+        exportPending.forEach(ex => {
+          const days = Math.floor((Date.now() - new Date(ex.RequestedAt).getTime()) / 86400000);
+          html += `<a href="export-review.html?id=${ex.ID}" class="req-card warn" style="text-decoration:none;display:block;">
+            <div class="ri-top">
+              <span class="ri-cat">📊 ${ex.StaffName}</span>
+              ${days >= 2 ? `<span class="pill bad">ค้าง ${days} วัน</span>` : '<span class="pill warn">ใหม่</span>'}
+              <span class="ri-amt">${Number(ex.TotalAmount||0).toLocaleString()} ฿</span>
+            </div>
+            <div class="ri-meta">ใบเบิกเดือน ${ex.Month}/${ex.Year} · ${ex.ItemCount} รายการ · แตะเพื่อตรวจสอบ</div>
+          </a>`;
+        });
+        html += `<div class="sec-label">คำขอเบิกรายรายการ</div>`;
+      }
+
       if (!mySig.hasSignature) {
         showToast('ตั้งลายเซ็นใน Profile ก่อน เพื่อ approve ทั้งชุด', 'error');
         return showDetail(pending.indexOf(items[0]));
       }
-      if (!confirm(`อนุมัติทั้ง ${items.length} รายการ?`)) return;
-      showLoading(`กำลังอนุมัติ ${items.length} รายการ...`);
+      const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const who = items[0] ? (items[0].StaffName || '') : '';
+      if (!confirm(`อนุมัติทั้ง ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท ?`)) return;
       try {
-        for (const r of items) {
-          await managerApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email });
-        }
-        hideLoading();
-        showToast(`✅ อนุมัติ ${items.length} รายการแล้ว`, 'success');
-        load();
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+        await runBatch(items, r => managerApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email }), 'อนุมัติ');
+      } finally { load(); }
     };
 
     window.rejectBatch = async (bid) => {
       const items = pending.filter(r => (r.BatchID || r.ID) === bid);
-      const remark = prompt('เหตุผลที่ปฏิเสธทั้งชุด:');
-      if (!remark) return;
-      showLoading(`กำลังปฏิเสธ ${items.length} รายการ...`);
+      const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const who = items[0] ? (items[0].StaffName || '') : '';
+      const remark = prompt('เหตุผลที่ไม่อนุมัติ (พนักงานจะเห็นข้อความนี้):');
+      if (!remark || !remark.trim()) return;
+      // ยืนยันอีกชั้น — ปฏิเสธแล้วย้อนไม่ได้ และอีเมลเด้งหาพนักงานทันที
+      if (!confirm(`ไม่อนุมัติทั้ง ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท\n\nเหตุผล: ${remark}\n\nยืนยัน? (ย้อนกลับไม่ได้)`)) return;
       try {
-        for (const r of items) {
-          await managerApprove({ id: r.ID, decision: 'Rejected', remark, approverEmail: session.Email });
-        }
-        hideLoading();
-        showToast('ปฏิเสธทั้งชุดแล้ว', 'success');
-        load();
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+        await runBatch(items, r => managerApprove({ id: r.ID, decision: 'Rejected', remark, approverEmail: session.Email }), 'ปฏิเสธ');
+      } finally { load(); }
     };
 
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
     window.showDetail = showDetail; window.loadReceipt = loadReceipt; window.decide = decide; window.closeModal = closeModal;
+    window.clearInboxFilters = () => {
+      ['fStaff','fCat','fSearch'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      render();
+    };
+
     if (session) load();
   </script>
 </body>
