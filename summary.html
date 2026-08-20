@@ -9,8 +9,11 @@
   <meta name="theme-color" content="#B7081D">
   <style>
     /* page-specific only — shared components live in css/style.css v6.1 */
-    table.xl { min-width: 920px; }
-    table.xl td.ctr { text-align: center; }
+    table.xl { min-width: 900px; }
+    table.xl td.ctr, table.xl th.ctr { text-align: center; }
+    table.xl td.sm { font-size: 10.5px; }
+    table.xl td, table.xl th { white-space: nowrap; }
+    table.xl td.sm, table.xl td:nth-child(4), table.xl td:nth-child(5) { white-space: normal; }
     table.xl tr.person-hdr td {
       background: linear-gradient(90deg,#B7081D,#7A0512); color: #fff;
       font-weight: 800; padding: 9px; font-size: 12px; letter-spacing: -.01em;
@@ -25,6 +28,43 @@
       background: linear-gradient(135deg,#B7081D,#8B0616); color: #fff;
       border-color: transparent; box-shadow: 0 4px 12px rgba(183,8,29,.26);
     }
+
+    /* toolbar เหนือตาราง */
+    .tbl-bar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .tbl-bar button {
+      padding: 7px 12px; border: 1.5px solid var(--gray-200); background: #fff;
+      border-radius: 999px; font-size: 11.5px; font-weight: 700; color: var(--gray-600);
+      cursor: pointer; font-family: inherit; transition: all .14s ease;
+    }
+    .tbl-bar button.on { background: #B7081D; color: #fff; border-color: transparent; }
+    .tbl-bar .spacer { flex: 1; }
+
+    /* ดูเต็มจอ */
+    .fs-overlay {
+      position: fixed; inset: 0; z-index: 4000; background: #fff;
+      display: none; flex-direction: column;
+    }
+    .fs-overlay.show { display: flex; }
+    .fs-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-bottom: 1px solid var(--gray-200);
+      background: linear-gradient(135deg,#B7081D,#8B0616); color: #fff; flex-shrink: 0;
+    }
+    .fs-head .t { font-weight: 800; font-size: 14px; }
+    .fs-head .s { font-size: 11px; opacity: .85; }
+    .fs-head button {
+      margin-left: auto; background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
+      color: #fff; width: 34px; height: 34px; border-radius: 50%;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+    }
+    .fs-body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 10px; }
+    .fs-body .xl-wrap { border: none; overflow: visible; }
+    .fs-body table.xl { min-width: 100%; font-size: 12.5px; }
+    .rotate-hint {
+      background: #FEF3C7; color: #92400E; font-size: 11.5px; font-weight: 700;
+      padding: 8px 12px; text-align: center; flex-shrink: 0;
+    }
+    @media (orientation: landscape) { .rotate-hint { display: none; } }
   </style>
 </head>
 <body>
@@ -55,6 +95,15 @@
     <div id="content" style="display:none;"></div>
   </div>
 
+  <div id="fsOverlay" class="fs-overlay">
+    <div class="fs-head">
+      <div><div class="t">📋 Preview ข้อมูล</div><div class="s" id="fsSub">—</div></div>
+      <button onclick="closeFs()">✕</button>
+    </div>
+    <div class="rotate-hint">📱 หมุนจอเป็นแนวนอน จะเห็นได้กว้างขึ้น</div>
+    <div class="fs-body" id="fsBody"></div>
+  </div>
+
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
@@ -66,6 +115,7 @@
 
     let raw = { scope:'self', myName:'', staffList:[], items:[] };
     let fStatus = '';
+    let lastItems = [], lastGroupBy = false, lastSub = '';
 
     const CAT_TH = {
       FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม',
@@ -80,12 +130,13 @@
       const now = new Date();
       months.forEach((m,i) => { const o=document.createElement('option'); o.value=i+1; o.textContent=m; if(i+1===now.getMonth()+1) o.selected=true; mSel.appendChild(o); });
       for (let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=document.createElement('option'); o.value=y; o.textContent=y; if(y===now.getFullYear()) o.selected=true; ySel.appendChild(o); }
-      mSel.addEventListener('change', render);
-      ySel.addEventListener('change', render);
+      mSel.addEventListener('change', reload);
+      ySel.addEventListener('change', reload);
 
       try {
+        // v6.0 กรองเดือนฝั่ง server — เดิมดึงทุกแถวทั้งระบบมาก้อนเดียว
         const [r, cats] = await Promise.all([
-          apiGet('getVisibleRequests', { email: session.Email }),
+          apiGet('getVisibleRequests', { email: session.Email, year: ySel.value, month: mSel.value }),
           fetchCategories().catch(() => [])
         ]);
         if (r.error) throw new Error(r.error);
@@ -105,7 +156,28 @@
         }
         render();
       } catch (err) {
-        document.getElementById('loading').innerHTML = `<div class="empty"><div class="title">Error</div><div class="sub">${err.message}</div></div>`;
+        document.getElementById('loading').innerHTML = `<div class="empty"><div class="title">โหลดข้อมูลไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+      }
+    }
+
+    /** เปลี่ยนเดือน/ปี → ดึงข้อมูลใหม่จาก server (กรองฝั่ง server) */
+    async function reload() {
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('loading').style.display = '';
+      document.getElementById('loading').classList.add('loading');
+      try {
+        const r = await apiGet('getVisibleRequests', {
+          email: session.Email,
+          year: document.getElementById('fYear').value,
+          month: document.getElementById('fMonth').value
+        });
+        if (r.error) throw new Error(r.error);
+        raw = r;
+        render();
+      } catch (err) {
+        document.getElementById('loading').classList.remove('loading');
+        document.getElementById('loading').innerHTML =
+          `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">โหลดข้อมูลไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
       }
     }
 
@@ -137,7 +209,9 @@
 
 
     function render() {
-      document.getElementById('loading').style.display = 'none';
+      const ld = document.getElementById('loading');
+      ld.classList.remove('loading');
+      ld.style.display = 'none';
       const c = document.getElementById('content');
       c.style.display = 'block';
 
@@ -193,72 +267,119 @@
       }
 
       // ═══ Excel-style preview table ═══
+      lastItems = items;
+      lastGroupBy = groupByPerson;
+      lastSub = `${scopeLbl} · ${mName} ${document.getElementById('fYear').value} · ${items.length} รายการ`;
+
       html += `<div class="card">
         <div class="card-head"><span class="ib ib-blue">📋</span>
           <div><div class="ch-title">Preview ข้อมูล (แบบ Excel)</div>
-          <div class="ch-sub">${items.length} รายการ · เลื่อนซ้าย-ขวาเพื่อดูคอลัมน์เพิ่ม</div></div></div>
+          <div class="ch-sub">${items.length} รายการ</div></div></div>
         <div style="margin-top:14px;">
-        ${items.length === 0 ? '<div class="empty" style="padding:28px 12px;"><div class="icon-wrap">📭</div><div class="title">ไม่มีข้อมูลในเดือนนี้</div></div>' : renderTable(items, groupByPerson)}
+          ${items.length === 0 ? '' : `<div class="tbl-bar">
+            <span style="font-size:11.5px;color:var(--gray-500);">เลื่อนซ้าย–ขวาเพื่อดูคอลัมน์เพิ่ม</span>
+            <span class="spacer"></span>
+            <button onclick="openFs()">⛶ ดูเต็มจอ</button>
+          </div>`}
+          ${items.length === 0 ? '<div class="empty" style="padding:28px 12px;"><div class="icon-wrap">📭</div><div class="title">ไม่มีข้อมูลในเดือนนี้</div></div>' : renderTable(items, groupByPerson)}
         </div>
       </div>`;
 
       c.innerHTML = html;
     }
 
-    function renderTable(items, groupByPerson) {
-      const th = `<tr>
-        <th>No.</th><th>วันที่</th><th>ประเภท</th><th>Customer</th><th>Contact</th>
-        <th>Distance</th><th>Mile ฿</th><th>Express ฿</th><th>Ent ฿</th><th>Job</th>
-        <th>Hotel ฿</th><th>Park ฿</th><th>Remark</th><th>Status</th>
-      </tr>`;
+    // ── ดูเต็มจอ ──
+    function openFs() {
+      document.getElementById('fsSub').textContent = lastSub;
+      document.getElementById('fsBody').innerHTML = renderTable(lastItems, lastGroupBy);
+      document.getElementById('fsOverlay').classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeFs() {
+      document.getElementById('fsOverlay').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+    window.openFs = openFs; window.closeFs = closeFs;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFs(); });
 
-      const rowHtml = (r, n) => {
-        const cat = r.Category;
-        const amt = Number(r.Amount)||0;
-        const d = r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '-';
-        const km = cat==='FUEL' ? (Number(r.Mileage_KM)||0) : '';
-        const cell = (v) => v ? Math.round(v).toLocaleString() : '';
-        const job = ['TRAVEL','OTHER','CAR','MOBILE','OVERSEAS','APT'].includes(cat)
-          ? ((r.Origin && r.Destination) ? `${r.Origin}→${r.Destination}` : (r.Occasion||r.Venue||CAT_TH[cat]||cat)) + ' ' + Math.round(amt).toLocaleString()
-          : '';
-        const stColor = r.Status==='Approved'?'#16a34a':r.Status==='Rejected'?'#dc2626':'#f59e0b';
-        return `<tr>
-          <td class="ctr">${n}</td>
-          <td class="ctr">${d}</td>
-          <td class="ctr">${CAT_TH[cat]||cat}</td>
-          <td>${r.Customer||'-'}</td>
-          <td>${r.CustomerContact||'-'}</td>
-          <td class="num">${km||''}</td>
-          <td class="num">${cat==='FUEL'?cell(amt):''}</td>
-          <td class="num">${cat==='EXPRESS'?cell(amt):''}</td>
-          <td class="num">${(cat==='ENT'||cat==='GOLF')?cell(amt):''}</td>
-          <td style="font-size:10px;">${job}</td>
-          <td class="num">${cat==='HOTEL'?cell(amt):''}</td>
-          <td class="num">${cat==='PARK'?cell(amt):''}</td>
-          <td style="font-size:10px;">${r.Venue||''}</td>
-          <td class="ctr" style="color:${stColor};font-weight:700;font-size:10px;">${r.Status||'-'}</td>
-        </tr>`;
-      };
+    function renderTable(items, groupByPerson) {
+      const cell = v => v ? Math.round(v).toLocaleString() : '';
+      const amtIf = (r, ok) => ok ? cell(Number(r.Amount)||0) : '';
+
+      // นิยามคอลัมน์ — always:true = โชว์เสมอ ถึงจะว่างก็ตาม
+      const COLS = [
+        { k:'no',    label:'No.',        cls:'ctr', always:true,  get:(r,n) => n },
+        { k:'date',  label:'วันที่',      cls:'ctr', always:true,  get:r => r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '-' },
+        { k:'cat',   label:'ประเภท',      cls:'ctr', always:true,  get:r => CAT_TH[r.Category] || r.Category },
+        { k:'cust',  label:'Customer',    cls:'',    get:r => r.Customer || '' },
+        { k:'ctc',   label:'Contact',     cls:'',    get:r => r.CustomerContact || '' },
+        { k:'dist',  label:'Distance',    cls:'num', get:r => r.Category==='FUEL' ? (Number(r.Mileage_KM)||'') : '' },
+        { k:'mile',  label:'Mile ฿',      cls:'num', get:r => amtIf(r, r.Category==='FUEL') },
+        { k:'exp',   label:'Express ฿',   cls:'num', get:r => amtIf(r, r.Category==='EXPRESS') },
+        { k:'ent',   label:'Ent ฿',       cls:'num', get:r => amtIf(r, r.Category==='ENT' || r.Category==='GOLF') },
+        { k:'job',   label:'Job',         cls:'sm',  get:r => {
+            if (['TRAVEL','OTHER','CAR','MOBILE','OVERSEAS','APT'].indexOf(r.Category) < 0) return '';
+            const base = (r.Origin && r.Destination) ? r.Origin + '→' + r.Destination
+                       : (r.Occasion || r.Venue || CAT_TH[r.Category] || r.Category);
+            return base + ' ' + Math.round(Number(r.Amount)||0).toLocaleString();
+          }},
+        { k:'hotel', label:'Hotel ฿',     cls:'num', get:r => amtIf(r, r.Category==='HOTEL') },
+        { k:'park',  label:'Park ฿',      cls:'num', get:r => amtIf(r, r.Category==='PARK') },
+        { k:'rmk',   label:'Remark',      cls:'sm',  get:r => r.Venue || '' },
+        { k:'st',    label:'Status',      cls:'ctr', always:true,  get:r => {
+            const c = r.Status==='Approved' ? '#16A34A' : r.Status==='Rejected' ? '#DC2626' : '#F59E0B';
+            return '<span style="color:' + c + ';font-weight:800;font-size:10.5px;">' + (r.Status||'-') + '</span>';
+          }}
+      ];
+
+      const cols = COLS;   // โชว์ครบทุกคอลัมน์เสมอ
+
+      const th = '<tr>' + cols.map(c =>
+        '<th class="' + (c.cls === 'num' ? 'num' : c.cls === 'ctr' ? 'ctr' : '') + '">' + c.label + '</th>').join('') + '</tr>';
+
+      const rowHtml = (r, n) => '<tr>' + cols.map(c =>
+        '<td class="' + c.cls + '">' + (c.get(r, n) || '') + '</td>').join('') + '</tr>';
 
       let body = '';
       if (groupByPerson) {
         const groups = {};
-        items.forEach(r => { const k = r.StaffName||'?'; (groups[k]=groups[k]||[]).push(r); });
-        Object.entries(groups).forEach(([name, rows]) => {
-          const sub = rows.reduce((s,r)=>s+(Number(r.Amount)||0),0);
-          body += `<tr class="person-hdr"><td colspan="14">👤 ${name} — ${rows.length} รายการ — ${Math.round(sub).toLocaleString()} THB</td></tr>`;
+        items.forEach(r => { const k = r.StaffName || '?'; (groups[k] = groups[k] || []).push(r); });
+        Object.keys(groups).forEach(name => {
+          const rows = groups[name];
+          const sub = rows.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+          body += '<tr class="person-hdr"><td colspan="' + cols.length + '">👤 ' + name +
+                  ' — ' + rows.length + ' รายการ — ' + Math.round(sub).toLocaleString() + ' THB</td></tr>';
           rows.forEach((r,i) => body += rowHtml(r, i+1));
         });
       } else {
         items.forEach((r,i) => body += rowHtml(r, i+1));
       }
 
-      const grand = items.reduce((s,r)=>s+(Number(r.Amount)||0),0);
-      return `<div class="xl-wrap"><table class="xl">
-        <thead>${th}</thead>
-        <tbody>${body}</tbody>
-        <tfoot><tr><td colspan="12" style="text-align:right;">รวมทั้งหมด</td><td class="num" colspan="2" style="text-align:right;color:#B7081D;">${Math.round(grand).toLocaleString()} THB</td></tr></tfoot>
-      </table></div>`;
+      // ── แถวรวม: รวมยอดใต้คอลัมน์เงินของมันเอง ──
+      const grand = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const sumOf = k => {
+        const col = COLS.filter(c => c.k === k)[0];
+        return items.reduce((s,r) => {
+          const v = String(col.get(r, 0) || '').replace(/,/g, '');
+          return s + (parseFloat(v) || 0);
+        }, 0);
+      };
+      const MONEY = ['dist','mile','exp','ent','hotel','park'];
+      let foot = '<tr>';
+      cols.forEach((c, i) => {
+        if (i === 0) { foot += '<td class="ctr">Σ</td>'; return; }
+        if (MONEY.indexOf(c.k) >= 0) {
+          const v = sumOf(c.k);
+          foot += '<td class="num">' + (v ? Math.round(v).toLocaleString() : '') + '</td>';
+          return;
+        }
+        if (c.k === 'cat') { foot += '<td class="ctr">รวมทั้งหมด</td>'; return; }
+        if (c.k === 'st')  { foot += '<td class="ctr" style="color:#B7081D;white-space:nowrap;">' + Math.round(grand).toLocaleString() + ' ฿</td>'; return; }
+        foot += '<td></td>';
+      });
+      foot += '</tr>';
+
+      return '<div class="xl-wrap"><table class="xl"><thead>' + th + '</thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>';
     }
 
     window.setStatus = setStatus;
