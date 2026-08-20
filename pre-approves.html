@@ -43,7 +43,7 @@
           list.innerHTML = `<div class="empty"><div class="icon-wrap">📋</div>
             <div class="title">ยังไม่มี Pre-Approve</div>
             <div class="sub">กดปุ่มด้านบนเพื่อขออนุมัติงบล่วงหน้า</div></div>`;
-          renderBottomNav('new');
+          renderBottomNav('');
           return;
         }
 
@@ -73,12 +73,12 @@
           done.forEach(r => html += row(r, 'done'));
         }
         list.innerHTML = html;
-        renderBottomNav('new');
+        renderBottomNav('');
       } catch (err) {
         const list = document.getElementById('list');
         list.classList.remove('loading');
         list.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">${err.message}</div></div>`;
-        renderBottomNav('new');
+        renderBottomNav('');
       }
     }
 
@@ -93,7 +93,7 @@
       const custTag = m ? `<span class="tag">${m[1]}</span> ${m[2]}` : custRaw;
       const over = Number(r.Amount) > Number(r.PreApproveBudget);
 
-      return `<div class="request-item ${cls}">
+      return `<div class="req-card ${cls}">
         <div class="ri-top">
           <span class="ri-cat">${CAT_TH[r.Category] || r.Category}</span>
           ${badge}
