@@ -258,9 +258,9 @@
               <span class="ri-amt">${Number(x.TotalAmount||0).toLocaleString()} ฿</span>
             </div>
             <div class="ri-meta">ใบเบิกเดือน ${x.Month}/${x.Year} · ${x.ItemCount} รายการ</div>
-            <button class="btn btn-primary btn-sm" style="margin-top:9px;"
+            ${session.isViewer ? '' : `<button class="btn btn-primary btn-sm" style="margin-top:9px;"
                     onclick="markPaid('${x.ID}','${String(x.StaffName).replace(/'/g,'')}',${Number(x.TotalAmount)||0})">
-              💵 ยืนยันว่าโอนแล้ว</button>
+              💵 ยืนยันว่าโอนแล้ว</button>`}
           </div>`;
         }).join('')}
         </div>
