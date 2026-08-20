@@ -385,6 +385,19 @@
           </a>
         </div>
 
+        ${session.isViewer ? `
+        <div class="sec-label">สำหรับผู้บริหาร</div>
+        <div class="tiles">
+          <a href="all-requests.html" class="tile">
+            <div class="ib ib-blue">${icon('list')}</div>
+            <div><div class="lb">คำขอทั้งบริษัท</div><div class="sb">ดูข้อมูล · โหลด Excel</div></div>
+          </a>
+          <a href="summary.html" class="tile">
+            <div class="ib ib-purple">📊</div>
+            <div><div class="lb">สรุปทั้งบริษัท</div><div class="sb">ยอดรวมทุกแผนก</div></div>
+          </a>
+        </div>` : ''}
+
         ${(isManager || isSenior || isGM) ? `
         <div class="sec-label">สำหรับผู้อนุมัติ</div>
         <div class="tiles">
