@@ -835,20 +835,22 @@ a { color: var(--accent); }
 .bar-row .bf { background: linear-gradient(90deg,#B7081D,#F59E0B); height: 100%; border-radius: 999px; display: block; transition: width .5s cubic-bezier(.4,0,.2,1); }
 .bar-row .bv { text-align: right; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
 
-/* ── Request item (stacked card) ── */
-.request-item {
+/* ── Request card (การ์ดแนวตั้ง — status / pre-approves) ──
+   หมายเหตุ: .request-item (แบบ flex + .cat-icon) ยังใช้อยู่ในหน้า inbox
+   จึงต้องแยกชื่อคลาส ไม่งั้น layout หน้า inbox จะพัง */
+.req-card {
   display: block; background: #fff; border: 1px solid var(--gray-200);
   border-left: 4px solid var(--gray-300);
   border-radius: var(--r-lg); padding: 14px; margin-bottom: 9px;
   box-shadow: var(--sh-xs);
 }
-.request-item.ok   { border-left-color: #16A34A; }
-.request-item.warn { border-left-color: #F59E0B; }
-.request-item.bad  { border-left-color: #DC2626; }
-.request-item .ri-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.request-item .ri-cat { font-weight: 800; font-size: 14px; color: var(--gray-900); letter-spacing: -.01em; }
-.request-item .ri-amt { margin-left: auto; font-weight: 800; font-size: 16px; color: var(--accent); font-variant-numeric: tabular-nums; }
-.request-item .ri-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; line-height: 1.45; }
+.req-card.ok   { border-left-color: #16A34A; }
+.req-card.warn { border-left-color: #F59E0B; }
+.req-card.bad  { border-left-color: #DC2626; }
+.req-card .ri-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.req-card .ri-cat { font-weight: 800; font-size: 14px; color: var(--gray-900); letter-spacing: -.01em; }
+.req-card .ri-amt { margin-left: auto; font-weight: 800; font-size: 16px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.req-card .ri-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; line-height: 1.45; }
 
 /* ── Pills / tags ── */
 .pill {
@@ -953,3 +955,137 @@ table.xl tfoot td { background: #FFE4E6; font-weight: 800; padding: 10px 7px; bo
 }
 .btn-danger { background: #DC2626; color: #fff; border: none; }
 .btn-danger:active { background: #B91C1C; }
+
+/* ปุ่มยกเลิกใน loading overlay — โผล่เมื่อรอนานเกิน 8 วิ */
+.loader-cancel {
+  display: none; margin: 14px auto 0;
+  padding: 9px 22px; min-height: 40px;
+  background: transparent; border: 1.5px solid var(--gray-300);
+  border-radius: 999px; color: var(--gray-600);
+  font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.loader-cancel.show { display: block; }
+
+/* ช่องที่กรอกไม่ครบ — ชี้ให้เห็นชัดตอนกดส่ง */
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea,
+.field.has-error .upload-area {
+  border-color: var(--danger) !important;
+  background: #FFF5F5;
+  animation: shake .3s ease;
+}
+.field.has-error label { color: var(--danger); }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-5px); }
+  75%     { transform: translateX(5px); }
+}
+
+/* ═══════════════════════════════════════════
+   ACCESSIBILITY v6.2 — เป้ากดขั้นต่ำ 44×44 px
+   นิ้วโป้งบนมือถือกดพลาดบ่อยมาก โดยเฉพาะปุ่มที่ลบข้อมูล
+   ═══════════════════════════════════════════ */
+
+/* ปุ่มลบรายการในฟอร์ม — เดิม 28px เล็กเกินไปสำหรับปุ่มที่ทำลายข้อมูล */
+.item-card .remove-item {
+  width: 40px; height: 40px;
+  top: 8px; right: 8px;
+  font-size: 16px;
+}
+/* ขยายพื้นที่กดออกไปอีก 4px รอบด้าน โดยหน้าตาไม่เปลี่ยน */
+.item-card .remove-item::after {
+  content: ''; position: absolute; inset: -4px;
+}
+
+/* ปุ่ม ✕ ลบไฟล์แนบ — เดิม ~20px */
+.file-chip { padding-right: 4px; }
+.file-chip button {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.file-chip button::after { content: ''; position: absolute; inset: -7px; }
+
+/* ปุ่มปิด modal */
+.modal-close {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ปุ่มย้อนกลับบน header */
+.header .back { width: 44px; height: 44px; }
+
+/* ปุ่มเล็กในการ์ด — ยังคงดูเล็ก แต่กดได้เต็ม 44px */
+.btn-sm { min-height: 42px; }
+
+/* ปุ่มปิดหน้าเต็มจอ */
+.fs-head button { width: 44px !important; height: 44px !important; }
+
+/* ทุกปุ่ม/ลิงก์ที่เป็น target ควรกดได้สบาย */
+button, .btn, .nav-item { min-height: 44px; }
+.btn-sm, .chips button, .tbl-bar button, .seg button { min-height: 42px; }
+
+/* แถบสรุปติดบน — เลื่อนดูรายการยาวๆ ก็ยังรู้ว่าเหลือเท่าไหร่ */
+.sticky-bar {
+  position: sticky; top: 0; z-index: 90;
+  background: linear-gradient(135deg,#B7081D,#8B0616); color: #fff;
+  padding: 9px 16px; font-size: 12.5px; text-align: center;
+  box-shadow: 0 2px 10px rgba(183,8,29,.24);
+}
+.sticky-bar b { font-weight: 800; }
+
+/* ═══════════════════════════════════════════
+   v6.0 — กระดิ่งแจ้งเตือน (แทนอีเมล)
+   ═══════════════════════════════════════════ */
+.notif-bell { position: relative; flex-shrink: 0; }
+.notif-bell button {
+  width: 44px; height: 44px; border-radius: 12px;
+  border: 1px solid var(--gray-200); background: #fff;
+  font-size: 19px; cursor: pointer; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.notif-bell button:active { background: var(--gray-100); transform: scale(.93); }
+.nb-count {
+  position: absolute; top: 4px; right: 4px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: var(--accent); color: #fff; border-radius: 999px;
+  font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.notif-panel {
+  position: fixed; z-index: 3000; display: none;
+  background: #fff; border: 1px solid var(--gray-200);
+  border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+  overflow: hidden;
+}
+.notif-panel.show { display: block; }
+@media (max-width: 640px) {
+  .notif-panel { left: 10px; right: 10px; top: calc(64px + env(safe-area-inset-top, 0px)); }
+}
+@media (min-width: 641px) {
+  .notif-panel { right: max(16px, calc(50vw - 320px)); top: 70px; width: 380px; }
+}
+.np-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--gray-200);
+  font-weight: 800; font-size: 13.5px; color: var(--gray-900);
+}
+.np-head button {
+  background: none; border: none; color: var(--accent);
+  font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+  min-height: 32px; padding: 0 6px;
+}
+.np-body { max-height: min(60vh, 460px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.np-empty { padding: 34px 16px; text-align: center; color: var(--gray-400); font-size: 13px; }
+.np-item {
+  display: block; padding: 12px 14px; text-decoration: none;
+  border-bottom: 1px solid var(--gray-100); color: inherit;
+}
+.np-item:active { background: var(--gray-50); }
+.np-item.unread { background: #FFF8F8; border-left: 3px solid var(--accent); }
+.np-t { font-weight: 700; font-size: 13px; color: var(--gray-900); line-height: 1.35; }
+.np-b { font-size: 11.5px; color: var(--gray-500); margin-top: 3px; line-height: 1.45; }
+.np-w { font-size: 10.5px; color: var(--gray-400); margin-top: 4px; }
