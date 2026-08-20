@@ -27,7 +27,7 @@
     <div class="card">
       <div class="card-head"><span class="ib ib-green">📊</span>
         <div><div class="ch-title">Export ใบเบิกรายเดือน</div>
-        <div class="ch-sub">ต้องผ่าน หัวหน้า → Senior → GM ก่อนดาวน์โหลดตัวจริง</div></div>
+        <div class="ch-sub">ขออนุมัติ 1 ครั้ง แล้วดาวน์โหลด Excel ตัวจริงได้เลย</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
         <div class="field" style="margin:0;"><label>เดือน</label><select id="exportMonth"></select></div>
@@ -123,37 +123,34 @@
 
       if (!ex || ex.OverallStatus === 'Rejected') {
         box.innerHTML = ex
-          ? `<div class="bad-box"><b>❌ ถูกปฏิเสธ</b><br><span style="font-weight:400;">${ex.ManagerRemark || ex.SeniorRemark || ex.GMRemark || 'ไม่มีหมายเหตุ'}</span></div>`
+          ? `<div class="bad-box"><b>❌ ไม่อนุมัติ</b><br><span style="font-weight:400;">${ex.GMRemark || ex.ManagerRemark || ex.SeniorRemark || 'ไม่ได้ระบุเหตุผล'}</span></div>`
           : `<div class="info-box">📋 ยังไม่ได้ขออนุมัติสำหรับ <b>${MONTHS[month-1]} ${year}</b></div>`;
         act.innerHTML = `
           <button class="btn btn-primary" onclick="requestApproval()">✅ ขออนุมัติเพื่อ Export</button>
-          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง / โหลด Draft</button>`;
+          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่างก่อน (ยังใช้เบิกไม่ได้)</button>`;
+
       } else if (ex.OverallStatus === 'Approved') {
-        box.innerHTML = `<div class="ok-box"><b>✅ อนุมัติครบทุกขั้นแล้ว</b><br>
-          <span style="font-weight:400;">${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} THB</span></div>
-          ${chainHtml(ex)}`;
+        // ✨ v6.0 ปิดลูป — บอกด้วยว่าบัญชีจ่ายเงินแล้วหรือยัง
+        const paid = !!ex.PaidAt;
+        box.innerHTML = `
+          <div class="ok-box"><b>✅ อนุมัติแล้ว</b><br>
+            <span style="font-weight:400;">${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span></div>
+          ${paid
+            ? `<div class="ok-box" style="background:#ECFDF5;border-color:#6EE7B7;">
+                 💵 <b>บัญชีโอนเงินแล้ว</b><br>
+                 <span style="font-weight:400;font-size:12px;">${new Date(ex.PaidAt).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'})}</span>
+               </div>`
+            : `<div class="info-box" style="margin-bottom:0;">⏳ รอฝ่ายบัญชีโอนเงิน</div>`}`;
         act.innerHTML = `
           <button class="btn btn-primary" onclick="downloadFinal('${ex.ID}')">📥 ดาวน์โหลด Excel ตัวจริง</button>
-          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดู Draft</button>`;
-      } else {
-        box.innerHTML = `<div class="warn-box"><b>⏳ รออนุมัติ</b></div>${chainHtml(ex)}`;
-        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง / โหลด Draft</button>`;
-      }
-    }
+          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง</button>`;
 
-    function chainHtml(req) {
-      const stages = [
-        { name:'หัวหน้า', email:req.ManagerEmail, status:req.ManagerStatus },
-        { name:'Senior',  email:req.SeniorEmail,  status:req.SeniorStatus },
-        { name:'GM',      email:req.GMEmail,      status:req.GMStatus }
-      ].filter(s => s.email);
-      return `<div class="approver-chain">` + stages.map(s => {
-        const cls = s.status==='Approved'?'done':s.status==='Rejected'?'rejected':s.status==='Pending'?'current':'';
-        const ic  = s.status==='Approved'?'✅':s.status==='Rejected'?'❌':s.status==='Pending'?'⏳':'⏸';
-        return `<div class="approver-step ${cls}"><div class="as-ic">${ic}</div>
-          <div class="as-role">${s.name}</div>
-          <div class="as-who">${String(s.email).split('@')[0]}</div></div>`;
-      }).join('') + `</div>`;
+      } else {
+        const who = String(ex.GMEmail || ex.SeniorEmail || ex.ManagerEmail || '').split('@')[0];
+        box.innerHTML = `<div class="warn-box"><b>⏳ รออนุมัติ</b><br>
+          <span style="font-weight:400;font-size:12.5px;">อยู่ที่ ${who || 'ผู้อนุมัติ'} · ${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span></div>`;
+        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่างก่อน (ยังใช้เบิกไม่ได้)</button>`;
+      }
     }
 
     window.requestApproval = async () => {
@@ -164,7 +161,9 @@
         const r = await apiPost('requestExportApproval', { staffEmail: session.Email, year, month });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        showToast('ส่งคำขอแล้ว รออนุมัติ ✅', 'success');
+        showToast(r.auto
+          ? '✅ ผ่านอัตโนมัติ — ดาวน์โหลด Excel ได้เลย'
+          : 'ส่งคำขอแล้ว รออนุมัติ ✅', 'success');
         await loadMyExports();
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
@@ -172,12 +171,12 @@
     window.downloadDraft = async () => {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
-      showLoading('กำลังสร้าง Draft...');
+      showLoading('กำลังสร้างตัวอย่าง...');
       try {
         const r = await apiPost('downloadDraftExport', { staffEmail: session.Email, year, month, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        dl(r); showToast('โหลด Draft สำเร็จ (มีลายน้ำ) ✅', 'success');
+        dl(r); showToast('โหลดตัวอย่างแล้ว — มีลายน้ำ ใช้เบิกจริงไม่ได้ ✅', 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
@@ -187,7 +186,14 @@
         const r = await apiPost('downloadFinalExport', { exportId, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        dl(r); showToast('ดาวน์โหลดสำเร็จ ✅', 'success');
+        dl(r);
+        if (r.drift) {
+          alert('⚠️ ตัวเลขเปลี่ยนไปหลังจากได้รับอนุมัติ\n\n' +
+            'ตอนอนุมัติ: ' + r.drift.approvedCount + ' รายการ · ' + Number(r.drift.approvedTotal).toLocaleString() + ' บาท\n' +
+            'ตอนนี้: ' + r.drift.currentCount + ' รายการ · ' + Number(r.drift.currentTotal).toLocaleString() + ' บาท\n\n' +
+            'กรุณาตรวจสอบกับหัวหน้าก่อนส่งบัญชี');
+        }
+        showToast('ดาวน์โหลดสำเร็จ ✅', 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
