@@ -35,10 +35,7 @@
       <div class="field" style="margin:10px 0 0;">
         <input type="search" id="search" placeholder="🔍 ค้นหา ลูกค้า / สถานที่ / ID">
       </div>
-      <div class="btn-row" style="margin-top:12px;">
-        <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="clearFilters()">🗑 ล้าง</button>
-        <button class="btn btn-primary btn-sm" style="flex:1;" onclick="applyFilters()">🔍 กรอง</button>
-      </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:12px;" onclick="clearFilters()">🗑 ล้างตัวกรอง</button>
     </div>
 
     <div id="kpiZone"></div>
@@ -73,6 +70,7 @@
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
+    window.load = load;
     async function load() {
       try {
         const [reqs, cats] = await Promise.all([fetchMyRequests(session.Email), fetchCategories()]);
@@ -84,7 +82,9 @@
         applyFilters();
       } catch (err) {
         document.getElementById('list').classList.remove('loading');
-        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+          <div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div>
+          <button class="btn btn-primary btn-sm" style="margin-top:14px;max-width:180px;" onclick="load()">🔄 ลองใหม่</button></div>`;
       }
     }
 
@@ -120,7 +120,9 @@
     window.clearFilters = clearFilters;
 
     document.getElementById('search').addEventListener('input', applyFilters);
-    ['filterCat','filterStatus'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
+    // ทุกช่องกรองอัปเดตทันที ไม่ต้องกดปุ่มยืนยัน
+    ['filterCat','filterStatus','dateFrom','dateTo'].forEach(id =>
+      document.getElementById(id).addEventListener('change', applyFilters));
 
     function renderList() {
       const list = document.getElementById('list');
@@ -129,7 +131,13 @@
 
       if (!filteredReqs.length) {
         kpi.innerHTML = '';
-        list.innerHTML = `<div class="empty"><div class="icon-wrap">📭</div><div class="title">ไม่พบคำขอ</div><div class="sub">ลองล้างตัวกรองดู</div></div>`;
+        const hasFilter = ['dateFrom','dateTo','filterCat','filterStatus','search'].some(id => document.getElementById(id).value);
+        list.innerHTML = hasFilter
+          ? `<div class="empty"><div class="icon-wrap">🔍</div><div class="title">ไม่พบคำขอที่ตรงกับตัวกรอง</div>
+              <button class="btn btn-secondary btn-sm" style="margin-top:14px;max-width:200px;" onclick="clearFilters()">🗑 ล้างตัวกรอง</button></div>`
+          : `<div class="empty"><div class="icon-wrap">📭</div><div class="title">ยังไม่มีคำขอเบิก</div>
+              <div class="sub">เริ่มต้นด้วยการสร้างคำขอแรกของคุณ</div>
+              <a href="submit.html" class="btn btn-primary btn-sm" style="margin-top:14px;max-width:220px;text-decoration:none;">➕ ขอเบิกใหม่</a></div>`;
         return;
       }
 
@@ -169,18 +177,18 @@
       const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
       const date = d && !isNaN(d) ? d.toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
       const meta = [date, r.Venue, r.Customer].filter(Boolean).join(' • ');
-      return `<div class="request-item ${cls}">
+      return `<div class="req-card ${cls}">
         <div class="ri-top">
           <span class="ri-cat">${catLabel(r.Category)}</span>
           <span class="pill ${cls}">${stTH}</span>
           <span class="ri-amt">${Number(r.Amount||0).toLocaleString()} ฿</span>
         </div>
         <div class="ri-meta">${meta}</div>
-        ${r.Remark ? `<div class="ri-meta" style="color:var(--gray-400);">💬 ${r.Remark}</div>` : ''}
+        ${cleanRemark(r.Remark) ? `<div class="ri-meta" style="color:var(--gray-400);">💬 ${cleanRemark(r.Remark)}</div>` : ''}
         <div class="btn-row" style="margin-top:10px;">
-          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewDetail('${r.ID}')">👁 ดู</button>
-          <button class="btn btn-secondary btn-sm" style="flex:1;color:#0891b2;border-color:#a5e5f0;" onclick="openEdit('${r.ID}')">✏️ แก้ไข</button>
-          <button class="btn btn-secondary btn-sm" style="flex:1;color:#dc2626;border-color:#fca5a5;" onclick="deleteReq('${r.ID}')">🗑 ลบ</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewDetail('${r.ID}')">👁 ดูรายละเอียด</button>
+          ${st === 'Approved' ? '' :
+            `<button class="btn btn-secondary btn-sm" style="flex:1;color:#0891b2;border-color:#a5e5f0;" onclick="openEdit('${r.ID}')">✏️ แก้ไข</button>`}
         </div>
       </div>`;
     }
@@ -191,16 +199,20 @@
       document.getElementById('detailTitle').textContent = catLabel(r.Category) + ' — ' + Number(r.Amount||0).toLocaleString() + ' ฿';
       const rows = [
         ['รหัส', r.ID], ['วันที่', r.ExpenseDate ? String(r.ExpenseDate).substr(0,10) : '-'],
-        ['สถานะ', r.Status], ['สถานที่ / รายละเอียด', r.Venue || '-'],
+        ['สถานะ', statusTH(r.Status)], ['สถานที่ / รายละเอียด', r.Venue || '-'],
         ['ลูกค้า', r.Customer || '-'], ['ผู้ติดต่อ', r.CustomerContact || '-'],
         ['ต้นทาง', r.Origin || '-'], ['ปลายทาง', r.Destination || '-'],
-        ['ระยะทาง', r.MileageKm ? r.MileageKm + ' กม.' : '-'],
+        ['ระยะทาง', mileageOf(r) ? mileageOf(r) + ' กม.' : '-'],
         ['โอกาส', r.Occasion || '-'], ['ผู้ร่วม', r.Attendees || '-'],
-        ['หมายเหตุ', r.Remark || '-'], ['ผู้อนุมัติ', r.ApprovedBy || '-']
+        ['หมายเหตุ', cleanRemark(r.Remark) || '-'], ['ผู้อนุมัติ', r.ApprovedBy || '-']
       ];
+      const canDelete = String(r.Status) !== 'Approved';
       document.getElementById('detailContent').innerHTML =
         `<div class="detail-list">` + rows.map(([k,v]) =>
-          `<div class="dl-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') + `</div>`;
+          `<div class="dl-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') + `</div>` +
+        (canDelete
+          ? `<button class="btn btn-danger" style="margin-top:16px;" onclick="deleteReq('${r.ID}')">🗑 ลบคำขอนี้</button>`
+          : `<div class="ok-box" style="margin-top:16px;">✅ อนุมัติแล้ว — แก้ไขหรือลบไม่ได้ ถ้าต้องแก้กรุณาแจ้งหัวหน้า</div>`);
       document.getElementById('detailModal').classList.add('show');
     };
     window.closeDetail = () => document.getElementById('detailModal').classList.remove('show');
@@ -248,7 +260,11 @@
     };
 
     window.deleteReq = async (id) => {
-      if (!confirm('ลบคำขอนี้? ย้อนกลับไม่ได้')) return;
+      const r = allReqs.find(x => x.ID === id);
+      const d = r && r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
+      const what = r ? `${catLabel(r.Category)} ${Number(r.Amount||0).toLocaleString()} ฿ (${d})` : 'คำขอนี้';
+      if (!confirm('ลบ ' + what + ' ?\n\nลบแล้วกู้คืนไม่ได้')) return;
+      closeDetail();
       showLoading('กำลังลบ...');
       try {
         const r = await apiPost('deleteRequest', { id, requesterEmail: session.Email });
