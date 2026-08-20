@@ -146,9 +146,10 @@
           </div>
           <div class="btn-row" style="margin-top:11px;">
             <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewSummary('${mem.Email}')">👁 ดูรายการ</button>
-            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="exportRep('${mem.Email}','${mem.Name.replace(/'/g,"")}')">📊 Excel</button>
-            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="emailRep('${mem.Email}','${mem.Name.replace(/'/g,"")}')">📧 Finance</button>
+            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="exportRep('${mem.Email}','${mem.Name.replace(/'/g,"")}')">📊 โหลด Excel</button>
           </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#B45309;border-color:#FCD34D;"
+                  onclick="resetPwd('${mem.Email}','${mem.Name.replace(/'/g,"")}')">🔑 ล้างรหัสผ่านให้</button>
         </div>`;
       });
 
@@ -177,6 +178,18 @@
           setTimeout(() => URL.revokeObjectURL(url), 5000);
           showToast(`✅ ${r.itemCount} รายการ • ${Math.round(r.totalAmount).toLocaleString()} THB`, 'success');
         }
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
+
+    /** ลืมรหัสผ่าน — ระบบไม่ส่งอีเมลแล้ว หัวหน้าล้างให้แทน */
+    window.resetPwd = async (email, name) => {
+      if (!confirm('ล้างรหัสผ่านของ ' + name + ' ?\n\nหลังล้างแล้วเขาจะตั้งรหัสใหม่เองตอนล็อกอินครั้งถัดไป')) return;
+      showLoading('กำลังล้างรหัสผ่าน...');
+      try {
+        const r = await adminResetPassword(session.Email, email);
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast('ล้างรหัสผ่านของ ' + name + ' แล้ว — แจ้งให้เขาตั้งรหัสใหม่', 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
