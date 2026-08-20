@@ -185,9 +185,10 @@
         </div>
         <div class="ri-meta">${meta}</div>
         ${cleanRemark(r.Remark) ? `<div class="ri-meta" style="color:var(--gray-400);">💬 ${cleanRemark(r.Remark)}</div>` : ''}
-        <div class="btn-row" style="margin-top:10px;">
-          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewDetail('${r.ID}')">👁 ดูรายละเอียด</button>
-          <button class="btn btn-secondary btn-sm" style="flex:1;color:#0891b2;border-color:#a5e5f0;" onclick="openEdit('${r.ID}')">✏️ แก้ไข</button>
+        <div class="btn-row" style="margin-top:10px;gap:8px;">
+          <button class="btn btn-secondary btn-sm" style="flex:1.5;" onclick="viewDetail('${r.ID}')">👁 ดูรายละเอียด</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1.1;color:#0891b2;border-color:#a5e5f0;" onclick="openEdit('${r.ID}')">✏️ แก้ไข</button>
+          <button class="btn btn-secondary btn-sm" style="flex:0 0 52px;padding-left:0;padding-right:0;color:#b91c1c;border-color:#fecaca;" onclick="deleteReq('${r.ID}')" title="ลบคำขอนี้" aria-label="ลบคำขอนี้">🗑</button>
         </div>
       </div>`;
     }
