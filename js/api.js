@@ -4,27 +4,48 @@
  * All requests include CONFIG.SECRET for server-side verification
  */
 
+// เน็ตช้า/หลุด → เลิกรอหลัง 45 วิ แทนที่จะค้างถาวร
+const API_TIMEOUT_MS = 45000;
+const NET_ERROR = 'เชื่อมต่อไม่สำเร็จ — เน็ตอาจไม่เสถียร ข้อมูลที่กรอกยังอยู่ ลองกดใหม่อีกครั้ง';
+
+async function fetchWithTimeout(url, opts = {}, ms = API_TIMEOUT_MS) {
+  // ให้ปุ่ม "ยกเลิก" ใน loading overlay สั่งหยุดได้
+  const ctrl = new AbortController();
+  window.__apiAbort = ctrl;
+  const timer = setTimeout(() => ctrl.abort('timeout'), ms);
+  try {
+    return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
+  } catch (err) {
+    if (err && (err.name === 'AbortError' || String(err).indexOf('abort') >= 0)) {
+      throw new Error(NET_ERROR);
+    }
+    throw new Error(NET_ERROR);
+  } finally {
+    clearTimeout(timer);
+    if (window.__apiAbort === ctrl) window.__apiAbort = null;
+  }
+}
+
 async function apiGet(action, params = {}) {
   const url = new URL(CONFIG.API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('secret', CONFIG.SECRET);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    redirect: 'follow'
-  });
+  const response = await fetchWithTimeout(url.toString(), { method: 'GET', redirect: 'follow' });
   return await response.json();
 }
 
 async function apiPost(action, body = {}) {
   // Note: Apps Script doesn't support custom CORS preflight
   // → use text/plain to avoid preflight, parse JSON on backend
-  const response = await fetch(CONFIG.API_URL, {
+  // อัปโหลดรูปหลายใบใช้เวลานาน → ให้เวลามากกว่าปกติ
+  const heavy = !!(body.items || body.receipts || body.signatureBase64);
+  const response = await fetchWithTimeout(CONFIG.API_URL, {
     method: 'POST',
     redirect: 'follow',
     body: JSON.stringify({ action, secret: CONFIG.SECRET, ...body }),
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-  });
+  }, heavy ? 120000 : API_TIMEOUT_MS);
   return await response.json();
 }
 
@@ -48,9 +69,26 @@ async function fetchAllRequests(email) { return apiGet('getAllRequests', { email
 async function fetchMyRole(email) { return apiGet('getMyRole', { email }); }
 async function fetchCustomers(email) { return apiGet('getCustomers', { email }); }
 async function approveRequest(payload) { return apiPost('approve', payload); }
-async function fetchReceiptImage(id, viewerEmail) {
-  return apiPost('getReceiptImage', { id, viewerEmail });
+async function fetchReceiptImage(id, viewerEmail, fileIndex) {
+  // fileIndex = ใบเสร็จใบที่เท่าไหร่ (0-based) สำหรับคำขอที่แนบหลายไฟล์
+  return apiPost('getReceiptImage', { id, viewerEmail, fileIndex: fileIndex || 0 });
 }
+// ── v6.0 แจ้งเตือนในแอป (แทนอีเมล) ──
+async function fetchNotifications(email) { return apiGet('getMyNotifications', { email }); }
+async function markNotifRead(email, id)  { return apiPost('markNotificationRead', { email, id }); }
+async function markAllNotifRead(email)   { return apiPost('markNotificationRead', { email, all: true }); }
+
+// ── v6.0 หัวหน้า/GM ล้างรหัสผ่านให้ลูกน้อง (ไม่มีเมล reset แล้ว) ──
+async function adminResetPassword(requesterEmail, targetEmail) {
+  return apiPost('adminResetPassword', { requesterEmail, targetEmail });
+}
+
+// ── v6.0 ปิดลูป: ทำเครื่องหมายว่าจ่ายเงินแล้ว ──
+async function fetchUnpaidExports(email) { return apiGet('getUnpaidExports', { email }); }
+async function markExportPaid(requesterEmail, exportId) {
+  return apiPost('markExportPaid', { requesterEmail, exportId });
+}
+
 async function fetchFuelRate(email) {
   return apiGet('getFuelRate', { email });
 }
