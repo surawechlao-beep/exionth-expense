@@ -15,6 +15,17 @@
   </div>
 
   <div class="container">
+    <div class="info-box" style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:22px;flex-shrink:0;">🍽</span>
+      <div style="flex:1;">
+        <b>ค่ารับรอง / กอล์ฟ อยู่คนละหน้า</b><br>
+        สองประเภทนี้ต้องขออนุมัติวงเงินก่อนไปเลี้ยง
+      </div>
+      <a href="pre-approve.html" class="btn btn-secondary btn-sm" style="width:auto;padding:9px 14px;text-decoration:none;flex-shrink:0;">ไปหน้านั้น →</a>
+    </div>
+
+    <div id="draftZone"></div>
+
     <div class="batch-summary">
       <div style="font-size:11px;opacity:.9;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">รายการในชุดนี้</div>
       <div style="font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:2px;" id="batchCount">1 รายการ</div>
@@ -37,6 +48,78 @@
     const HIDDEN = ['ENT','GOLF'];
     let categories = [], currentFuelRate = null, items = [], itemSeq = 0;
 
+    // ─── กันข้อมูลหาย: เซฟร่างลงเครื่องทุกครั้งที่แก้ ───
+    // ไม่เซฟไฟล์แนบ (base64 ใหญ่เกิน localStorage) — เก็บแค่ชื่อไว้เตือน
+    const DRAFT_KEY = 'exion_draft_' + String(session.Email || '').toLowerCase();
+
+    function saveDraft() {
+      try {
+        syncDom();
+        const hasData = items.some(it => it.category || it.amount > 0 || it.mileageKm > 0 || it.venue || it.customer);
+        if (!hasData) return localStorage.removeItem(DRAFT_KEY);
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          savedAt: Date.now(),
+          items: items.map(it => Object.assign({}, it, { receipts: [], _files: it.receipts.length }))
+        }));
+      } catch (e) {}
+    }
+
+    function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+
+    function loadDraft() {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return null;
+        const d = JSON.parse(raw);
+        // ร่างเก่าเกิน 7 วัน ถือว่าไม่เกี่ยวแล้ว
+        if (!d.items || !d.items.length || Date.now() - d.savedAt > 7*86400000) { clearDraft(); return null; }
+        return d;
+      } catch (e) { return null; }
+    }
+
+    function offerDraft(d) {
+      const ago = Math.round((Date.now() - d.savedAt) / 60000);
+      const when = ago < 60 ? ago + ' นาทีที่แล้ว' : new Date(d.savedAt).toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      const files = d.items.reduce((s,it) => s + (it._files||0), 0);
+      document.getElementById('draftZone').innerHTML = `
+        <div class="warn-box">
+          <div class="t">📝 มีใบเบิกที่กรอกค้างไว้</div>
+          <div style="font-size:12.5px;color:#78350F;">
+            ${d.items.length} รายการ · บันทึกเมื่อ ${when}
+            ${files ? '<br>⚠️ ไฟล์แนบ ' + files + ' ไฟล์ต้องแนบใหม่' : ''}
+          </div>
+          <div class="btn-row" style="margin-top:11px;">
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="discardDraft()">ทิ้ง เริ่มใหม่</button>
+            <button class="btn btn-primary btn-sm" style="flex:1.3;" onclick="restoreDraft()">↩︎ ทำต่อ</button>
+          </div>
+        </div>`;
+    }
+
+    window.restoreDraft = () => {
+      const d = loadDraft();
+      if (!d) return;
+      document.getElementById('itemsContainer').innerHTML = '';
+      items = []; itemSeq = 0;
+      d.items.forEach(src => {
+        itemSeq++;
+        const it = Object.assign({}, src, { id: 'item_' + itemSeq, receipts: [], _dup: false });
+        items.push(it);
+        const wrap = document.createElement('div');
+        wrap.innerHTML = cardHtml(it, items.length);
+        document.getElementById('itemsContainer').appendChild(wrap.firstElementChild);
+        attach(it);
+      });
+      refreshNums(); updateSummary();
+      document.getElementById('draftZone').innerHTML = '';
+      showToast('กู้คืนแล้ว ' + items.length + ' รายการ — อย่าลืมแนบใบเสร็จใหม่', 'success');
+    };
+
+    window.discardDraft = () => {
+      clearDraft();
+      document.getElementById('draftZone').innerHTML = '';
+      showToast('ทิ้งร่างแล้ว', 'success');
+    };
+
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
@@ -45,7 +128,14 @@
         const all = await fetchCategories();
         categories = (Array.isArray(all) ? all : []).filter(c => !HIDDEN.includes(c.Code));
         if (!categories.length) throw new Error('ไม่มีประเภท');
-      } catch (err) { return showToast('โหลดประเภทไม่สำเร็จ: ' + err.message, 'error'); }
+      } catch (err) {
+        document.getElementById('itemsContainer').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+          <div class="title">โหลดประเภทค่าใช้จ่ายไม่สำเร็จ</div><div class="sub">${err.message}</div>
+          <button class="btn btn-primary btn-sm" style="margin-top:14px;max-width:180px;" onclick="location.reload()">🔄 ลองใหม่</button></div>`;
+        document.getElementById('addItemBtn').style.display = 'none';
+        document.getElementById('submitBtn').style.display = 'none';
+        return;
+      }
 
       fetchFuelRate(session.Email).then(r => { if (r && !r.error) currentFuelRate = r; }).catch(()=>{});
       fetchCustomerHistory(session.Email).then(ch => {
@@ -53,9 +143,18 @@
         (Array.isArray(ch)?ch:[]).forEach(c => { const o=document.createElement('option'); o.value=c; dl.appendChild(o); });
       }).catch(()=>{});
 
+      const draft = loadDraft();
       addItem();
+      if (draft) offerDraft(draft);
+
       document.getElementById('addItemBtn').addEventListener('click', addItem);
       document.getElementById('submitBtn').addEventListener('click', onSubmit);
+
+      // เซฟร่างทุก 3 วิหลังหยุดพิมพ์ + ตอนสลับแอป/ปิดหน้า
+      document.addEventListener('input', () => { clearTimeout(window.__dt); window.__dt = setTimeout(saveDraft, 3000); });
+      document.addEventListener('change', saveDraft);
+      window.addEventListener('pagehide', saveDraft);
+      document.addEventListener('visibilitychange', () => { if (document.hidden) saveDraft(); });
     }
 
     // sync DOM → model (fix iOS date picker)
@@ -248,7 +347,10 @@
       const km = parseFloat(it.mileageKm) || 0;
       it.amount = km * currentFuelRate.rate;
       const p = document.getElementById(itemId + '_fuelPreview');
-      if (p) p.textContent = formatCurrency(it.amount) + ' THB (' + km + ' กม. × ' + currentFuelRate.rate + ')';
+      if (p) {
+        const rt = currentFuelRate.rateType ? ' · ' + currentFuelRate.rateType : '';
+        p.textContent = formatCurrency(it.amount) + ' THB (' + km + ' กม. × ' + currentFuelRate.rate + ')' + rt;
+      }
       updateSummary();
     }
 
@@ -258,17 +360,36 @@
       document.getElementById('batchTotal').textContent = 'รวม ' + formatCurrency(t) + ' THB';
     }
 
+    /** ชี้ให้เห็นว่าผิดตรงไหน แทนที่จะบอกลอยๆ */
+    function flagError(itemId, field, msg, num) {
+      document.querySelectorAll('.field.has-error').forEach(el => el.classList.remove('has-error'));
+      const el = field ? document.getElementById(itemId + '_' + field) : null;
+      const card = document.querySelectorAll('#itemsContainer .item-card')[num - 1];
+      const target = (el && el.closest('.field')) || card;
+      if (target) {
+        if (el && el.closest('.field')) el.closest('.field').classList.add('has-error');
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (el) setTimeout(() => { try { el.focus({ preventScroll: true }); } catch (e) {} }, 350);
+      }
+      showToast('รายการ ' + num + ': ' + msg, 'error');
+    }
+
     async function onSubmit() {
       syncDom();
-      for (const it of items) {
-        if (!it.category) return showToast('เลือกประเภทให้ครบ', 'error');
-        if (!it.expenseDate) return showToast('ใส่วันที่ให้ครบ', 'error');
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i], num = i + 1;
+        if (!it.category)    return flagError(it.id, 'cat', 'ยังไม่ได้เลือกประเภท', num);
+        if (!it.expenseDate) return flagError(it.id, 'expenseDate', 'ยังไม่ได้ใส่วันที่', num);
         const cat = categories.find(c => c.Code === it.category);
         const isFuel = it.category === 'FUEL';
-        if (isFuel && (!it.mileageKm || it.mileageKm <= 0)) return showToast('ใส่ระยะทาง', 'error');
-        if (!isFuel && (!it.amount || it.amount <= 0)) return showToast('ใส่จำนวนเงิน', 'error');
-        if (cat.NeedClaimForm === 'YES' && (!it.venue || !it.occasion || !it.attendees)) return showToast('กรอกข้อมูลรับรองให้ครบ', 'error');
-        if (cat.NeedReceipt === 'YES' && !it.receipts.length) return showToast('แนบใบเสร็จ', 'error');
+        if (isFuel && (!it.mileageKm || it.mileageKm <= 0)) return flagError(it.id, 'mileageKm', 'ยังไม่ได้ใส่ระยะทาง', num);
+        if (!isFuel && (!it.amount || it.amount <= 0))      return flagError(it.id, 'amount', 'ยังไม่ได้ใส่จำนวนเงิน', num);
+        if (cat.NeedClaimForm === 'YES') {
+          if (!it.venue)     return flagError(it.id, 'venue', 'ยังไม่ได้ใส่สถานที่', num);
+          if (!it.occasion)  return flagError(it.id, 'occasion', 'ยังไม่ได้ใส่โอกาส', num);
+          if (!it.attendees) return flagError(it.id, 'attendees', 'ยังไม่ได้ใส่ผู้ร่วม', num);
+        }
+        if (cat.NeedReceipt === 'YES' && !it.receipts.length) return flagError(it.id, 'files', 'ยังไม่ได้แนบใบเสร็จ', num);
       }
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
@@ -285,6 +406,7 @@
         });
         hideLoading();
         if (result.error) throw new Error(result.error);
+        clearDraft();
         showToast('✅ ส่งสำเร็จ ' + result.items.length + ' รายการ', 'success');
         setTimeout(() => location.href = 'status.html', 1400);
       } catch (err) {
