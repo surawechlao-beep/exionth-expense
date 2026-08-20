@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="history.back()" id="backBtn"></button>
+    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ตรวจสอบ Export</span></h1>
   </div>
 
@@ -44,7 +44,9 @@
     function fail(msg) {
       const c = document.getElementById('content');
       c.classList.remove('loading');
-      c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">เปิดไม่ได้</div><div class="sub">${msg}</div></div>`;
+      c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+        <div class="title">เปิดไม่ได้</div><div class="sub">${msg}</div>
+        <a href="index.html" class="btn btn-primary btn-sm" style="margin-top:16px;max-width:220px;text-decoration:none;">→ ไปหน้าแรก</a></div>`;
     }
 
     function render() {
@@ -125,7 +127,7 @@
               <tfoot><tr><td colspan="5">รวมทั้งสิ้น</td><td class="num">${Number(req.TotalAmount||0).toLocaleString()}</td></tr></tfoot>
             </table>
           </div>
-          <button class="btn btn-secondary" onclick="downloadDraft()" style="margin-top:12px;">👀 ดาวน์โหลด Draft (มีลายน้ำ)</button>
+          <button class="btn btn-secondary" onclick="downloadDraft()" style="margin-top:12px;">👀 ดาวน์โหลดตัวอย่าง (มีลายน้ำ)</button>
         </div>
 
         ${canApprove ? `
@@ -164,7 +166,7 @@
 
     window.downloadDraft = async () => {
       const req = detail.request;
-      showLoading('กำลังสร้าง Draft...');
+      showLoading('กำลังสร้างตัวอย่าง...');
       try {
         const r = await apiPost('downloadDraftExport', { staffEmail: req.StaffEmail, year: req.Year, month: req.Month, requesterEmail: session.Email });
         hideLoading();
@@ -178,11 +180,11 @@
         a.href = url; a.download = r.filename;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
-        showToast('ดาวน์โหลด Draft สำเร็จ ✅', 'success');
+        showToast('ดาวน์โหลดตัวอย่างแล้ว ✅', 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
-    if (session) load();
+    if (session) { load(); renderBottomNav('inbox'); }
   </script>
 </body>
 </html>
