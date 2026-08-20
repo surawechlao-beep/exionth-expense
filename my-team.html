@@ -148,8 +148,8 @@
             <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewSummary('${mem.Email}')">👁 ดูรายการ</button>
             <button class="btn btn-primary btn-sm" style="flex:1;" onclick="exportRep('${mem.Email}','${mem.Name.replace(/'/g,"")}')">📊 โหลด Excel</button>
           </div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#B45309;border-color:#FCD34D;"
-                  onclick="resetPwd('${mem.Email}','${mem.Name.replace(/'/g,"")}')">🔑 ล้างรหัสผ่านให้</button>
+          ${session.isViewer ? '' : `<button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#B45309;border-color:#FCD34D;"
+                  onclick="resetPwd('${mem.Email}','${mem.Name.replace(/'/g,"")}')">🔑 ล้างรหัสผ่านให้</button>`}
         </div>`;
       });
 
