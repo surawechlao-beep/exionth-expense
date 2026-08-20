@@ -3,68 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Summary — EXION Expense</title>
+  <title>สรุปภาพรวม — EXION Expense</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
   <style>
-    /* page-specific only — shared components live in css/style.css v6.1 */
-    table.xl { min-width: 900px; }
-    table.xl td.ctr, table.xl th.ctr { text-align: center; }
-    table.xl td.sm { font-size: 10.5px; }
-    table.xl td, table.xl th { white-space: nowrap; }
-    table.xl td.sm, table.xl td:nth-child(4), table.xl td:nth-child(5) { white-space: normal; }
-    table.xl tr.person-hdr td {
-      background: linear-gradient(90deg,#B7081D,#7A0512); color: #fff;
-      font-weight: 800; padding: 9px; font-size: 12px; letter-spacing: -.01em;
+    /* ── แถบเดือน ── */
+    .mbar { display:flex; gap:7px; overflow-x:auto; padding:2px 0 4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .mbar::-webkit-scrollbar { display:none; }
+    .mchip {
+      flex:0 0 auto; padding:8px 15px; border-radius:999px;
+      border:1.5px solid var(--gray-200); background:#fff;
+      font-size:12.5px; font-weight:700; color:var(--gray-600);
+      cursor:pointer; font-family:inherit; white-space:nowrap; min-height:40px; transition:all .14s;
     }
-    .chips { display: flex; gap: 6px; margin-top: 11px; }
-    .chips button {
-      flex: 1; padding: 9px 6px; border: 1.5px solid var(--gray-200); background: #fff;
-      border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--gray-600);
-      cursor: pointer; font-family: inherit; transition: all .14s ease;
+    .mchip.on { background:linear-gradient(135deg,#B7081D,#8B0616); color:#fff; border-color:transparent;
+                box-shadow:0 4px 12px rgba(183,8,29,.26); }
+
+    /* ── ปุ่มขอบเขต / สถานะ ── */
+    .segs { display:flex; gap:7px; margin-top:11px; }
+    .segs button {
+      flex:1; padding:9px 6px; border:1.5px solid var(--gray-200); background:#fff;
+      border-radius:12px; font-size:12px; font-weight:700; color:var(--gray-600);
+      cursor:pointer; font-family:inherit; min-height:42px; transition:all .14s;
     }
-    .chips button.active {
-      background: linear-gradient(135deg,#B7081D,#8B0616); color: #fff;
-      border-color: transparent; box-shadow: 0 4px 12px rgba(183,8,29,.26);
+    .segs button.on { background:linear-gradient(135deg,#B7081D,#8B0616); color:#fff;
+                      border-color:transparent; box-shadow:0 4px 12px rgba(183,8,29,.26); }
+
+    .trend {
+      display:inline-flex; align-items:center; gap:5px; margin-top:9px;
+      background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.28);
+      padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700; backdrop-filter:blur(8px);
     }
 
-    /* toolbar เหนือตาราง */
-    .tbl-bar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
-    .tbl-bar button {
-      padding: 7px 12px; border: 1.5px solid var(--gray-200); background: #fff;
-      border-radius: 999px; font-size: 11.5px; font-weight: 700; color: var(--gray-600);
-      cursor: pointer; font-family: inherit; transition: all .14s ease;
-    }
-    .tbl-bar button.on { background: #B7081D; color: #fff; border-color: transparent; }
-    .tbl-bar .spacer { flex: 1; }
+    /* ── กราฟจัดอันดับคน ── */
+    .rank-row { display:grid; grid-template-columns:34px 1fr auto; gap:10px; align-items:center;
+                padding:9px 0; cursor:pointer; border-bottom:1px solid var(--gray-100); }
+    .rank-row:last-child { border-bottom:none; }
+    .rank-row:active { background:var(--gray-50); }
+    .rk-badge { width:30px; height:30px; border-radius:10px; display:flex; align-items:center;
+                justify-content:center; font-size:12px; font-weight:800; color:#fff; flex-shrink:0; }
+    .rk-name { font-size:13px; font-weight:700; color:var(--gray-900); margin-bottom:5px;
+               overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rk-track { height:9px; border-radius:999px; background:var(--gray-100); overflow:hidden; }
+    .rk-fill { height:100%; border-radius:999px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+    .rk-right { text-align:right; }
+    .rk-amt { font-size:14px; font-weight:800; color:var(--gray-900); font-variant-numeric:tabular-nums; }
+    .rk-pct { font-size:10.5px; color:var(--gray-400); }
 
-    /* ดูเต็มจอ */
-    .fs-overlay {
-      position: fixed; inset: 0; z-index: 4000; background: #fff;
-      display: none; flex-direction: column;
+    /* ── กราฟรายวัน ── */
+    .daily { display:flex; align-items:flex-end; gap:2px; height:110px; margin-top:14px; }
+    .dcol { flex:1; display:flex; flex-direction:column; justify-content:flex-end; height:100%;
+            position:relative; cursor:pointer; }
+    .dbar { width:100%; border-radius:3px 3px 0 0; background:linear-gradient(180deg,#B7081D,#E11D48);
+            min-height:2px; transition:height .5s cubic-bezier(.4,0,.2,1); }
+    .dbar.zero { background:var(--gray-100); }
+    .daily-x { display:flex; gap:2px; margin-top:5px; }
+    .daily-x span { flex:1; text-align:center; font-size:8.5px; color:var(--gray-400); }
+    .dtip {
+      position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+      background:var(--gray-900); color:#fff; font-size:10.5px; font-weight:700;
+      padding:4px 8px; border-radius:6px; white-space:nowrap; display:none; z-index:5; margin-bottom:4px;
     }
-    .fs-overlay.show { display: flex; }
-    .fs-head {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 14px; border-bottom: 1px solid var(--gray-200);
-      background: linear-gradient(135deg,#B7081D,#8B0616); color: #fff; flex-shrink: 0;
-    }
-    .fs-head .t { font-weight: 800; font-size: 14px; }
-    .fs-head .s { font-size: 11px; opacity: .85; }
-    .fs-head button {
-      margin-left: auto; background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
-      color: #fff; width: 34px; height: 34px; border-radius: 50%;
-      font-size: 16px; font-weight: 700; cursor: pointer;
-    }
-    .fs-body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 10px; }
-    .fs-body .xl-wrap { border: none; overflow: visible; }
-    .fs-body table.xl { min-width: 100%; font-size: 12.5px; }
-    .rotate-hint {
-      background: #FEF3C7; color: #92400E; font-size: 11.5px; font-weight: 700;
-      padding: 8px 12px; text-align: center; flex-shrink: 0;
-    }
-    @media (orientation: landscape) { .rotate-hint { display: none; } }
+    .dcol.show .dtip { display:block; }
+
+    /* ── โดนัท ── */
+    .donut-wrap { display:flex; align-items:center; gap:16px; margin-top:14px; }
+    .donut { flex:0 0 128px; position:relative; }
+    .donut svg { transform:rotate(-90deg); display:block; }
+    .donut-mid { position:absolute; inset:0; display:flex; flex-direction:column;
+                 align-items:center; justify-content:center; pointer-events:none; }
+    .donut-mid .n { font-size:19px; font-weight:800; letter-spacing:-.03em; color:var(--gray-900); line-height:1.1; }
+    .donut-mid .l { font-size:9.5px; color:var(--gray-400); font-weight:600; }
+    .legend { flex:1; min-width:0; }
+    .lg-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12px; }
+    .lg-dot { width:11px; height:11px; border-radius:4px; flex-shrink:0; }
+    .lg-name { flex:1; color:var(--gray-700); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lg-val { font-weight:800; color:var(--gray-900); font-variant-numeric:tabular-nums; }
+
+    /* ── รายชื่อลูกค้า ── */
+    .cust-row { display:flex; align-items:center; gap:10px; padding:9px 0;
+                border-bottom:1px solid var(--gray-100); font-size:12.5px; }
+    .cust-row:last-child { border-bottom:none; }
+    .cust-rank { width:22px; height:22px; border-radius:7px; background:var(--gray-100);
+                 color:var(--gray-600); display:flex; align-items:center; justify-content:center;
+                 font-size:10.5px; font-weight:800; flex-shrink:0; }
+    .cust-name { flex:1; color:var(--gray-800); font-weight:600; overflow:hidden;
+                 text-overflow:ellipsis; white-space:nowrap; }
+    .cust-amt { font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
+
+    /* ── ตาราง Excel (พับได้) ── */
+    .foldable .fold-body { display:none; }
+    .foldable.open .fold-body { display:block; }
+    .fold-btn { display:flex; align-items:center; justify-content:center; gap:6px;
+                width:100%; margin-top:12px; padding:11px; min-height:44px;
+                background:var(--gray-50); border:1.5px solid var(--gray-200); border-radius:12px;
+                font-size:12.5px; font-weight:700; color:var(--gray-600); cursor:pointer; font-family:inherit; }
+    .foldable.open .fold-btn .arw { transform:rotate(180deg); }
+    .fold-btn .arw { transition:transform .2s; }
+
+    table.xl { min-width:900px; }
+    table.xl td.ctr, table.xl th.ctr { text-align:center; }
+    table.xl td.sm { font-size:10.5px; }
+    table.xl td, table.xl th { white-space:nowrap; }
+    table.xl td.sm, table.xl td:nth-child(4), table.xl td:nth-child(5) { white-space:normal; }
+    table.xl tr.person-hdr td { background:linear-gradient(90deg,#B7081D,#7A0512); color:#fff;
+      font-weight:800; padding:9px; font-size:12px; letter-spacing:-.01em; }
+
+    .tbl-bar { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+    .tbl-bar button { padding:7px 12px; border:1.5px solid var(--gray-200); background:#fff;
+      border-radius:999px; font-size:11.5px; font-weight:700; color:var(--gray-600);
+      cursor:pointer; font-family:inherit; min-height:40px; }
+    .tbl-bar .spacer { flex:1; }
+
+    /* ── เต็มจอ ── */
+    .fs-overlay { position:fixed; inset:0; z-index:4000; background:#fff; display:none; flex-direction:column; }
+    .fs-overlay.show { display:flex; }
+    .fs-head { display:flex; align-items:center; gap:10px; padding:12px 14px;
+      background:linear-gradient(135deg,#B7081D,#8B0616); color:#fff; flex-shrink:0; }
+    .fs-head .t { font-weight:800; font-size:14px; }
+    .fs-head .s { font-size:11px; opacity:.85; }
+    .fs-head button { margin-left:auto; background:rgba(255,255,255,.2);
+      border:1px solid rgba(255,255,255,.3); color:#fff; width:44px; height:44px;
+      border-radius:50%; font-size:16px; font-weight:700; cursor:pointer; }
+    .fs-body { flex:1; overflow:auto; -webkit-overflow-scrolling:touch; padding:10px; }
+    .fs-body .xl-wrap { border:none; overflow:visible; }
+    .fs-body table.xl { min-width:100%; font-size:12.5px; }
+    .rotate-hint { background:#FEF3C7; color:#92400E; font-size:11.5px; font-weight:700;
+      padding:8px 12px; text-align:center; flex-shrink:0; }
+    @media (orientation:landscape) { .rotate-hint { display:none; } }
   </style>
 </head>
 <body>
@@ -74,20 +141,27 @@
   </div>
 
   <div class="container">
-    <div class="card">
-      <div class="sec-label" style="margin:0 0 10px;">ช่วงเวลา &amp; ขอบเขต</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="field" style="margin:0;"><label>เดือน</label><select id="fMonth"></select></div>
-        <div class="field" style="margin:0;"><label>ปี</label><select id="fYear"></select></div>
+    <div class="card" style="padding:14px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
+        <span class="sec-label" style="margin:0;flex:1;">เลือกเดือน</span>
+        <select id="fYear" style="width:auto;padding:7px 10px;font-size:12.5px;border-radius:10px;border:1.5px solid var(--gray-200);font-family:inherit;font-weight:700;"></select>
       </div>
-      <div class="field" id="personWrap" style="display:none;margin:10px 0 0;">
-        <label>ดูข้อมูลของ</label>
-        <select id="fPerson"><option value="__self__">ตัวเอง</option></select>
+      <div class="mbar" id="mbar"></div>
+
+      <div id="scopeWrap" style="display:none;">
+        <div class="segs" id="scopeSeg">
+          <button type="button" data-s="__self__" class="on">👤 ตัวเอง</button>
+          <button type="button" data-s="__all__">👥 ทุกคน</button>
+        </div>
+        <div class="field" style="margin:9px 0 0;">
+          <select id="fPerson"><option value="">— หรือเลือกรายบุคคล —</option></select>
+        </div>
       </div>
-      <div class="chips">
-        <button data-st="" class="active" onclick="setStatus('', this)">ทั้งหมด</button>
-        <button data-st="Approved" onclick="setStatus('Approved', this)">✅ อนุมัติ</button>
-        <button data-st="Pending" onclick="setStatus('Pending', this)">⏳ รออนุมัติ</button>
+
+      <div class="segs" id="stSeg">
+        <button type="button" data-st="" class="on">ทั้งหมด</button>
+        <button type="button" data-st="Approved">✅ อนุมัติ</button>
+        <button type="button" data-st="Pending">⏳ รออนุมัติ</button>
       </div>
     </div>
 
@@ -97,7 +171,7 @@
 
   <div id="fsOverlay" class="fs-overlay">
     <div class="fs-head">
-      <div><div class="t">📋 Preview ข้อมูล</div><div class="s" id="fsSub">—</div></div>
+      <div><div class="t">📋 ตารางข้อมูล</div><div class="s" id="fsSub">—</div></div>
       <button onclick="closeFs()">✕</button>
     </div>
     <div class="rotate-hint">📱 หมุนจอเป็นแนวนอน จะเห็นได้กว้างขึ้น</div>
@@ -114,114 +188,236 @@
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
     let raw = { scope:'self', myName:'', staffList:[], items:[] };
-    let fStatus = '';
+    let fStatus = '', selMonth = new Date().getMonth() + 1, scope = '__self__';
     let lastItems = [], lastGroupBy = false, lastSub = '';
+
+    const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
     const CAT_TH = {
       FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม',
       ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ',
       CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทรตปท.', APT:'ที่พัก'
     };
+    const PALETTE = ['#B7081D','#2563EB','#16A34A','#D97706','#7C3AED',
+                     '#0D9488','#DB2777','#0891B2','#65A30D','#E11D48','#4F46E5','#EA580C'];
+    const CAT_COLORS = ['#B7081D','#F59E0B','#2563EB','#16A34A','#7C3AED',
+                        '#0D9488','#DB2777','#64748B','#EA580C','#0891B2'];
+    const personColor = {};   // ชื่อ → สีประจำตัว คงที่ทุกครั้งที่เปิด
+
+    // ── ตัวเลือกปี / เดือน ──
+    const ySel = document.getElementById('fYear');
+    const now = new Date();
+    for (let y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
+      const o = document.createElement('option'); o.value = y; o.textContent = y;
+      if (y === now.getFullYear()) o.selected = true; ySel.appendChild(o);
+    }
+    ySel.addEventListener('change', reload);
+
+    function buildMonthBar() {
+      const bar = document.getElementById('mbar');
+      bar.innerHTML = MONTHS.map((m,i) =>
+        `<button type="button" class="mchip ${i+1===selMonth?'on':''}" data-m="${i+1}">${m}</button>`).join('');
+      bar.querySelectorAll('.mchip').forEach(b => b.addEventListener('click', () => {
+        selMonth = parseInt(b.dataset.m);
+        bar.querySelectorAll('.mchip').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        reload();
+      }));
+      setTimeout(() => {
+        const on = bar.querySelector('.mchip.on');
+        if (on) bar.scrollLeft = on.offsetLeft - bar.clientWidth/2 + on.clientWidth/2;
+      }, 50);
+    }
+
+    // ── ปุ่มสถานะ ──
+    document.getElementById('stSeg').querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => {
+        fStatus = b.dataset.st;
+        document.getElementById('stSeg').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        render();
+      });
+    });
 
     async function load() {
-      // Populate month/year
-      const mSel = document.getElementById('fMonth'), ySel = document.getElementById('fYear');
-      const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-      const now = new Date();
-      months.forEach((m,i) => { const o=document.createElement('option'); o.value=i+1; o.textContent=m; if(i+1===now.getMonth()+1) o.selected=true; mSel.appendChild(o); });
-      for (let y=now.getFullYear(); y>=now.getFullYear()-3; y--) { const o=document.createElement('option'); o.value=y; o.textContent=y; if(y===now.getFullYear()) o.selected=true; ySel.appendChild(o); }
-      mSel.addEventListener('change', reload);
-      ySel.addEventListener('change', reload);
-
+      buildMonthBar();
       try {
-        // v6.0 กรองเดือนฝั่ง server — เดิมดึงทุกแถวทั้งระบบมาก้อนเดียว
         const [r, cats] = await Promise.all([
-          apiGet('getVisibleRequests', { email: session.Email, year: ySel.value, month: mSel.value }),
+          apiGet('getVisibleRequests', { email: session.Email, year: ySel.value, month: selMonth }),
           fetchCategories().catch(() => [])
         ]);
         if (r.error) throw new Error(r.error);
         raw = r;
-
-        // ดึงชื่อภาษาไทยของแต่ละประเภทจากชีท Categories
         (Array.isArray(cats) ? cats : []).forEach(c => { if (c.NameTH) CAT_TH[c.Code] = c.NameTH; });
 
-        // Person dropdown (only if team/all scope)
         if (raw.scope === 'team' || raw.scope === 'all') {
-          const wrap = document.getElementById('personWrap');
-          wrap.style.display = 'block';
+          document.getElementById('scopeWrap').style.display = 'block';
           const pSel = document.getElementById('fPerson');
-          pSel.innerHTML = '<option value="__self__">👤 ตัวเอง</option><option value="__all__">👥 ทุกคนที่ดูแล</option>';
-          raw.staffList.forEach(n => { const o=document.createElement('option'); o.value=n; o.textContent=n; pSel.appendChild(o); });
-          pSel.addEventListener('change', render);
+          pSel.innerHTML = '<option value="">— หรือเลือกรายบุคคล —</option>';
+          (raw.staffList || []).forEach(n => {
+            const o = document.createElement('option'); o.value = n; o.textContent = '👤 ' + n; pSel.appendChild(o);
+          });
+          pSel.addEventListener('change', () => {
+            if (pSel.value) {
+              scope = pSel.value;
+              document.getElementById('scopeSeg').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+            }
+            render();
+          });
+          document.getElementById('scopeSeg').querySelectorAll('button').forEach(b => {
+            b.addEventListener('click', () => {
+              scope = b.dataset.s;
+              pSel.value = '';
+              document.getElementById('scopeSeg').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+              b.classList.add('on');
+              render();
+            });
+          });
         }
+        (raw.staffList || []).forEach((n,i) => personColor[n] = PALETTE[i % PALETTE.length]);
         render();
-      } catch (err) {
-        document.getElementById('loading').innerHTML = `<div class="empty"><div class="title">โหลดข้อมูลไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
-      }
+      } catch (err) { fail(err.message); }
     }
 
-    /** เปลี่ยนเดือน/ปี → ดึงข้อมูลใหม่จาก server (กรองฝั่ง server) */
+    /** เปลี่ยนเดือน/ปี → ดึงใหม่จาก server (กรองฝั่ง server) */
     async function reload() {
+      const ld = document.getElementById('loading');
       document.getElementById('content').style.display = 'none';
-      document.getElementById('loading').style.display = '';
-      document.getElementById('loading').classList.add('loading');
+      ld.style.display = ''; ld.classList.add('loading');
+      ld.innerHTML = '<div class="spinner"></div>';
       try {
-        const r = await apiGet('getVisibleRequests', {
-          email: session.Email,
-          year: document.getElementById('fYear').value,
-          month: document.getElementById('fMonth').value
-        });
+        const r = await apiGet('getVisibleRequests', { email: session.Email, year: ySel.value, month: selMonth });
         if (r.error) throw new Error(r.error);
         raw = r;
+        (raw.staffList || []).forEach((n,i) => { if (!personColor[n]) personColor[n] = PALETTE[i % PALETTE.length]; });
         render();
-      } catch (err) {
-        document.getElementById('loading').classList.remove('loading');
-        document.getElementById('loading').innerHTML =
-          `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">โหลดข้อมูลไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
-      }
+      } catch (err) { fail(err.message); }
     }
 
-    function setStatus(st, btn) {
-      fStatus = st;
-      document.querySelectorAll('.chips button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      render();
+    function fail(msg) {
+      const ld = document.getElementById('loading');
+      ld.classList.remove('loading');
+      ld.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+        <div class="title">โหลดข้อมูลไม่สำเร็จ</div><div class="sub">${msg}</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:14px;max-width:180px;" onclick="location.reload()">🔄 ลองใหม่</button></div>`;
     }
 
     function getFiltered() {
-      const y = parseInt(document.getElementById('fYear').value);
-      const m = parseInt(document.getElementById('fMonth').value);
-      const pSel = document.getElementById('fPerson');
-      const person = pSel ? pSel.value : '__self__';
-
+      const y = parseInt(ySel.value);
       return raw.items.filter(r => {
-        // month
         const d = new Date(r.ExpenseDate || r.Timestamp);
-        if (isNaN(d) || d.getFullYear() !== y || d.getMonth()+1 !== m) return false;
-        // status
+        if (isNaN(d) || d.getFullYear() !== y || d.getMonth()+1 !== selMonth) return false;
         if (fStatus && r.Status !== fStatus) return false;
-        // person
-        if (person === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
-        if (person === '__all__') return true;
-        return r.StaffName === person;
+        if (scope === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
+        if (scope === '__all__') return true;
+        return r.StaffName === scope;
       }).sort((a,b) => new Date(a.ExpenseDate||a.Timestamp) - new Date(b.ExpenseDate||b.Timestamp));
     }
 
-
     function render() {
       const ld = document.getElementById('loading');
-      ld.classList.remove('loading');
-      ld.style.display = 'none';
+      ld.classList.remove('loading'); ld.style.display = 'none';
       const c = document.getElementById('content');
       c.style.display = 'block';
 
+      const y = parseInt(ySel.value);
       const items = getFiltered();
       const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
       const approved = items.filter(r => r.Status === 'Approved');
-      const pending = items.filter(r => r.Status === 'Pending');
-      const rejected = items.filter(r => r.Status === 'Rejected');
+      const pending  = items.filter(r => r.Status === 'Pending');
+      const isAll = scope === '__all__';
+      const scopeLbl = isAll ? 'ทุกคนที่ดูแล' : (scope === '__self__' ? (raw.myName || 'ตัวเอง') : scope);
 
-      // by category
+      let html = `
+        <div class="count-hero">
+          <div class="lbl">${scopeLbl} · ${MONTHS_FULL[selMonth-1]} ${y}</div>
+          <div class="num">${Math.round(total).toLocaleString()}</div>
+          <div class="sub">บาท · ${items.length} รายการ</div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi ok"><div class="n">${approved.length}</div><div class="l">อนุมัติแล้ว</div></div>
+          <div class="kpi warn"><div class="n">${pending.length}</div><div class="l">รออนุมัติ</div></div>
+          <div class="kpi"><div class="n">${Math.round(approved.reduce((s,r)=>s+(Number(r.Amount)||0),0)).toLocaleString()}</div><div class="l">อนุมัติ (บาท)</div></div>
+          <div class="kpi ${pending.length?'warn':''}"><div class="n">${Math.round(pending.reduce((s,r)=>s+(Number(r.Amount)||0),0)).toLocaleString()}</div><div class="l">รออนุมัติ (บาท)</div></div>
+        </div>`;
+
+      if (items.length === 0) {
+        html += `<div class="card"><div class="empty" style="padding:32px 12px;">
+          <div class="icon-wrap">📭</div>
+          <div class="title">ไม่มีข้อมูลใน${MONTHS_FULL[selMonth-1]} ${y}</div>
+          <div class="sub">${fStatus ? 'ลองเลือกสถานะ "ทั้งหมด" ดู' : 'ลองเลือกเดือนอื่น'}</div>
+        </div></div>`;
+        c.innerHTML = html;
+        lastItems = []; return;
+      }
+
+      // ═══ [ทุกคน] กราฟจัดอันดับรายคน ═══
+      if (isAll) {
+        const byPerson = {};
+        items.forEach(r => {
+          const n = r.StaffName || '?';
+          if (!byPerson[n]) byPerson[n] = { total:0, count:0 };
+          byPerson[n].total += Number(r.Amount)||0;
+          byPerson[n].count++;
+        });
+        const people = Object.keys(byPerson).sort((a,b) => byPerson[b].total - byPerson[a].total);
+        const maxP = Math.max(...people.map(n => byPerson[n].total), 1);
+
+        html += `<div class="card">
+          <div class="card-head"><span class="ib ib-red">🏆</span>
+            <div><div class="ch-title">จัดอันดับรายคน</div>
+            <div class="ch-sub">${people.length} คน · แตะเพื่อดูเฉพาะคนนั้น</div></div>
+          </div>
+          <div style="margin-top:12px;">
+          ${people.map((n,i) => {
+            const st = byPerson[n];
+            const col = personColor[n] || PALETTE[i % PALETTE.length];
+            const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+            return `<div class="rank-row" data-person="${n}">
+              <div class="rk-badge" style="background:${col};">${medal}</div>
+              <div>
+                <div class="rk-name">${n}</div>
+                <div class="rk-track"><div class="rk-fill" style="width:${(st.total/maxP*100).toFixed(1)}%;background:${col};"></div></div>
+              </div>
+              <div class="rk-right">
+                <div class="rk-amt">${Math.round(st.total).toLocaleString()}</div>
+                <div class="rk-pct">${(st.total/total*100).toFixed(0)}% · ${st.count} ใบ</div>
+              </div>
+            </div>`;
+          }).join('')}
+          </div>
+        </div>`;
+      }
+
+      // ═══ กราฟรายวัน ═══
+      const daysInMonth = new Date(y, selMonth, 0).getDate();
+      const byDay = new Array(daysInMonth).fill(0);
+      items.forEach(r => {
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        if (!isNaN(d)) byDay[d.getDate()-1] += Number(r.Amount)||0;
+      });
+      const maxDay = Math.max(...byDay, 1);
+      const busiest = byDay.indexOf(Math.max(...byDay)) + 1;
+
+      html += `<div class="card">
+        <div class="card-head"><span class="ib ib-teal">📅</span>
+          <div><div class="ch-title">ใช้จ่ายรายวัน</div>
+          <div class="ch-sub">สูงสุดวันที่ ${busiest} · ${Math.round(Math.max(...byDay)).toLocaleString()} บาท</div></div>
+        </div>
+        <div class="daily">
+          ${byDay.map((v,i) => `<div class="dcol" data-day="${i+1}" data-amt="${Math.round(v)}">
+            <div class="dtip">${i+1} ${MONTHS[selMonth-1]} · ${Math.round(v).toLocaleString()} ฿</div>
+            <div class="dbar ${v?'':'zero'}" style="height:${v ? Math.max(4,(v/maxDay*100)).toFixed(1) : 2}%;"></div>
+          </div>`).join('')}
+        </div>
+        <div class="daily-x">
+          ${byDay.map((v,i) => `<span>${(i+1)%5===0||i===0 ? (i+1) : ''}</span>`).join('')}
+        </div>
+      </div>`;
+
+      // ═══ โดนัทแยกประเภท ═══
       const byCat = {};
       items.forEach(r => {
         const k = r.Category || 'OTHER';
@@ -229,63 +425,127 @@
         byCat[k].amt += Number(r.Amount)||0; byCat[k].cnt++;
       });
       const cats = Object.values(byCat).sort((a,b) => b.amt - a.amt);
-      const catMax = Math.max(...cats.map(x => x.amt), 1);
 
-      // by person (for grouped table)
-      const pSel = document.getElementById('fPerson');
-      const groupByPerson = pSel && pSel.value === '__all__';
-
-      const mName = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][parseInt(document.getElementById('fMonth').value)-1];
-      const scopeLbl = pSel && pSel.value === '__all__' ? 'ทุกคนที่ดูแล' : (pSel && pSel.value !== '__self__' ? pSel.value : (raw.myName || 'ตัวเอง'));
-
-      let html = `
-        <div class="count-hero">
-          <div class="lbl">${scopeLbl} · ${mName} ${document.getElementById('fYear').value}</div>
-          <div class="num">${Math.round(total).toLocaleString()}</div>
-          <div class="sub">THB • ${items.length} รายการ</div>
+      html += `<div class="card">
+        <div class="card-head"><span class="ib ib-orange">🍩</span>
+          <div><div class="ch-title">แยกตามประเภท</div><div class="ch-sub">${cats.length} ประเภท</div></div>
         </div>
-        <div class="kpi-grid">
-          <div class="kpi ok"><div class="n">${approved.length}</div><div class="l">อนุมัติแล้ว</div></div>
-          <div class="kpi warn"><div class="n">${pending.length}</div><div class="l">รออนุมัติ</div></div>
-          <div class="kpi"><div class="n">${Math.round(approved.reduce((s,r)=>s+(Number(r.Amount)||0),0)).toLocaleString()}</div><div class="l">อนุมัติ (THB)</div></div>
-          <div class="kpi ${rejected.length ? 'bad' : ''}"><div class="n">${Math.round(pending.reduce((s,r)=>s+(Number(r.Amount)||0),0)).toLocaleString()}</div><div class="l">รออนุมัติ (THB)</div></div>
-        </div>`;
+        ${donutHtml(cats, total)}
+      </div>`;
 
-      // Category chart
-      if (cats.length) {
+      // ═══ ลูกค้าที่ใช้จ่ายมากสุด ═══
+      const byCust = {};
+      items.forEach(r => {
+        const cu = String(r.Customer || '').replace(/^\[.+?\]\s*/, '').trim();
+        if (!cu) return;
+        byCust[cu] = (byCust[cu] || 0) + (Number(r.Amount)||0);
+      });
+      const custs = Object.keys(byCust).map(k => ({ name:k, amt:byCust[k] }))
+        .sort((a,b) => b.amt - a.amt).slice(0, 8);
+
+      if (custs.length) {
         html += `<div class="card">
-          <div class="card-head"><span class="ib ib-orange">📊</span>
-            <div><div class="ch-title">แยกตามประเภท</div><div class="ch-sub">${cats.length} ประเภท</div></div></div>
-          <div style="margin-top:14px;">
-          ${cats.map(x => `<div class="bar-row">
-            <span class="bl">${CAT_TH[x.cat]||x.cat}</span>
-            <span class="bt"><span class="bf" style="width:${(x.amt/catMax*100).toFixed(0)}%;"></span></span>
-            <span class="bv">${Math.round(x.amt).toLocaleString()}</span>
+          <div class="card-head"><span class="ib ib-purple">🏢</span>
+            <div><div class="ch-title">ลูกค้าที่ใช้จ่ายมากสุด</div>
+            <div class="ch-sub">${Object.keys(byCust).length} ราย</div></div>
+          </div>
+          <div style="margin-top:12px;">
+          ${custs.map((cu,i) => `<div class="cust-row">
+            <span class="cust-rank">${i+1}</span>
+            <span class="cust-name">${cu.name}</span>
+            <span class="cust-amt">${Math.round(cu.amt).toLocaleString()}</span>
           </div>`).join('')}
           </div>
         </div>`;
       }
 
-      // ═══ Excel-style preview table ═══
+      // ═══ ตาราง Excel (พับไว้) ═══
       lastItems = items;
-      lastGroupBy = groupByPerson;
-      lastSub = `${scopeLbl} · ${mName} ${document.getElementById('fYear').value} · ${items.length} รายการ`;
+      lastGroupBy = isAll;
+      lastSub = `${scopeLbl} · ${MONTHS_FULL[selMonth-1]} ${y} · ${items.length} รายการ`;
 
-      html += `<div class="card">
+      html += `<div class="card foldable" id="tblCard">
         <div class="card-head"><span class="ib ib-blue">📋</span>
-          <div><div class="ch-title">Preview ข้อมูล (แบบ Excel)</div>
-          <div class="ch-sub">${items.length} รายการ</div></div></div>
-        <div style="margin-top:14px;">
-          ${items.length === 0 ? '' : `<div class="tbl-bar">
+          <div><div class="ch-title">ตารางข้อมูล (แบบ Excel)</div>
+          <div class="ch-sub">${items.length} รายการ · ตรงกับไฟล์ที่ส่งบัญชี</div></div>
+        </div>
+        <button type="button" class="fold-btn" id="foldBtn">
+          <span id="foldTxt">ดูตารางทั้งหมด</span> <span class="arw">▼</span>
+        </button>
+        <div class="fold-body" style="margin-top:12px;">
+          <div class="tbl-bar">
             <span style="font-size:11.5px;color:var(--gray-500);">เลื่อนซ้าย–ขวาเพื่อดูคอลัมน์เพิ่ม</span>
             <span class="spacer"></span>
             <button onclick="openFs()">⛶ ดูเต็มจอ</button>
-          </div>`}
-          ${items.length === 0 ? '<div class="empty" style="padding:28px 12px;"><div class="icon-wrap">📭</div><div class="title">ไม่มีข้อมูลในเดือนนี้</div></div>' : renderTable(items, groupByPerson)}
+          </div>
+          ${renderTable(items, isAll)}
         </div>
       </div>`;
 
       c.innerHTML = html;
+      bindInteractions();
+    }
+
+    function bindInteractions() {
+      // แตะแถวอันดับ → ดูเฉพาะคนนั้น
+      document.querySelectorAll('.rank-row[data-person]').forEach(row => {
+        row.addEventListener('click', () => {
+          scope = row.dataset.person;
+          const pSel = document.getElementById('fPerson');
+          if (pSel) pSel.value = scope;
+          document.getElementById('scopeSeg').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+          render();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+      // แตะแท่งรายวัน → โชว์ยอด
+      document.querySelectorAll('.dcol').forEach(col => {
+        col.addEventListener('click', () => {
+          const wasOn = col.classList.contains('show');
+          document.querySelectorAll('.dcol').forEach(x => x.classList.remove('show'));
+          if (!wasOn) col.classList.add('show');
+        });
+      });
+      // พับ/กางตาราง
+      const fb = document.getElementById('foldBtn');
+      if (fb) fb.addEventListener('click', () => {
+        const card = document.getElementById('tblCard');
+        card.classList.toggle('open');
+        document.getElementById('foldTxt').textContent =
+          card.classList.contains('open') ? 'ซ่อนตาราง' : 'ดูตารางทั้งหมด';
+      });
+    }
+
+    /** โดนัท SVG ล้วน ไม่ต้องโหลดไลบรารีเพิ่ม */
+    function donutHtml(cats, total) {
+      const R = 52, C = 2 * Math.PI * R;
+      let offset = 0;
+      const arcs = cats.slice(0,8).map((c,i) => {
+        const len = (c.amt / total) * C;
+        const seg = `<circle cx="64" cy="64" r="${R}" fill="none"
+          stroke="${CAT_COLORS[i % CAT_COLORS.length]}" stroke-width="21"
+          stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}"
+          stroke-dashoffset="${(-offset).toFixed(2)}"></circle>`;
+        offset += len;
+        return seg;
+      }).join('');
+      const legend = cats.slice(0,8).map((c,i) => `
+        <div class="lg-row">
+          <span class="lg-dot" style="background:${CAT_COLORS[i % CAT_COLORS.length]};"></span>
+          <span class="lg-name">${CAT_TH[c.cat] || c.cat}</span>
+          <span class="lg-val">${Math.round(c.amt).toLocaleString()}</span>
+          <span style="color:var(--gray-400);font-size:10.5px;min-width:32px;text-align:right;">${(c.amt/total*100).toFixed(0)}%</span>
+        </div>`).join('');
+      return `<div class="donut-wrap">
+        <div class="donut">
+          <svg width="128" height="128" viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="${R}" fill="none" stroke="#F1F5F9" stroke-width="21"></circle>
+            ${arcs}
+          </svg>
+          <div class="donut-mid"><div class="n">${Math.round(total).toLocaleString()}</div><div class="l">บาท</div></div>
+        </div>
+        <div class="legend">${legend}</div>
+      </div>`;
     }
 
     // ── ดูเต็มจอ ──
@@ -306,39 +566,37 @@
       const cell = v => v ? Math.round(v).toLocaleString() : '';
       const amtIf = (r, ok) => ok ? cell(Number(r.Amount)||0) : '';
 
-      // นิยามคอลัมน์ — always:true = โชว์เสมอ ถึงจะว่างก็ตาม
       const COLS = [
-        { k:'no',    label:'No.',        cls:'ctr', always:true,  get:(r,n) => n },
-        { k:'date',  label:'วันที่',      cls:'ctr', always:true,  get:r => r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '-' },
-        { k:'cat',   label:'ประเภท',      cls:'ctr', always:true,  get:r => CAT_TH[r.Category] || r.Category },
-        { k:'cust',  label:'Customer',    cls:'',    get:r => r.Customer || '' },
-        { k:'ctc',   label:'Contact',     cls:'',    get:r => r.CustomerContact || '' },
-        { k:'dist',  label:'Distance',    cls:'num', get:r => r.Category==='FUEL' ? (Number(r.Mileage_KM)||'') : '' },
-        { k:'mile',  label:'Mile ฿',      cls:'num', get:r => amtIf(r, r.Category==='FUEL') },
-        { k:'exp',   label:'Express ฿',   cls:'num', get:r => amtIf(r, r.Category==='EXPRESS') },
-        { k:'ent',   label:'Ent ฿',       cls:'num', get:r => amtIf(r, r.Category==='ENT' || r.Category==='GOLF') },
-        { k:'job',   label:'Job',         cls:'sm',  get:r => {
+        { k:'no',    label:'No.',      cls:'ctr', get:(r,n) => n },
+        { k:'date',  label:'วันที่',    cls:'ctr', get:r => r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '-' },
+        { k:'cat',   label:'ประเภท',    cls:'ctr', get:r => CAT_TH[r.Category] || r.Category },
+        { k:'cust',  label:'Customer',  cls:'',    get:r => r.Customer || '' },
+        { k:'ctc',   label:'Contact',   cls:'',    get:r => r.CustomerContact || '' },
+        { k:'dist',  label:'Distance',  cls:'num', get:r => r.Category==='FUEL' ? (Number(r.Mileage_KM)||'') : '' },
+        { k:'mile',  label:'Mile ฿',    cls:'num', get:r => amtIf(r, r.Category==='FUEL') },
+        { k:'exp',   label:'Express ฿', cls:'num', get:r => amtIf(r, r.Category==='EXPRESS') },
+        { k:'ent',   label:'Ent ฿',     cls:'num', get:r => amtIf(r, r.Category==='ENT' || r.Category==='GOLF') },
+        { k:'job',   label:'Job',       cls:'sm',  get:r => {
             if (['TRAVEL','OTHER','CAR','MOBILE','OVERSEAS','APT'].indexOf(r.Category) < 0) return '';
             const base = (r.Origin && r.Destination) ? r.Origin + '→' + r.Destination
                        : (r.Occasion || r.Venue || CAT_TH[r.Category] || r.Category);
             return base + ' ' + Math.round(Number(r.Amount)||0).toLocaleString();
           }},
-        { k:'hotel', label:'Hotel ฿',     cls:'num', get:r => amtIf(r, r.Category==='HOTEL') },
-        { k:'park',  label:'Park ฿',      cls:'num', get:r => amtIf(r, r.Category==='PARK') },
-        { k:'rmk',   label:'Remark',      cls:'sm',  get:r => r.Venue || '' },
-        { k:'st',    label:'Status',      cls:'ctr', always:true,  get:r => {
+        { k:'hotel', label:'Hotel ฿',   cls:'num', get:r => amtIf(r, r.Category==='HOTEL') },
+        { k:'park',  label:'Park ฿',    cls:'num', get:r => amtIf(r, r.Category==='PARK') },
+        { k:'rmk',   label:'Remark',    cls:'sm',  get:r => r.Venue || '' },
+        { k:'st',    label:'Status',    cls:'ctr', get:r => {
             const c = r.Status==='Approved' ? '#16A34A' : r.Status==='Rejected' ? '#DC2626' : '#F59E0B';
-            return '<span style="color:' + c + ';font-weight:800;font-size:10.5px;">' + (r.Status||'-') + '</span>';
+            const t = r.Status==='Approved' ? 'อนุมัติ' : r.Status==='Rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ';
+            return '<span style="color:' + c + ';font-weight:800;font-size:10.5px;">' + t + '</span>';
           }}
       ];
-
-      const cols = COLS;   // โชว์ครบทุกคอลัมน์เสมอ
+      const cols = COLS;
 
       const th = '<tr>' + cols.map(c =>
-        '<th class="' + (c.cls === 'num' ? 'num' : c.cls === 'ctr' ? 'ctr' : '') + '">' + c.label + '</th>').join('') + '</tr>';
-
-      const rowHtml = (r, n) => '<tr>' + cols.map(c =>
-        '<td class="' + c.cls + '">' + (c.get(r, n) || '') + '</td>').join('') + '</tr>';
+        '<th class="' + (c.cls==='num'?'num':c.cls==='ctr'?'ctr':'') + '">' + c.label + '</th>').join('') + '</tr>';
+      const rowHtml = (r,n) => '<tr>' + cols.map(c =>
+        '<td class="' + c.cls + '">' + (c.get(r,n) || '') + '</td>').join('') + '</tr>';
 
       let body = '';
       if (groupByPerson) {
@@ -348,30 +606,25 @@
           const rows = groups[name];
           const sub = rows.reduce((s,r) => s + (Number(r.Amount)||0), 0);
           body += '<tr class="person-hdr"><td colspan="' + cols.length + '">👤 ' + name +
-                  ' — ' + rows.length + ' รายการ — ' + Math.round(sub).toLocaleString() + ' THB</td></tr>';
+                  ' — ' + rows.length + ' รายการ — ' + Math.round(sub).toLocaleString() + ' บาท</td></tr>';
           rows.forEach((r,i) => body += rowHtml(r, i+1));
         });
       } else {
         items.forEach((r,i) => body += rowHtml(r, i+1));
       }
 
-      // ── แถวรวม: รวมยอดใต้คอลัมน์เงินของมันเอง ──
       const grand = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
       const sumOf = k => {
         const col = COLS.filter(c => c.k === k)[0];
-        return items.reduce((s,r) => {
-          const v = String(col.get(r, 0) || '').replace(/,/g, '');
-          return s + (parseFloat(v) || 0);
-        }, 0);
+        return items.reduce((s,r) => s + (parseFloat(String(col.get(r,0)||'').replace(/,/g,'')) || 0), 0);
       };
       const MONEY = ['dist','mile','exp','ent','hotel','park'];
       let foot = '<tr>';
-      cols.forEach((c, i) => {
+      cols.forEach((c,i) => {
         if (i === 0) { foot += '<td class="ctr">Σ</td>'; return; }
         if (MONEY.indexOf(c.k) >= 0) {
           const v = sumOf(c.k);
-          foot += '<td class="num">' + (v ? Math.round(v).toLocaleString() : '') + '</td>';
-          return;
+          foot += '<td class="num">' + (v ? Math.round(v).toLocaleString() : '') + '</td>'; return;
         }
         if (c.k === 'cat') { foot += '<td class="ctr">รวมทั้งหมด</td>'; return; }
         if (c.k === 'st')  { foot += '<td class="ctr" style="color:#B7081D;white-space:nowrap;">' + Math.round(grand).toLocaleString() + ' ฿</td>'; return; }
@@ -382,7 +635,6 @@
       return '<div class="xl-wrap"><table class="xl"><thead>' + th + '</thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>';
     }
 
-    window.setStatus = setStatus;
     if (session) { load(); renderBottomNav('summary'); }
   </script>
 </body>
