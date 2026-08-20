@@ -35,6 +35,7 @@
   <script>
     const session = requireLogin();
     let pending = [];
+    let exportPending = [];
     let mySig = { hasSignature: false };
     let sigPad = null;
 
@@ -45,10 +46,12 @@
       const bb = document.getElementById('backBtn');
       if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
       try {
-        const [result, sig] = await Promise.all([
+        const [result, sig, exps] = await Promise.all([
           fetchSeniorInbox(session.Email),
-          getMySignature(session.Email).catch(() => ({ hasSignature: false }))
+          getMySignature(session.Email).catch(() => ({ hasSignature: false })),
+          apiGet('getExportApprovalInbox', { email: session.Email }).catch(() => [])
         ]);
+        exportPending = Array.isArray(exps) ? exps : [];
         mySig = sig;
         if (result && result.error) throw new Error(result.error);
         pending = Array.isArray(result) ? result : [];
@@ -63,8 +66,8 @@
       const list = document.getElementById('list');
       list.classList.remove('loading');
 
-      if (pending.length === 0) {
-        list.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div><div class="title">เคลียร์หมดแล้ว!</div><div class="sub">ไม่มีคำขอรอ Final Approve</div></div>`;
+      if (pending.length === 0 && exportPending.length === 0) {
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div><div class="title">เคลียร์หมดแล้ว!</div><div class="sub">ไม่มีคำขอรอ อนุมัติขั้นสุดท้าย</div></div>`;
         renderBottomNav('inbox');
         return;
       }
@@ -79,10 +82,27 @@
       });
 
       let html = `<div class="count-hero">
-        <div class="lbl">รอ Final Approve</div>
+        <div class="lbl">รอ อนุมัติขั้นสุดท้าย</div>
         <div class="num">${pending.length}</div>
         <div class="sub">${Object.keys(batches).length} ชุด • รวม ${Math.round(total).toLocaleString()} THB</div>
       </div>`;
+
+      // ✨ v6.0 คำขอ Export เคยแจ้งทางอีเมลอย่างเดียว หัวหน้าเปิดแอปแล้วไม่เห็นอะไรเลย
+      if (exportPending.length) {
+        html += `<div class="sec-label" style="color:var(--accent);">📊 คำขอ Export รออนุมัติ (${exportPending.length})</div>`;
+        exportPending.forEach(ex => {
+          const days = Math.floor((Date.now() - new Date(ex.RequestedAt).getTime()) / 86400000);
+          html += `<a href="export-review.html?id=${ex.ID}" class="req-card warn" style="text-decoration:none;display:block;">
+            <div class="ri-top">
+              <span class="ri-cat">📊 ${ex.StaffName}</span>
+              ${days >= 2 ? `<span class="pill bad">ค้าง ${days} วัน</span>` : '<span class="pill warn">ใหม่</span>'}
+              <span class="ri-amt">${Number(ex.TotalAmount||0).toLocaleString()} ฿</span>
+            </div>
+            <div class="ri-meta">ใบเบิกเดือน ${ex.Month}/${ex.Year} · ${ex.ItemCount} รายการ · แตะเพื่อตรวจสอบ</div>
+          </a>`;
+        });
+        html += `<div class="sec-label">คำขอเบิกรายรายการ</div>`;
+      }
 
       if (!mySig.hasSignature) {
         html += `<div class="warn-box"><div class="t">✍️ ยังไม่มีลายเซ็นบันทึกไว้</div>
@@ -91,8 +111,8 @@
       }
 
       Object.entries(batches).forEach(([bid, b]) => {
-        const bypass = b.mgrStatus === 'Bypassed'
-          ? '<span class="badge-pill badge-pending" style="margin-left:6px;font-size:9.5px;">Bypass</span>'
+        const bypass = b.mgrStatus === 'ข้ามขั้นหัวหน้าed'
+          ? '<span class="badge-pill badge-pending" style="margin-left:6px;font-size:9.5px;">ข้ามขั้นหัวหน้า</span>'
           : '<span class="badge-pill badge-approved" style="margin-left:6px;font-size:9.5px;">Mgr ✓</span>';
         html += `<div class="batch-card">
           <div class="batch-head">
@@ -114,7 +134,7 @@
           </div>`;
         });
         if (mySig.hasSignature) {
-          html += `<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="approveBatch('${bid}')">✅ Final Approve ทั้งชุด</button>`;
+          html += `<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="approveBatch('${bid}')">✅ อนุมัติขั้นสุดท้าย ทั้งชุด</button>`;
         }
         html += `</div>`;
       });
@@ -138,7 +158,7 @@
       if (r.Origin) rows.push(['ต้นทาง', r.Origin]);
       if (r.Destination) rows.push(['ปลายทาง', r.Destination]);
       if (r.Customer) rows.push(['ลูกค้า', r.Customer + (r.CustomerContact ? ' (' + r.CustomerContact + ')' : '')]);
-      rows.push(['Manager', (r.ManagerEmail || '-') + (r.ManagerStatus === 'Bypassed' ? ' (Bypass)' : ' ✓')]);
+      rows.push(['Manager', (r.ManagerEmail || '-') + (r.ManagerStatus === 'ข้ามขั้นหัวหน้าed' ? ' (ข้ามขั้นหัวหน้า)' : ' ✓')]);
       if (r.ManagerRemark) rows.push(['Manager Remark', String(r.ManagerRemark).split(' sig:')[0]]);
       if (r.PreApproveBudget) rows.push(['งบที่อนุมัติ', Math.round(Number(r.PreApproveBudget)).toLocaleString() + ' THB']);
 
@@ -180,7 +200,7 @@
       }
 
       html += `<div class="btn-row" style="margin-top:14px;">
-        <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">🎉 Final Approve</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">🎉 อนุมัติขั้นสุดท้าย</button>
         <button class="btn" style="flex:1;background:var(--danger);color:white;" onclick="decide('${r.ID}','Rejected')">❌ Reject</button>
       </div>`;
 
@@ -230,13 +250,13 @@
         signatureBase64 = sigPad.toDataURL();
       }
       if (decision === 'Rejected' && !remark) return showToast('ระบุเหตุผล', 'error');
-      if (!confirm(decision === 'Approved' ? 'Final Approve?' : 'Reject?')) return;
+      if (!confirm(decision === 'Approved' ? 'อนุมัติขั้นสุดท้าย?' : 'Reject?')) return;
       showLoading('กำลังบันทึก...');
       try {
         const result = await seniorApprove({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
         hideLoading();
         if (result && result.error) throw new Error(result.error);
-        showToast(decision === 'Approved' ? '🎉 Final Approved!' : '❌ Rejected', 'success');
+        showToast(decision === 'Approved' ? '🎉 อนุมัติขั้นสุดท้ายd!' : '❌ Rejected', 'success');
         closeModal();
         load();
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
@@ -244,14 +264,12 @@
 
     window.approveBatch = async (bid) => {
       const items = pending.filter(r => (r.BatchID || r.ID) === bid);
-      if (!confirm(`Final Approve ทั้ง ${items.length} รายการ?`)) return;
-      showLoading(`กำลังอนุมัติ ${items.length} รายการ...`);
+      const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const who = items[0] ? (items[0].StaffName || '') : '';
+      if (!confirm(`อนุมัติขั้นสุดท้าย ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท ?`)) return;
       try {
-        for (const r of items) await seniorApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email });
-        hideLoading();
-        showToast(`🎉 อนุมัติ ${items.length} รายการแล้ว`, 'success');
-        load();
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+        await runBatch(items, r => seniorApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email }), 'อนุมัติ');
+      } finally { load(); }
     };
 
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
