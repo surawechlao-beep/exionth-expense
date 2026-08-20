@@ -8,24 +8,96 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
   <style>
-    .member-card {
-      background: white; border: 1px solid var(--gray-200);
-      border-radius: var(--r-lg); padding: 14px; margin-bottom: 10px;
-      box-shadow: var(--sh-xs);
+    /* ── แถบเลือกเดือนแบบเลื่อนได้ ── */
+    .mbar { display:flex; gap:7px; overflow-x:auto; padding:2px 0 4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .mbar::-webkit-scrollbar { display:none; }
+    .mchip {
+      flex:0 0 auto; padding:8px 15px; border-radius:999px;
+      border:1.5px solid var(--gray-200); background:#fff;
+      font-size:12.5px; font-weight:700; color:var(--gray-600);
+      cursor:pointer; font-family:inherit; white-space:nowrap; min-height:40px;
+      transition:all .14s ease;
     }
-    .member-top { display: flex; align-items: center; gap: 12px; }
-    .member-av {
-      width: 46px; height: 46px; border-radius: 14px;
-      background: linear-gradient(135deg,#B7081D,#7a0512); color: white;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 16px; flex-shrink: 0;
+    .mchip.on {
+      background:linear-gradient(135deg,#B7081D,#8B0616); color:#fff;
+      border-color:transparent; box-shadow:0 4px 12px rgba(183,8,29,.26);
     }
-    .member-info { flex: 1; min-width: 0; }
-    .member-name { font-weight: 800; font-size: 15px; letter-spacing: -.01em; }
-    .member-mail { font-size: 11px; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; }
-    .member-total { text-align: right; }
-    .member-total .n { font-weight: 800; color: var(--accent); font-size: 16px; }
-    .member-total .l { font-size: 10px; color: var(--gray-400); }
+
+    /* ── Hero + เทรนด์ ── */
+    .trend {
+      display:inline-flex; align-items:center; gap:5px; margin-top:9px;
+      background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.28);
+      padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700;
+      backdrop-filter:blur(8px);
+    }
+
+    /* ── กราฟแท่งจัดอันดับ ── */
+    .rank-row {
+      display:grid; grid-template-columns:34px 1fr auto; gap:10px;
+      align-items:center; padding:9px 0; cursor:pointer;
+      border-bottom:1px solid var(--gray-100);
+    }
+    .rank-row:last-child { border-bottom:none; }
+    .rank-row:active { background:var(--gray-50); }
+    .rk-badge {
+      width:30px; height:30px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:800; color:#fff; flex-shrink:0;
+    }
+    .rk-mid { min-width:0; }
+    .rk-name { font-size:13px; font-weight:700; color:var(--gray-900); margin-bottom:5px;
+               overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .rk-track { height:9px; border-radius:999px; background:var(--gray-100); overflow:hidden; }
+    .rk-fill { height:100%; border-radius:999px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+    .rk-right { text-align:right; flex-shrink:0; }
+    .rk-amt { font-size:14px; font-weight:800; color:var(--gray-900); font-variant-numeric:tabular-nums; }
+    .rk-pct { font-size:10.5px; color:var(--gray-400); }
+
+    /* ── โดนัทประเภทค่าใช้จ่าย ── */
+    .donut-wrap { display:flex; align-items:center; gap:16px; margin-top:14px; }
+    .donut { flex:0 0 128px; position:relative; }
+    .donut svg { transform:rotate(-90deg); display:block; }
+    .donut-mid {
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; pointer-events:none;
+    }
+    .donut-mid .n { font-size:19px; font-weight:800; letter-spacing:-.03em; color:var(--gray-900); line-height:1.1; }
+    .donut-mid .l { font-size:9.5px; color:var(--gray-400); font-weight:600; }
+    .legend { flex:1; min-width:0; }
+    .lg-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12px; }
+    .lg-dot { width:11px; height:11px; border-radius:4px; flex-shrink:0; }
+    .lg-name { flex:1; color:var(--gray-700); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lg-val { font-weight:800; color:var(--gray-900); font-variant-numeric:tabular-nums; }
+
+    /* ── การ์ดพนักงาน ── */
+    .pcard {
+      background:#fff; border:1px solid var(--gray-200); border-radius:var(--r-lg);
+      margin-bottom:10px; box-shadow:var(--sh-xs); overflow:hidden;
+    }
+    .pcard-top { display:flex; align-items:center; gap:12px; padding:14px; cursor:pointer; }
+    .pav {
+      width:46px; height:46px; border-radius:15px; color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800; font-size:15px; flex-shrink:0; letter-spacing:-.02em;
+    }
+    .pinfo { flex:1; min-width:0; }
+    .pname { font-weight:800; font-size:15px; letter-spacing:-.01em; color:var(--gray-900); }
+    .pmeta { font-size:11px; color:var(--gray-500); margin-top:1px;
+             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pright { text-align:right; flex-shrink:0; }
+    .pamt { font-weight:800; font-size:17px; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+    .pcnt { font-size:10.5px; color:var(--gray-400); }
+    .pchev { color:var(--gray-300); font-size:13px; margin-left:2px; transition:transform .2s; }
+    .pcard.open .pchev { transform:rotate(90deg); }
+    .pbody { display:none; padding:0 14px 14px; border-top:1px solid var(--gray-100); }
+    .pcard.open .pbody { display:block; }
+    .pbar { display:grid; grid-template-columns:74px 1fr 60px; gap:8px; align-items:center;
+            font-size:11.5px; margin-top:8px; }
+    .pbar .bn { color:var(--gray-600); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pbar .bt { height:7px; background:var(--gray-100); border-radius:999px; overflow:hidden; }
+    .pbar .bf { height:100%; border-radius:999px; }
+    .pbar .bv { text-align:right; font-weight:700; color:var(--gray-800); font-variant-numeric:tabular-nums; }
+    .pzero { opacity:.55; }
   </style>
 </head>
 <body>
@@ -35,20 +107,15 @@
   </div>
 
   <div class="container">
-    <div class="card">
-      <div class="sec-label" style="margin:0 0 10px;">เลือกเดือน</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="field" style="margin:0;">
-          <label>เดือน</label>
-          <select id="month"></select>
-        </div>
-        <div class="field" style="margin:0;">
-          <label>ปี</label>
-          <select id="year"></select>
-        </div>
+    <div class="card" style="padding:14px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
+        <span class="sec-label" style="margin:0;flex:1;">เลือกเดือน</span>
+        <select id="year" style="width:auto;padding:7px 10px;font-size:12.5px;border-radius:10px;border:1.5px solid var(--gray-200);font-family:inherit;font-weight:700;"></select>
       </div>
+      <div class="mbar" id="mbar"></div>
     </div>
-    <div id="list" class="loading"><div class="spinner"></div></div>
+
+    <div id="dash" class="loading"><div class="spinner"></div></div>
   </div>
 
   <script src="js/config.js"></script>
@@ -57,22 +124,56 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    let teamData = null;
-    let allTeamReqs = [];
+    let teamData = null, allTeamReqs = [];
+    let selMonth = new Date().getMonth() + 1;
+
+    const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+    const CAT_TH = { FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', TOLL:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'ที่พัก',
+      ENT:'ค่ารับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ', CAR:'ค่ารถเหมา',
+      MOBILE:'โทรศัพท์', OVERSEAS:'โทร ตปท.', APT:'ที่พักรายเดือน', MILE:'เบี้ยเลี้ยงรถ' };
+
+    // สีประจำตัว — คนละสีชัดเจน ไล่ตามลำดับในทีม ไม่สุ่ม จะได้คงที่ทุกครั้งที่เปิด
+    const PALETTE = ['#B7081D','#2563EB','#16A34A','#D97706','#7C3AED',
+                     '#0D9488','#DB2777','#0891B2','#65A30D','#E11D48',
+                     '#4F46E5','#EA580C'];
+    const CAT_COLORS = ['#B7081D','#F59E0B','#2563EB','#16A34A','#7C3AED',
+                        '#0D9488','#DB2777','#64748B','#EA580C','#0891B2'];
+
+    const colorOf = {};   // email → สี
 
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
-    // Populate selectors
-    const mSel = document.getElementById('month'), ySel = document.getElementById('year');
-    const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    // ── ตัวเลือกเดือน / ปี ──
+    const ySel = document.getElementById('year');
     const now = new Date();
-    months.forEach((m,i) => { const o=document.createElement('option'); o.value=i+1; o.textContent=m; if(i+1===now.getMonth()+1) o.selected=true; mSel.appendChild(o); });
-    for (let y = now.getFullYear(); y >= now.getFullYear()-3; y--) { const o=document.createElement('option'); o.value=y; o.textContent=y; if(y===now.getFullYear()) o.selected=true; ySel.appendChild(o); }
-    mSel.addEventListener('change', render);
+    for (let y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
+      const o = document.createElement('option'); o.value = y; o.textContent = y;
+      if (y === now.getFullYear()) o.selected = true; ySel.appendChild(o);
+    }
     ySel.addEventListener('change', render);
 
+    function buildMonthBar() {
+      const bar = document.getElementById('mbar');
+      bar.innerHTML = MONTHS.map((m, i) =>
+        `<button type="button" class="mchip ${i+1===selMonth?'on':''}" data-m="${i+1}">${m}</button>`).join('');
+      bar.querySelectorAll('.mchip').forEach(b => b.addEventListener('click', () => {
+        selMonth = parseInt(b.dataset.m);
+        bar.querySelectorAll('.mchip').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        render();
+      }));
+      // เลื่อนให้เดือนที่เลือกอยู่กลางจอ
+      setTimeout(() => {
+        const on = bar.querySelector('.mchip.on');
+        if (on) bar.scrollLeft = on.offsetLeft - bar.clientWidth / 2 + on.clientWidth / 2;
+      }, 50);
+    }
+
     async function load() {
+      buildMonthBar();
       try {
         const [team, reqs] = await Promise.all([
           fetchMyTeam(session.Email),
@@ -81,103 +182,284 @@
         if (team && team.error) throw new Error(team.error);
         teamData = team;
         allTeamReqs = Array.isArray(reqs) ? reqs : [];
+        (teamData.team || []).forEach((mem, i) => {
+          colorOf[String(mem.Email).toLowerCase()] = PALETTE[i % PALETTE.length];
+        });
         render();
       } catch (err) {
-        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">${err.message}</div></div>`;
+        const d = document.getElementById('dash');
+        d.classList.remove('loading');
+        d.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+          <div class="title">โหลดข้อมูลไม่สำเร็จ</div><div class="sub">${err.message}</div>
+          <button class="btn btn-primary btn-sm" style="margin-top:14px;max-width:180px;" onclick="location.reload()">🔄 ลองใหม่</button></div>`;
         renderBottomNav('home');
       }
     }
 
+    /** รวมยอดของเดือนที่ระบุ */
+    function sumMonth(y, m) {
+      return allTeamReqs
+        .filter(r => {
+          if (r.Status !== 'Approved') return false;
+          const d = new Date(r.ExpenseDate || r.Timestamp);
+          return !isNaN(d) && d.getFullYear() === y && d.getMonth() + 1 === m;
+        });
+    }
+
     function render() {
-      const list = document.getElementById('list');
-      list.classList.remove('loading');
+      const dash = document.getElementById('dash');
+      dash.classList.remove('loading');
 
       if (!teamData || !teamData.team || teamData.team.length === 0) {
-        list.innerHTML = `<div class="empty"><div class="icon-wrap">👥</div><div class="title">ไม่มีสมาชิกในทีม</div><div class="sub">${teamData?.teamName || ''}</div></div>`;
+        dash.innerHTML = `<div class="empty"><div class="icon-wrap">👥</div>
+          <div class="title">ยังไม่มีสมาชิกในทีม</div>
+          <div class="sub">ระบบดูจากช่อง Manager ในชีท Staff — ถ้ายังไม่มีใครใส่ชื่อคุณไว้ จะยังไม่เห็นใคร</div></div>`;
         renderBottomNav('home');
         return;
       }
 
-      const y = parseInt(ySel.value), m = parseInt(mSel.value);
+      const y = parseInt(ySel.value);
+      const reqs = sumMonth(y, selMonth);
+      const total = reqs.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
 
-      // Filter this month approved
-      const monthReqs = allTeamReqs.filter(r => {
-        if (r.Status !== 'Approved') return false;
-        const d = new Date(r.ExpenseDate || r.Timestamp);
-        return !isNaN(d) && d.getFullYear() === y && d.getMonth()+1 === m;
-      });
-      const grandTotal = monthReqs.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      // เดือนก่อนหน้า เอาไว้เทียบเทรนด์
+      const pm = selMonth === 1 ? 12 : selMonth - 1;
+      const py = selMonth === 1 ? y - 1 : y;
+      const prevTotal = sumMonth(py, pm).reduce((s, r) => s + (Number(r.Amount) || 0), 0);
 
-      // Per member totals
+      // แยกตามคน
       const byEmail = {};
-      monthReqs.forEach(r => {
-        const e = String(r.StaffEmail||'').toLowerCase();
-        if (!byEmail[e]) byEmail[e] = { total: 0, count: 0 };
-        byEmail[e].total += Number(r.Amount)||0;
+      reqs.forEach(r => {
+        const e = String(r.StaffEmail || '').toLowerCase();
+        if (!byEmail[e]) byEmail[e] = { total: 0, count: 0, cats: {} };
+        const amt = Number(r.Amount) || 0;
+        byEmail[e].total += amt;
         byEmail[e].count++;
+        const c = r.Category || 'OTHER';
+        byEmail[e].cats[c] = (byEmail[e].cats[c] || 0) + amt;
       });
 
-      let html = `<div class="count-hero">
-        <div class="lbl">${teamData.teamName || 'Team'} · ${months[m-1]} ${y}</div>
-        <div class="num">${Math.round(grandTotal).toLocaleString()}</div>
-        <div class="sub">THB • ${teamData.team.length} คน • ${monthReqs.length} รายการ</div>
-      </div>`;
-
-      // Sort by spend desc
-      const sorted = [...teamData.team].sort((a,b) => {
-        const ta = byEmail[String(a.Email).toLowerCase()]?.total || 0;
-        const tb = byEmail[String(b.Email).toLowerCase()]?.total || 0;
-        return tb - ta;
+      // แยกตามประเภท (ทั้งทีม)
+      const byCat = {};
+      reqs.forEach(r => {
+        const c = r.Category || 'OTHER';
+        byCat[c] = (byCat[c] || 0) + (Number(r.Amount) || 0);
       });
+      const cats = Object.keys(byCat).map(c => ({ code: c, amt: byCat[c] })).sort((a, b) => b.amt - a.amt);
 
-      sorted.forEach(mem => {
-        const st = byEmail[String(mem.Email).toLowerCase()] || { total: 0, count: 0 };
-        html += `<div class="member-card">
-          <div class="member-top">
-            <div class="member-av">${initials(mem.Name)}</div>
-            <div class="member-info">
-              <div class="member-name">${mem.Name}</div>
-              <div class="member-mail">${mem.Email}</div>
-            </div>
-            <div class="member-total">
-              <div class="n">${Math.round(st.total).toLocaleString()}</div>
-              <div class="l">${st.count} รายการ</div>
-            </div>
+      const members = [...teamData.team].sort((a, b) =>
+        (byEmail[String(b.Email).toLowerCase()]?.total || 0) - (byEmail[String(a.Email).toLowerCase()]?.total || 0));
+
+      const active = members.filter(m => (byEmail[String(m.Email).toLowerCase()]?.total || 0) > 0).length;
+      const avg = active ? total / active : 0;
+
+      // ── เทรนด์เทียบเดือนก่อน ──
+      let trendHtml = '';
+      if (prevTotal > 0) {
+        const diff = total - prevTotal;
+        const pct = Math.round(Math.abs(diff) / prevTotal * 100);
+        const up = diff > 0;
+        trendHtml = `<div class="trend">${up ? '📈' : '📉'} ${up ? 'เพิ่มขึ้น' : 'ลดลง'} ${pct}% จาก ${MONTHS_FULL[pm-1]}</div>`;
+      } else if (total > 0) {
+        trendHtml = `<div class="trend">🆕 เดือนก่อนไม่มีรายการ</div>`;
+      }
+
+      let html = `
+        <div class="count-hero">
+          <div class="lbl">${teamData.teamName || 'ทีม'} · ${MONTHS_FULL[selMonth-1]} ${y}</div>
+          <div class="num">${Math.round(total).toLocaleString()}</div>
+          <div class="sub">บาท · ${reqs.length} รายการ</div>
+          ${trendHtml}
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi"><div class="n">${teamData.team.length}</div><div class="l">คนในทีม</div></div>
+          <div class="kpi ok"><div class="n">${active}</div><div class="l">มีการเบิก</div></div>
+          <div class="kpi warn"><div class="n">${Math.round(avg).toLocaleString()}</div><div class="l">เฉลี่ย/คน</div></div>
+          <div class="kpi"><div class="n">${reqs.length}</div><div class="l">รายการ</div></div>
+        </div>`;
+
+      // ── ไม่มีข้อมูลเดือนนี้ ──
+      if (total === 0) {
+        html += `<div class="card"><div class="empty" style="padding:30px 12px;">
+          <div class="icon-wrap">📭</div>
+          <div class="title">ไม่มีรายการที่อนุมัติแล้วใน${MONTHS_FULL[selMonth-1]}</div>
+          <div class="sub">ลองเลือกเดือนอื่นดู หรือรายการอาจยังรออนุมัติอยู่</div>
+        </div></div>`;
+        html += renderMemberCards(members, byEmail, 0, y);
+        dash.innerHTML = html;
+        bindCards();
+        renderBottomNav('home');
+        return;
+      }
+
+      // ── กราฟจัดอันดับรายคน ──
+      const maxSpend = Math.max(...members.map(m => byEmail[String(m.Email).toLowerCase()]?.total || 0), 1);
+      html += `<div class="card">
+        <div class="card-head"><span class="ib ib-red">🏆</span>
+          <div><div class="ch-title">จัดอันดับการใช้จ่าย</div>
+          <div class="ch-sub">แตะที่ชื่อเพื่อดูรายละเอียด</div></div>
+        </div>
+        <div style="margin-top:12px;">`;
+
+      members.forEach((mem, i) => {
+        const em = String(mem.Email).toLowerCase();
+        const st = byEmail[em] || { total: 0, count: 0 };
+        const color = colorOf[em] || PALETTE[0];
+        const pct = total ? (st.total / total * 100) : 0;
+        const w = (st.total / maxSpend * 100).toFixed(1);
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+        html += `<div class="rank-row ${st.total ? '' : 'pzero'}" data-go="${em}">
+          <div class="rk-badge" style="background:${color};">${medal}</div>
+          <div class="rk-mid">
+            <div class="rk-name">${mem.Name}</div>
+            <div class="rk-track"><div class="rk-fill" style="width:${w}%;background:${color};"></div></div>
           </div>
-          <div class="btn-row" style="margin-top:11px;">
-            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="viewSummary('${mem.Email}')">👁 ดูรายการ</button>
-            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="exportRep('${mem.Email}','${mem.Name.replace(/'/g,"")}')">📊 โหลด Excel</button>
+          <div class="rk-right">
+            <div class="rk-amt">${Math.round(st.total).toLocaleString()}</div>
+            <div class="rk-pct">${pct.toFixed(0)}% · ${st.count} ใบ</div>
           </div>
-          ${session.isViewer ? '' : `<button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#B45309;border-color:#FCD34D;"
-                  onclick="resetPwd('${mem.Email}','${mem.Name.replace(/'/g,"")}')">🔑 ล้างรหัสผ่านให้</button>`}
         </div>`;
       });
+      html += `</div></div>`;
 
-      list.innerHTML = html;
+      // ── โดนัทแยกตามประเภท ──
+      html += `<div class="card">
+        <div class="card-head"><span class="ib ib-orange">🍩</span>
+          <div><div class="ch-title">แยกตามประเภท</div>
+          <div class="ch-sub">${cats.length} ประเภท</div></div>
+        </div>
+        ${donutHtml(cats, total)}
+      </div>`;
+
+      // ── การ์ดรายคน ──
+      html += `<div class="sec-label">รายละเอียดรายคน</div>`;
+      html += renderMemberCards(members, byEmail, total, y);
+
+      dash.innerHTML = html;
+      bindCards();
       renderBottomNav('home');
     }
 
-    window.viewSummary = (email) => { location.href = 'summary.html'; };
+    /** โดนัทวาดด้วย SVG ล้วน ไม่ต้องโหลดไลบรารีเพิ่ม */
+    function donutHtml(cats, total) {
+      const R = 52, C = 2 * Math.PI * R;
+      let offset = 0;
+      const arcs = cats.slice(0, 8).map((c, i) => {
+        const frac = c.amt / total;
+        const len = frac * C;
+        const seg = `<circle cx="64" cy="64" r="${R}" fill="none"
+          stroke="${CAT_COLORS[i % CAT_COLORS.length]}" stroke-width="21"
+          stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}"
+          stroke-dashoffset="${(-offset).toFixed(2)}"></circle>`;
+        offset += len;
+        return seg;
+      }).join('');
+
+      const legend = cats.slice(0, 8).map((c, i) => `
+        <div class="lg-row">
+          <span class="lg-dot" style="background:${CAT_COLORS[i % CAT_COLORS.length]};"></span>
+          <span class="lg-name">${CAT_TH[c.code] || c.code}</span>
+          <span class="lg-val">${Math.round(c.amt).toLocaleString()}</span>
+          <span style="color:var(--gray-400);font-size:10.5px;min-width:32px;text-align:right;">${(c.amt/total*100).toFixed(0)}%</span>
+        </div>`).join('');
+
+      return `<div class="donut-wrap">
+        <div class="donut">
+          <svg width="128" height="128" viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="${R}" fill="none" stroke="#F1F5F9" stroke-width="21"></circle>
+            ${arcs}
+          </svg>
+          <div class="donut-mid">
+            <div class="n">${Math.round(total).toLocaleString()}</div>
+            <div class="l">บาท</div>
+          </div>
+        </div>
+        <div class="legend">${legend}</div>
+      </div>`;
+    }
+
+    function renderMemberCards(members, byEmail, total, y) {
+      return members.map(mem => {
+        const em = String(mem.Email).toLowerCase();
+        const st = byEmail[em] || { total: 0, count: 0, cats: {} };
+        const color = colorOf[em] || PALETTE[0];
+        const pct = total ? (st.total / total * 100).toFixed(0) : 0;
+
+        const myCats = Object.keys(st.cats || {})
+          .map(c => ({ code: c, amt: st.cats[c] })).sort((a, b) => b.amt - a.amt);
+        const maxCat = Math.max(...myCats.map(c => c.amt), 1);
+
+        const bars = myCats.length
+          ? myCats.map((c, i) => `<div class="pbar">
+              <span class="bn">${CAT_TH[c.code] || c.code}</span>
+              <span class="bt"><span class="bf" style="width:${(c.amt/maxCat*100).toFixed(0)}%;background:${CAT_COLORS[i % CAT_COLORS.length]};"></span></span>
+              <span class="bv">${Math.round(c.amt).toLocaleString()}</span>
+            </div>`).join('')
+          : `<div style="font-size:12px;color:var(--gray-400);padding:10px 0;text-align:center;">ไม่มีรายการในเดือนนี้</div>`;
+
+        const safeName = String(mem.Name).replace(/'/g, '');
+        return `<div class="pcard ${st.total ? '' : 'pzero'}">
+          <div class="pcard-top">
+            <div class="pav" style="background:${color};">${initials(mem.Name)}</div>
+            <div class="pinfo">
+              <div class="pname">${mem.Name}</div>
+              <div class="pmeta">${mem.Department || ''}${mem.Position ? ' · ' + mem.Position : ''}</div>
+            </div>
+            <div class="pright">
+              <div class="pamt">${Math.round(st.total).toLocaleString()}</div>
+              <div class="pcnt">${st.count} ใบ${total ? ' · ' + pct + '%' : ''}</div>
+            </div>
+            <span class="pchev">▶</span>
+          </div>
+          <div class="pbody">
+            <div style="margin-top:10px;">${bars}</div>
+            <div class="btn-row" style="margin-top:12px;">
+              <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="event.stopPropagation();viewSummary('${em}')">👁 ดูรายการ</button>
+              <button class="btn btn-primary btn-sm" style="flex:1;" onclick="event.stopPropagation();exportRep('${mem.Email}','${safeName}')">📊 โหลด Excel</button>
+            </div>
+            ${session.isViewer ? '' : `<button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#B45309;border-color:#FCD34D;"
+              onclick="event.stopPropagation();resetPwd('${mem.Email}','${safeName}')">🔑 ล้างรหัสผ่านให้</button>`}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    /** แตะการ์ดเพื่อกาง/พับ + แตะแถวในกราฟแล้วเลื่อนไปหาการ์ดนั้น */
+    function bindCards() {
+      document.querySelectorAll('.pcard-top').forEach(top => {
+        top.addEventListener('click', () => top.closest('.pcard').classList.toggle('open'));
+      });
+      document.querySelectorAll('.rank-row').forEach((row, i) => {
+        row.addEventListener('click', () => {
+          const card = document.querySelectorAll('.pcard')[i];
+          if (!card) return;
+          card.classList.add('open');
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
+    }
+
+    window.viewSummary = () => { location.href = 'summary.html'; };
 
     window.exportRep = async (email, name) => {
-      const year = parseInt(ySel.value), month = parseInt(mSel.value);
+      const year = parseInt(ySel.value);
       showLoading('สร้าง Excel ของ ' + name + '...');
       try {
-        const r = await exportStaffReport({ staffEmail: email, year, month, requesterEmail: session.Email });
+        const r = await exportStaffReport({ staffEmail: email, year, month: selMonth, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        if (r.base64) {
-          const bytes = atob(r.base64);
-          const arr = new Uint8Array(bytes.length);
-          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-          const blob = new Blob([arr], { type: r.mimeType });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url; a.download = r.filename;
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-          showToast(`✅ ${r.itemCount} รายการ • ${Math.round(r.totalAmount).toLocaleString()} THB`, 'success');
-        }
+        if (!r.base64) throw new Error('ไม่มีข้อมูลไฟล์');
+        const bytes = atob(r.base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: r.mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = r.filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast('✅ ' + r.itemCount + ' รายการ · ' + Math.round(r.totalAmount).toLocaleString() + ' บาท', 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
@@ -190,18 +472,6 @@
         hideLoading();
         if (r.error) throw new Error(r.error);
         showToast('ล้างรหัสผ่านของ ' + name + ' แล้ว — แจ้งให้เขาตั้งรหัสใหม่', 'success');
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
-    };
-
-    window.emailRep = async (email, name) => {
-      const year = parseInt(ySel.value), month = parseInt(mSel.value);
-      if (!confirm('ส่ง Excel ของ ' + name + ' ไปฝ่ายบัญชี?')) return;
-      showLoading('กำลังส่ง email...');
-      try {
-        const r = await emailStaffReport({ staffEmail: email, year, month, requesterEmail: session.Email, ccFinance: true });
-        hideLoading();
-        if (r.error) throw new Error(r.error);
-        showToast('📧 ส่งให้บัญชีแล้ว', 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
