@@ -265,7 +265,7 @@
         const r = await checkUser(email);
         hideLoading();
         if (!r.exists) throw new Error('Email นี้ไม่อยู่ในระบบ');
-        if (r.active === false) throw new Error('Account ปิดอยู่');
+        if (r.active === false) throw new Error('บัญชีถูกปิดใช้งาน');
         currentEmail = email;
         hideAll();
         if (r.hasPassword) {
@@ -381,7 +381,7 @@
           </a>
           <a href="summary.html" class="tile">
             <div class="ib ib-purple">📊</div>
-            <div><div class="lb">Summary</div><div class="sb">Preview + สรุปยอด</div></div>
+            <div><div class="lb">สรุปภาพรวม</div><div class="sb">Preview + สรุปยอด</div></div>
           </a>
         </div>
 
@@ -391,7 +391,7 @@
           ${isManager && !isGM && !isSenior ? `
           <a href="manager-inbox.html" class="tile">
             <div class="ib ib-orange">${icon('bell')}</div>
-            <div><div class="lb">Manager Inbox</div><div class="sb" id="mgrCount">กำลังโหลด...</div></div>
+            <div><div class="lb">รออนุมัติ</div><div class="sb" id="mgrCount">กำลังโหลด...</div></div>
             <span class="cnt-badge" id="mgrBadge" style="display:none;">0</span>
           </a>
           <a href="my-team.html" class="tile">
@@ -401,12 +401,12 @@
           ${isSenior || isGM ? `
           <a href="senior-inbox.html" class="tile">
             <div class="ib ib-orange">${icon('bell')}</div>
-            <div><div class="lb">Senior Inbox</div><div class="sb" id="snrCount">กำลังโหลด...</div></div>
+            <div><div class="lb">รออนุมัติ (Senior)</div><div class="sb" id="snrCount">กำลังโหลด...</div></div>
             <span class="cnt-badge" id="snrBadge" style="display:none;">0</span>
           </a>
           <a href="all-requests.html" class="tile">
             <div class="ib ib-blue">${icon('list')}</div>
-            <div><div class="lb">All Requests</div><div class="sb">ทุกคำขอในบริษัท</div></div>
+            <div><div class="lb">คำขอทั้งบริษัท</div><div class="sb">ทุกคำขอในบริษัท</div></div>
           </a>
           <a href="my-team.html" class="tile">
             <div class="ib ib-teal">👥</div>
