@@ -257,7 +257,13 @@
       const cat = categories.find(c => c.Code === it.category);
       const isFuel = it.category === 'FUEL';
       const isEnt = cat && cat.NeedClaimForm === 'YES';
-      const needRcpt = cat && cat.NeedReceipt === 'YES';
+      // ใบเสร็จมี 3 แบบตามชีท Categories คอลัมน์ NeedReceipt
+      //   YES      = บังคับแนบ
+      //   OPTIONAL = แนบก็ได้ ไม่แนบก็ได้ (เช่น ค่าโทรศัพท์)
+      //   อื่นๆ/ว่าง = ไม่ต้องแนบ ไม่ต้องโชว์ช่องเลย
+      const rcptMode = cat ? String(cat.NeedReceipt || '').trim().toUpperCase() : '';
+      const needRcpt = rcptMode === 'YES';
+      const showRcpt = needRcpt || rcptMode === 'OPTIONAL';
       const needTravel = cat && cat.NeedTravelInfo === 'YES';
       const dup = it._dup && num > 1 ? `<div class="dup-hint">📋 คัดลอกข้อมูลจากรายการก่อน — แก้ไขได้</div>` : '';
 
@@ -291,13 +297,13 @@
         <div class="field"><label>ผู้ติดต่อ</label><input type="text" id="${it.id}_customerContact" value="${it.customerContact}" placeholder="ชื่อ ตำแหน่ง"></div>` : ''}
         ${(!isFuel && !isEnt) ? `<div class="field"><label>รายละเอียด</label><input type="text" id="${it.id}_venue" value="${it.venue}" placeholder="เช่น ค่าทางด่วน"></div>` : ''}
         ${!isFuel ? `<div class="field"><label>จำนวนเงิน (THB) <span class="required">*</span></label><input type="number" id="${it.id}_amount" step="0.01" min="0" value="${it.amount||''}" placeholder="0.00" inputmode="decimal"></div>` : ''}
-        ${needRcpt ? `<div class="field">
-          <label>ใบเสร็จ <span class="required">*</span></label>
+        ${showRcpt ? `<div class="field">
+          <label>ใบเสร็จ ${needRcpt ? '<span class="required">*</span>' : '<span class="optional-tag">ไม่บังคับ</span>'}</label>
           <label for="${it.id}_files" class="upload-area">
             <input type="file" id="${it.id}_files" accept="image/*,application/pdf" multiple>
             <div class="icon-wrap">📎</div>
-            <div class="text">แตะเพื่อแนบไฟล์</div>
-            <div class="sub">ภาพ/PDF · สูงสุด 10 ไฟล์ × 5 MB</div>
+            <div class="text">${needRcpt ? 'แตะเพื่อแนบไฟล์' : 'แตะเพื่อแนบไฟล์ (ถ้ามี)'}</div>
+            <div class="sub">${needRcpt ? 'ภาพ/PDF · สูงสุด 10 ไฟล์ × 5 MB' : 'มีบิลก็แนบได้ ไม่มีก็ส่งได้เลย'}</div>
           </label>
           <div id="${it.id}_chips" style="margin-top:8px;">${chips(it)}</div>
         </div>` : ''}
@@ -389,7 +395,9 @@
           if (!it.occasion)  return flagError(it.id, 'occasion', 'ยังไม่ได้ใส่โอกาส', num);
           if (!it.attendees) return flagError(it.id, 'attendees', 'ยังไม่ได้ใส่ผู้ร่วม', num);
         }
-        if (cat.NeedReceipt === 'YES' && !it.receipts.length) return flagError(it.id, 'files', 'ยังไม่ได้แนบใบเสร็จ', num);
+        // บังคับเฉพาะ YES — OPTIONAL แนบหรือไม่แนบก็ผ่าน
+        if (String(cat.NeedReceipt || '').trim().toUpperCase() === 'YES' && !it.receipts.length)
+          return flagError(it.id, 'files', 'ยังไม่ได้แนบใบเสร็จ', num);
       }
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
