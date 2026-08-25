@@ -33,6 +33,13 @@
         <div class="field" style="margin:0;"><label>เดือน</label><select id="exportMonth"></select></div>
         <div class="field" style="margin:0;"><label>ปี</label><select id="exportYear"></select></div>
       </div>
+      <div id="cutoffWrap" style="margin-top:12px;display:none;">
+        <div class="field" style="margin:0;">
+          <label>ตัดยอดถึงวันที่ <span class="optional-tag">ปรับได้</span></label>
+          <input type="date" id="cutoffEnd">
+          <div class="hint" id="cutoffHint">—</div>
+        </div>
+      </div>
       <div id="exportStatusBox" style="margin-top:14px;"><div class="loading" style="padding:20px;"><div class="spinner"></div></div></div>
       <div id="exportActions" style="display:grid;gap:9px;margin-top:12px;"></div>
     </div>
@@ -114,12 +121,40 @@
       refreshExportStatus();
     }
 
+    // 📅 v6.3 วันตัดรอบปรับได้ — บางเดือนตัด 25 บางเดือนตัด 28
+    let periodInfo = null;
+    async function loadPeriodInfo() {
+      const year = parseInt(document.getElementById('exportYear').value);
+      const month = parseInt(document.getElementById('exportMonth').value);
+      const wrap = document.getElementById('cutoffWrap');
+      const inp = document.getElementById('cutoffEnd');
+      const hint = document.getElementById('cutoffHint');
+      try {
+        periodInfo = await apiGet('getPeriodInfo', { email: session.Email, year, month });
+        if (!periodInfo || periodInfo.error) throw new Error('n/a');
+        inp.min = periodInfo.periodStart;
+        inp.max = periodInfo.maxEnd;
+        inp.value = periodInfo.suggestedEnd;
+        hint.innerHTML = `รอบนี้เริ่ม <b>${periodInfo.periodStartTH}</b> — ` +
+          (periodInfo.lastSettledTH
+            ? `ต่อจากรอบก่อนที่ปิดถึง ${periodInfo.lastSettledTH}`
+            : `ยังไม่เคยปิดรอบ`) +
+          `<br>ค่าเริ่มต้นคือวันที่ ${periodInfo.cutoffDay} ของเดือน · เปลี่ยนได้ตามที่ตกลงกับหัวหน้า`;
+        wrap.style.display = 'block';
+      } catch { wrap.style.display = 'none'; periodInfo = null; }
+    }
+
     function refreshExportStatus() {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
       const ex = myExports.find(x => Number(x.Year)===year && Number(x.Month)===month);
       const box = document.getElementById('exportStatusBox');
       const act = document.getElementById('exportActions');
+      const cw = document.getElementById('cutoffWrap');
+
+      // เลือกวันตัดได้เฉพาะตอนที่ยังไม่ได้ขอ (หรือถูกปฏิเสธมา)
+      const canPickCutoff = !ex || ex.OverallStatus === 'Rejected';
+      if (canPickCutoff) loadPeriodInfo(); else cw.style.display = 'none';
 
       if (!ex || ex.OverallStatus === 'Rejected') {
         box.innerHTML = ex
@@ -134,7 +169,8 @@
         const paid = !!ex.PaidAt;
         box.innerHTML = `
           <div class="ok-box"><b>✅ อนุมัติแล้ว</b><br>
-            <span style="font-weight:400;">${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span></div>
+            <span style="font-weight:400;">${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span>
+            ${periodTxt(ex)}</div>
           ${paid
             ? `<div class="ok-box" style="background:#ECFDF5;border-color:#6EE7B7;">
                  💵 <b>บัญชีโอนเงินแล้ว</b><br>
@@ -148,17 +184,32 @@
       } else {
         const who = String(ex.GMEmail || ex.SeniorEmail || ex.ManagerEmail || '').split('@')[0];
         box.innerHTML = `<div class="warn-box"><b>⏳ รออนุมัติ</b><br>
-          <span style="font-weight:400;font-size:12.5px;">อยู่ที่ ${who || 'ผู้อนุมัติ'} · ${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span></div>`;
+          <span style="font-weight:400;font-size:12.5px;">อยู่ที่ ${who || 'ผู้อนุมัติ'} · ${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span>
+          ${periodTxt(ex)}</div>`;
         act.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่างก่อน (ยังใช้เบิกไม่ได้)</button>`;
       }
+    }
+
+    // แสดงช่วงวันของรอบใต้กล่องสถานะ
+    function periodTxt(ex) {
+      if (!ex || !ex.PeriodStart || !ex.PeriodEnd) return '';
+      const f = s => new Date(s).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' });
+      return `<br><span style="font-weight:400;font-size:11.5px;opacity:.8;">📅 รอบ ${f(ex.PeriodStart)} – ${f(ex.PeriodEnd)}</span>`;
     }
 
     window.requestApproval = async () => {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
+      const periodEnd = (document.getElementById('cutoffEnd') || {}).value || '';
+      if (periodEnd && periodInfo) {
+        const label = new Date(periodEnd).toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
+        if (!confirm(`ตัดยอดถึงวันที่ ${label}\n\nรายการหลังจากวันนี้จะไปอยู่รอบถัดไป\nยืนยันส่งขออนุมัติ?`)) return;
+      }
       showLoading('กำลังส่งคำขอ...');
       try {
-        const r = await apiPost('requestExportApproval', { staffEmail: session.Email, year, month });
+        const r = await apiPost('requestExportApproval', {
+          staffEmail: session.Email, year, month, periodEnd, requesterEmail: session.Email
+        });
         hideLoading();
         if (r.error) throw new Error(r.error);
         showToast(r.auto
