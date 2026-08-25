@@ -108,6 +108,8 @@
           <div class="lbl">${req.StaffName} · ${MONTHS[Number(req.Month)-1]} ${req.Year}</div>
           <div class="num">${Number(req.TotalAmount||0).toLocaleString()}</div>
           <div class="sub">THB • ${req.ItemCount} รายการ</div>
+          ${req.PeriodStart && req.PeriodEnd
+            ? `<div class="sub" style="opacity:.85;">📅 ${fmtTH(req.PeriodStart)} – ${fmtTH(req.PeriodEnd)}</div>` : ''}
         </div>
 
         <div class="card">
@@ -136,6 +138,19 @@
             <div><div class="ch-title">คุณคือ ${stage}</div><div class="ch-sub">กรุณาตรวจสอบและตัดสินใจ</div></div>
           </div>
           <div class="field" style="margin-top:12px;">
+            <label>ตัดยอดถึงวันที่ <span class="optional-tag">ปรับได้</span></label>
+            <input type="date" id="periodEndInput"
+              value="${req.PeriodEnd ? String(req.PeriodEnd).substr(0,10) : ''}"
+              min="${req.PeriodStart ? String(req.PeriodStart).substr(0,10) : ''}"
+              max="${new Date().toISOString().substr(0,10)}">
+            <div class="hint">
+              ${req.PeriodStart
+                ? `รอบนี้เริ่ม <b>${fmtTH(req.PeriodStart)}</b> — ต่อจากรอบก่อนที่ปิดไปแล้ว`
+                : 'รอบเก่าที่ยังไม่ได้บันทึกช่วงวัน — เลือกวันตัดยอดได้เลย'}
+              <br>เปลี่ยนวันแล้วระบบคิดยอดใหม่ให้ทันที ไม่ต้องตีกลับให้พนักงานส่งใหม่
+            </div>
+          </div>
+          <div class="field">
             <label>หมายเหตุ (บังคับถ้าไม่อนุมัติ)</label>
             <textarea id="remarkInput" rows="2" placeholder="ระบุเหตุผล..."></textarea>
           </div>
@@ -149,14 +164,30 @@
       `;
     }
 
+    function fmtTH(v) {
+      const d = new Date(v);
+      return isNaN(d) ? '-' : d.toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
+    }
+
     window.decide = async (decision) => {
       const el = document.getElementById('remarkInput');
       const remark = el ? el.value.trim() : '';
       if (decision === 'Rejected' && !remark) return showToast('กรุณาระบุเหตุผล', 'error');
-      if (!confirm(decision === 'Approved' ? 'อนุมัติ Export นี้?' : 'ไม่อนุมัติ Export นี้?')) return;
-      showLoading('กำลังบันทึก...');
+
+      const pe = document.getElementById('periodEndInput');
+      const periodEnd = (decision === 'Approved' && pe) ? pe.value : '';
+      const orig = detail.request.PeriodEnd ? String(detail.request.PeriodEnd).substr(0,10) : '';
+      const moved = periodEnd && orig && periodEnd !== orig;
+
+      const msg = decision !== 'Approved' ? 'ไม่อนุมัติ Export นี้?'
+        : moved
+          ? `เปลี่ยนวันตัดยอดจาก ${fmtTH(orig)}\nเป็น ${fmtTH(periodEnd)}\n\nระบบจะคิดยอดใหม่ตามช่วงนี้ แล้วอนุมัติเลย\nยืนยัน?`
+          : 'อนุมัติ Export นี้?';
+      if (!confirm(msg)) return;
+
+      showLoading(moved ? 'กำลังคิดยอดใหม่...' : 'กำลังบันทึก...');
       try {
-        const r = await apiPost('approveExportRequest', { id: exportId, decision, approverEmail: session.Email, remark });
+        const r = await apiPost('approveExportRequest', { id: exportId, decision, approverEmail: session.Email, remark, periodEnd });
         hideLoading();
         if (r.error) throw new Error(r.error);
         showToast(decision === 'Approved' ? 'อนุมัติเรียบร้อย ✅' : 'บันทึกแล้ว', 'success');
