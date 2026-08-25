@@ -172,6 +172,10 @@
 
     function renderItem(r) {
       const st = String(r.Status||'Pending');
+
+      // 📋 Pre-Approve เป็นคนละเรื่องกับรายการเบิก — ต้องไปกรอกยอดจริงที่หน้าส่งบิล
+      if (st === 'PreApprove') return renderPreApproveItem(r);
+
       const cls = st === 'Approved' ? 'ok' : st === 'Rejected' ? 'bad' : 'warn';
       const stTH = st === 'Approved' ? '✅ อนุมัติ' : st === 'Rejected' ? '❌ ไม่อนุมัติ' : '⏳ รออนุมัติ';
       const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
@@ -190,6 +194,32 @@
           <button class="btn btn-secondary btn-sm" style="flex:1.1;color:#0891b2;border-color:#a5e5f0;" onclick="openEdit('${r.ID}')">✏️ แก้ไข</button>
           <button class="btn btn-secondary btn-sm" style="flex:0 0 52px;padding-left:0;padding-right:0;color:#b91c1c;border-color:#fecaca;" onclick="deleteReq('${r.ID}')" title="ลบคำขอนี้" aria-label="ลบคำขอนี้">🗑</button>
         </div>
+      </div>`;
+    }
+
+    function renderPreApproveItem(r) {
+      const ps = String(r.PreApproveStatus || 'Pending');
+      const ready = ps === 'Approved';
+      const cls = ready ? 'ok' : ps === 'Rejected' ? 'bad' : 'warn';
+      const badge = ready ? '<span class="pill ok">✅ อนุมัติงบแล้ว</span>'
+        : ps === 'Rejected' ? '<span class="pill bad">❌ ไม่อนุมัติงบ</span>'
+        : '<span class="pill warn">⏳ รออนุมัติงบ</span>';
+      const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
+      const date = d && !isNaN(d) ? d.toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+      const meta = [date, r.Venue, r.Customer].filter(Boolean).join(' • ');
+      return `<div class="req-card ${cls}">
+        <div class="ri-top">
+          <span class="ri-cat">📋 ขอวงเงิน · ${catLabel(r.Category)}</span>
+          ${badge}
+          <span class="ri-amt">${Number(r.PreApproveBudget||0).toLocaleString()} ฿</span>
+        </div>
+        <div class="ri-meta">${meta}</div>
+        ${ready
+          ? `<div class="ok-box" style="margin:9px 0 0;font-size:12.5px;">📤 อนุมัติงบแล้ว — เหลือกรอกยอดจริงพร้อม<b>แนบใบเสร็จ</b></div>
+             <a href="finalize-claim.html?id=${r.ID}" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:9px;">📤 ส่งบิล + ยอดจริง</a>`
+          : `<div class="btn-row" style="margin-top:10px;">
+               <a href="pre-approves.html" class="btn btn-secondary btn-sm" style="flex:1;text-decoration:none;">👁 ดูที่หน้า Pre-Approve</a>
+             </div>`}
       </div>`;
     }
 
@@ -216,10 +246,26 @@
     };
     window.closeDetail = () => document.getElementById('detailModal').classList.remove('show');
 
+    let editFiles = [];   // ใบเสร็จที่เพิ่งเลือกในรอบแก้ไขนี้
+
     window.openEdit = (id) => {
       const r = allReqs.find(x => x.ID === id);
       if (!r) return;
+
+      // 📋 Pre-Approve ที่อนุมัติงบแล้ว → ไปหน้าส่งบิลใช้จริง (บังคับแนบใบเสร็จ)
+      if (r.Status === 'PreApprove' && r.PreApproveStatus === 'Approved') {
+        return location.href = 'finalize-claim.html?id=' + r.ID;
+      }
+      if (r.Status === 'PreApprove') {
+        return showToast('ยังรอหัวหน้าอนุมัติงบอยู่ — แก้ไขที่หน้า Pre-Approve', 'error');
+      }
+
+      editFiles = [];
       const opts = categories.map(c => `<option value="${c.Code}" ${r.Category===c.Code?'selected':''}>${catLabel(c.Code)}</option>`).join('');
+      let existing = [];
+      try { existing = JSON.parse(r.ReceiptURLs || '[]'); } catch { existing = []; }
+      if (!existing.length && r.ReceiptURL) existing = [r.ReceiptURL];
+
       document.getElementById('editContent').innerHTML = `
         <div class="warn-box">⚠️ ถ้าประเภทนี้ต้องอนุมัติ — หลังแก้ไขจะกลับเป็น <b>รออนุมัติ</b> ให้หัวหน้าอนุมัติใหม่<br>
           <span style="font-weight:400;font-size:12px;">เดือนที่ส่งบัญชีไปแล้ว (Export อนุมัติ) จะแก้ไม่ได้ ระบบจะแจ้งเตือน</span></div>
@@ -233,10 +279,45 @@
           <div class="field"><label>ต้นทาง</label><input type="text" id="e_origin" value="${r.Origin || ''}"></div>
           <div class="field"><label>ปลายทาง</label><input type="text" id="e_dest" value="${r.Destination || ''}"></div>
         </div>
+        <div class="field">
+          <label>ใบเสร็จ <span class="optional-tag">${existing.length ? 'มีอยู่แล้ว ' + existing.length + ' ไฟล์' : 'ยังไม่มี'}</span></label>
+          <label for="e_files" class="upload-area">
+            <input type="file" id="e_files" accept="image/*,application/pdf" multiple>
+            <div class="icon-wrap">📎</div>
+            <div class="text">แตะเพื่อแนบใบเสร็จเพิ่ม</div>
+            <div class="sub">ภาพ/PDF · ไม่แนบก็ได้ ของเดิมจะอยู่เหมือนเดิม</div>
+          </label>
+          <div id="e_chips" style="margin-top:8px;"></div>
+          ${existing.length ? `<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:var(--gray-400);cursor:pointer;">
+            <input type="checkbox" id="e_replace" style="width:auto;margin:0;"> ลบใบเสร็จเดิมทิ้ง แล้วใช้ไฟล์ใหม่แทน</label>` : ''}
+        </div>
         <button class="btn btn-primary" onclick="saveEdit('${r.ID}')" style="margin-top:6px;">💾 บันทึกการแก้ไข</button>`;
+
+      document.getElementById('e_files').addEventListener('change', onEditFiles);
       document.getElementById('editModal').classList.add('show');
     };
-    window.closeEdit = () => document.getElementById('editModal').classList.remove('show');
+
+    async function onEditFiles(e) {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      if (editFiles.length + files.length > 10) return showToast('ไฟล์เกิน 10', 'error');
+      for (const f of files) {
+        if (f.size > 5 * 1024 * 1024) { showToast(f.name + ' ใหญ่เกิน 5 MB', 'error'); continue; }
+        editFiles.push({ name: f.name, base64: await fileToBase64(f) });
+      }
+      e.target.value = '';
+      renderEditChips();
+    }
+
+    function renderEditChips() {
+      const c = document.getElementById('e_chips');
+      if (!c) return;
+      c.innerHTML = editFiles.map((f,i) =>
+        `<span class="file-chip">📎 ${f.name.length>18?f.name.substr(0,15)+'...':f.name}<button type="button" onclick="removeEditFile(${i})">✕</button></span>`).join('');
+    }
+    window.removeEditFile = (i) => { editFiles.splice(i,1); renderEditChips(); };
+
+    window.closeEdit = () => { editFiles = []; document.getElementById('editModal').classList.remove('show'); };
 
     window.saveEdit = async (id) => {
       const updates = {
@@ -249,9 +330,16 @@
         Origin: document.getElementById('e_origin').value,
         Destination: document.getElementById('e_dest').value
       };
-      showLoading('กำลังบันทึก...');
+      const repEl = document.getElementById('e_replace');
+      const replaceReceipts = !!(repEl && repEl.checked);
+      if (replaceReceipts && !editFiles.length) return showToast('เลือกไฟล์ใหม่ก่อน ถึงจะลบของเดิมได้', 'error');
+
+      showLoading(editFiles.length ? 'กำลังอัปโหลดใบเสร็จ...' : 'กำลังบันทึก...');
       try {
-        const r = await apiPost('updateRequest', { id, requesterEmail: session.Email, updates });
+        const r = await apiPost('updateRequest', {
+          id, requesterEmail: session.Email, updates,
+          newReceipts: editFiles, replaceReceipts
+        });
         hideLoading();
         if (r.error) throw new Error(r.error);
         showToast('แก้ไขสำเร็จ ✅', 'success');
