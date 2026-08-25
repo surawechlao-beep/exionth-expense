@@ -138,17 +138,22 @@
             <div><div class="ch-title">คุณคือ ${stage}</div><div class="ch-sub">กรุณาตรวจสอบและตัดสินใจ</div></div>
           </div>
           <div class="field" style="margin-top:12px;">
-            <label>ตัดยอดถึงวันที่ <span class="optional-tag">ปรับได้</span></label>
-            <input type="date" id="periodEndInput"
-              value="${req.PeriodEnd ? String(req.PeriodEnd).substr(0,10) : ''}"
-              min="${req.PeriodStart ? String(req.PeriodStart).substr(0,10) : ''}"
-              max="${new Date().toISOString().substr(0,10)}">
+            <label>ช่วงรอบ <span class="optional-tag">ปรับได้</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <input type="date" id="periodStartInput"
+                value="${req.PeriodStart ? String(req.PeriodStart).substr(0,10) : ''}"
+                max="${new Date().toISOString().substr(0,10)}">
+              <input type="date" id="periodEndInput"
+                value="${req.PeriodEnd ? String(req.PeriodEnd).substr(0,10) : ''}"
+                max="${new Date().toISOString().substr(0,10)}">
+            </div>
             <div class="hint">
               ${req.PeriodStart
-                ? `รอบนี้เริ่ม <b>${fmtTH(req.PeriodStart)}</b> — ต่อจากรอบก่อนที่ปิดไปแล้ว`
-                : 'รอบเก่าที่ยังไม่ได้บันทึกช่วงวัน — เลือกวันตัดยอดได้เลย'}
-              <br>เปลี่ยนวันแล้วระบบคิดยอดใหม่ให้ทันที ไม่ต้องตีกลับให้พนักงานส่งใหม่
+                ? `พนักงานส่งมาเป็น <b>${fmtTH(req.PeriodStart)} – ${fmtTH(req.PeriodEnd)}</b>`
+                : 'รอบเก่าที่ยังไม่ได้บันทึกช่วงวัน — เลือกได้เลย'}
+              <br>เปลี่ยนแล้วระบบคิดยอดใหม่ให้ทันที ไม่ต้องตีกลับให้พนักงานส่งใหม่
             </div>
+            <div id="periodWarn" style="margin-top:8px;"></div>
           </div>
           <div class="field">
             <label>หมายเหตุ (บังคับถ้าไม่อนุมัติ)</label>
@@ -162,6 +167,7 @@
         </div>` : (req.OverallStatus === 'Pending'
           ? `<div class="info-box">⏳ รอ ${stage} อนุมัติ — คุณยังไม่ต้องดำเนินการ</div>` : '')}
       `;
+      if (canApprove) bindPeriodWatch();
     }
 
     function fmtTH(v) {
@@ -169,25 +175,67 @@
       return isNaN(d) ? '-' : d.toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
     }
 
+    // เตือนสดๆ ถ้าช่วงที่เลือกทับรอบก่อนหรือมีวันหาย — ถามจาก server เพราะรู้ประวัติรอบทั้งหมด
+    let warnTimer = null;
+    function bindPeriodWatch() {
+      const s = document.getElementById('periodStartInput');
+      const e = document.getElementById('periodEndInput');
+      if (!s || !e) return;
+      const run = () => {
+        clearTimeout(warnTimer);
+        warnTimer = setTimeout(async () => {
+          const box = document.getElementById('periodWarn');
+          if (!box || !s.value || !e.value) return;
+          if (new Date(e.value) < new Date(s.value)) {
+            box.innerHTML = `<div class="bad-box" style="margin:0;font-size:12.5px;">❌ วันจบอยู่ก่อนวันเริ่ม</div>`;
+            return;
+          }
+          try {
+            const p = await apiGet('previewPeriod', {
+              email: detail.request.StaffEmail, start: s.value, end: e.value });
+            if (!p || p.error) return;
+            box.innerHTML =
+              (p.warnings || []).map(x => `<div class="warn-box" style="margin:0 0 6px;font-size:12.5px;">${x}</div>`).join('') +
+              `<div class="info-box" style="margin:0;font-size:12.5px;">📊 ช่วงนี้มี <b>${p.count}</b> รายการ · <b>${Number(p.total).toLocaleString()}</b> บาท</div>`;
+          } catch {}
+        }, 350);
+      };
+      s.addEventListener('input', run);
+      e.addEventListener('input', run);
+      run();
+    }
+
     window.decide = async (decision) => {
       const el = document.getElementById('remarkInput');
       const remark = el ? el.value.trim() : '';
       if (decision === 'Rejected' && !remark) return showToast('กรุณาระบุเหตุผล', 'error');
 
+      const ps = document.getElementById('periodStartInput');
       const pe = document.getElementById('periodEndInput');
-      const periodEnd = (decision === 'Approved' && pe) ? pe.value : '';
-      const orig = detail.request.PeriodEnd ? String(detail.request.PeriodEnd).substr(0,10) : '';
-      const moved = periodEnd && orig && periodEnd !== orig;
+      const periodStart = (decision === 'Approved' && ps) ? ps.value : '';
+      const periodEnd   = (decision === 'Approved' && pe) ? pe.value : '';
+      if (decision === 'Approved' && periodStart && periodEnd && new Date(periodEnd) < new Date(periodStart)) {
+        return showToast('วันจบอยู่ก่อนวันเริ่ม', 'error');
+      }
 
-      const msg = decision !== 'Approved' ? 'ไม่อนุมัติ Export นี้?'
-        : moved
-          ? `เปลี่ยนวันตัดยอดจาก ${fmtTH(orig)}\nเป็น ${fmtTH(periodEnd)}\n\nระบบจะคิดยอดใหม่ตามช่วงนี้ แล้วอนุมัติเลย\nยืนยัน?`
-          : 'อนุมัติ Export นี้?';
+      const origS = detail.request.PeriodStart ? String(detail.request.PeriodStart).substr(0,10) : '';
+      const origE = detail.request.PeriodEnd ? String(detail.request.PeriodEnd).substr(0,10) : '';
+      const moved = decision === 'Approved' && ((periodStart && periodStart !== origS) || (periodEnd && periodEnd !== origE));
+
+      let msg;
+      if (decision !== 'Approved') msg = 'ไม่อนุมัติ Export นี้?';
+      else if (moved) {
+        const warnTxt = (document.getElementById('periodWarn') || {}).textContent || '';
+        msg = `เปลี่ยนช่วงรอบเป็น\n${fmtTH(periodStart)} – ${fmtTH(periodEnd)}\n\n` +
+              (/⚠️/.test(warnTxt) ? warnTxt.trim() + '\n\n' : '') +
+              'ระบบจะคิดยอดใหม่ตามช่วงนี้ แล้วอนุมัติเลย\nยืนยัน?';
+      } else msg = 'อนุมัติ Export นี้?';
       if (!confirm(msg)) return;
 
       showLoading(moved ? 'กำลังคิดยอดใหม่...' : 'กำลังบันทึก...');
       try {
-        const r = await apiPost('approveExportRequest', { id: exportId, decision, approverEmail: session.Email, remark, periodEnd });
+        const r = await apiPost('approveExportRequest', {
+          id: exportId, decision, approverEmail: session.Email, remark, periodStart, periodEnd });
         hideLoading();
         if (r.error) throw new Error(r.error);
         showToast(decision === 'Approved' ? 'อนุมัติเรียบร้อย ✅' : 'บันทึกแล้ว', 'success');
