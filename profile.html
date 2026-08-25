@@ -34,11 +34,12 @@
         <div class="field" style="margin:0;"><label>ปี</label><select id="exportYear"></select></div>
       </div>
       <div id="cutoffWrap" style="margin-top:12px;display:none;">
-        <div class="field" style="margin:0;">
-          <label>ตัดยอดถึงวันที่ <span class="optional-tag">ปรับได้</span></label>
-          <input type="date" id="cutoffEnd">
-          <div class="hint" id="cutoffHint">—</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="margin:0;"><label>ตั้งแต่วันที่</label><input type="date" id="cutoffStart"></div>
+          <div class="field" style="margin:0;"><label>ถึงวันที่</label><input type="date" id="cutoffEnd"></div>
         </div>
+        <div class="hint" id="cutoffHint" style="margin-top:6px;">—</div>
+        <div id="cutoffWarn" style="margin-top:8px;"></div>
       </div>
       <div id="exportStatusBox" style="margin-top:14px;"><div class="loading" style="padding:20px;"><div class="spinner"></div></div></div>
       <div id="exportActions" style="display:grid;gap:9px;margin-top:12px;"></div>
@@ -121,27 +122,62 @@
       refreshExportStatus();
     }
 
-    // 📅 v6.3 วันตัดรอบปรับได้ — บางเดือนตัด 25 บางเดือนตัด 28
+    // 📅 v6.3 เลือกช่วงรอบเองได้ทั้งวันเริ่มและวันจบ — ทับหรือเว้นแค่เตือน ไม่บล็อก
     let periodInfo = null;
     async function loadPeriodInfo() {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
       const wrap = document.getElementById('cutoffWrap');
-      const inp = document.getElementById('cutoffEnd');
+      const sIn = document.getElementById('cutoffStart');
+      const eIn = document.getElementById('cutoffEnd');
       const hint = document.getElementById('cutoffHint');
       try {
         periodInfo = await apiGet('getPeriodInfo', { email: session.Email, year, month });
         if (!periodInfo || periodInfo.error) throw new Error('n/a');
-        inp.min = periodInfo.periodStart;
-        inp.max = periodInfo.maxEnd;
-        inp.value = periodInfo.suggestedEnd;
-        hint.innerHTML = `รอบนี้เริ่ม <b>${periodInfo.periodStartTH}</b> — ` +
-          (periodInfo.lastSettledTH
-            ? `ต่อจากรอบก่อนที่ปิดถึง ${periodInfo.lastSettledTH}`
-            : `ยังไม่เคยปิดรอบ`) +
-          `<br>ค่าเริ่มต้นคือวันที่ ${periodInfo.cutoffDay} ของเดือน · เปลี่ยนได้ตามที่ตกลงกับหัวหน้า`;
+        sIn.value = periodInfo.expectedStart;
+        sIn.max = periodInfo.maxEnd;
+        eIn.max = periodInfo.maxEnd;
+        eIn.value = periodInfo.suggestedEnd;
+        hint.innerHTML = (periodInfo.hasSettled
+            ? `รอบก่อนปิดถึง <b>${periodInfo.lastSettledTH}</b> — ระบบแนะนำให้เริ่ม ${periodInfo.expectedStartTH}`
+            : `ยังไม่เคยปิดรอบ — เริ่มจากบิลเก่าสุดที่มี (${periodInfo.expectedStartTH})`) +
+          `<br>วันตัดยอดตามค่ากลางคือ${periodInfo.cutoffLabel} · เลือกเองได้ทั้งสองช่อง`;
+        sIn.oninput = checkPeriodRange;
+        eIn.oninput = checkPeriodRange;
+        checkPeriodRange();
         wrap.style.display = 'block';
       } catch { wrap.style.display = 'none'; periodInfo = null; }
+    }
+
+    // เตือนแบบสดๆ ถ้าทับรอบก่อนหรือมีวันหาย — คำนวณฝั่งหน้าเว็บ ไม่ต้องยิง server
+    function periodWarnings(startStr, endStr) {
+      const w = [];
+      if (!periodInfo || !startStr || !endStr) return w;
+      const day = 86400000;
+      const s = new Date(startStr), e = new Date(endStr);
+      const exp = new Date(periodInfo.expectedStart);
+      if (e < s) { w.push('❌ วันจบอยู่ก่อนวันเริ่ม'); return w; }
+      if (periodInfo.hasSettled && s < exp) {
+        w.push(`⚠️ ทับกับรอบก่อน ${Math.round((exp - s)/day)} วัน — ช่วงนั้นเบิกไปแล้ว อาจได้เงินซ้ำ`);
+      } else if (s > exp) {
+        w.push(`⚠️ มีวันหาย ${Math.round((s - exp)/day)} วัน — บิลช่วง ${fmtTH(periodInfo.expectedStart)} ถึง ${fmtTH(new Date(s - day))} จะไม่อยู่ในรอบไหนเลย`);
+      }
+      return w;
+    }
+
+    function fmtTH(v) {
+      const d = new Date(v);
+      return isNaN(d) ? '-' : d.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'numeric' });
+    }
+
+    function checkPeriodRange() {
+      const box = document.getElementById('cutoffWarn');
+      if (!box) return;
+      const w = periodWarnings(document.getElementById('cutoffStart').value,
+                               document.getElementById('cutoffEnd').value);
+      box.innerHTML = w.length
+        ? w.map(x => `<div class="warn-box" style="margin:0 0 6px;font-size:12.5px;">${x}</div>`).join('')
+        : '';
     }
 
     function refreshExportStatus() {
@@ -200,15 +236,22 @@
     window.requestApproval = async () => {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
-      const periodEnd = (document.getElementById('cutoffEnd') || {}).value || '';
-      if (periodEnd && periodInfo) {
-        const label = new Date(periodEnd).toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
-        if (!confirm(`ตัดยอดถึงวันที่ ${label}\n\nรายการหลังจากวันนี้จะไปอยู่รอบถัดไป\nยืนยันส่งขออนุมัติ?`)) return;
+      const periodStart = (document.getElementById('cutoffStart') || {}).value || '';
+      const periodEnd   = (document.getElementById('cutoffEnd') || {}).value || '';
+
+      if (periodStart && periodEnd) {
+        if (new Date(periodEnd) < new Date(periodStart)) return showToast('วันจบอยู่ก่อนวันเริ่ม', 'error');
+        const w = periodWarnings(periodStart, periodEnd);
+        let msg = `ส่งรอบ ${fmtTH(periodStart)} – ${fmtTH(periodEnd)}\n\n`;
+        if (w.length) msg += w.join('\n') + '\n\nยืนยันส่งทั้งที่มีคำเตือน?';
+        else msg += 'รายการหลังจากวันนี้จะไปอยู่รอบถัดไป\nยืนยันส่งขออนุมัติ?';
+        if (!confirm(msg)) return;
       }
+
       showLoading('กำลังส่งคำขอ...');
       try {
         const r = await apiPost('requestExportApproval', {
-          staffEmail: session.Email, year, month, periodEnd, requesterEmail: session.Email
+          staffEmail: session.Email, year, month, periodStart, periodEnd, requesterEmail: session.Email
         });
         hideLoading();
         if (r.error) throw new Error(r.error);
