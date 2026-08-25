@@ -418,6 +418,8 @@
               <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="event.stopPropagation();viewSummary('${em}')">👁 ดูรายการ</button>
               <button class="btn btn-primary btn-sm" style="flex:1;" onclick="event.stopPropagation();exportRep('${mem.Email}','${safeName}')">📊 โหลด Excel</button>
             </div>
+            ${session.isViewer ? '' : `<button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#0F766E;border-color:#5EEAD4;"
+              onclick="event.stopPropagation();closePeriod('${mem.Email}','${safeName}')">📅 ปิดรอบ / ตัดยอด</button>`}
             ${session.isViewer ? '' : `<button class="btn btn-secondary btn-sm" style="margin-top:7px;color:#B45309;border-color:#FCD34D;"
               onclick="event.stopPropagation();resetPwd('${mem.Email}','${safeName}')">🔑 ล้างรหัสผ่านให้</button>`}
           </div>
@@ -441,6 +443,39 @@
     }
 
     window.viewSummary = () => { location.href = 'summary.html'; };
+
+    // 📅 v6.3 หัวหน้าปิดรอบ/ตัดยอดให้ลูกน้องได้ เลือกวันตัดเองได้ทุกเดือน
+    window.closePeriod = async (email, name) => {
+      const year = parseInt(ySel.value);
+      showLoading('ดูข้อมูลรอบของ ' + name + '...');
+      let info;
+      try {
+        info = await apiGet('getPeriodInfo', { email, year, month: selMonth });
+        hideLoading();
+        if (!info || info.error) throw new Error((info && info.error) || 'ดูข้อมูลรอบไม่ได้');
+      } catch (err) { hideLoading(); return showToast(err.message, 'error'); }
+
+      const ans = prompt(
+        `ปิดรอบให้ ${name}\n\n` +
+        `รอบนี้เริ่ม ${info.periodStartTH}\n` +
+        (info.lastSettledTH ? `รอบก่อนปิดถึง ${info.lastSettledTH}\n` : 'ยังไม่เคยปิดรอบ\n') +
+        `\nตัดยอดถึงวันที่ไหน? (YYYY-MM-DD)\n` +
+        `ค่าเริ่มต้น = วันที่ ${info.cutoffDay} ของเดือน`,
+        info.suggestedEnd
+      );
+      if (!ans) return;
+
+      showLoading('กำลังปิดรอบ...');
+      try {
+        const r = await apiPost('requestExportApproval', {
+          staffEmail: email, year, month: selMonth,
+          periodEnd: ans.trim(), requesterEmail: session.Email
+        });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast(r.auto ? `ปิดรอบ ${name} แล้ว ✅` : `ส่งขออนุมัติรอบของ ${name} แล้ว ✅`, 'success');
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
 
     window.exportRep = async (email, name) => {
       const year = parseInt(ySel.value);
