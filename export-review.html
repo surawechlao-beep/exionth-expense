@@ -192,7 +192,7 @@
           }
           try {
             const p = await apiGet('previewPeriod', {
-              email: detail.request.StaffEmail, start: s.value, end: e.value });
+              email: detail.request.StaffEmail, start: s.value, end: e.value, exportId: exportId });
             if (!p || p.error) return;
             box.innerHTML =
               (p.warnings || []).map(x => `<div class="warn-box" style="margin:0 0 6px;font-size:12.5px;">${x}</div>`).join('') +
@@ -247,7 +247,14 @@
       const req = detail.request;
       showLoading('กำลังสร้างตัวอย่าง...');
       try {
-        const r = await apiPost('downloadDraftExport', { staffEmail: req.StaffEmail, year: req.Year, month: req.Month, requesterEmail: session.Email });
+        // ส่งช่วงวันที่กำลังปรับอยู่บนหน้าจอไปด้วย ไม่งั้นตัวอย่างไม่ตรงกับที่จะอนุมัติ
+        const ps = document.getElementById('periodStartInput');
+        const pe = document.getElementById('periodEndInput');
+        const r = await apiPost('downloadDraftExport', {
+          staffEmail: req.StaffEmail, year: req.Year, month: req.Month,
+          periodStart: ps ? ps.value : toYMD(req.PeriodStart),
+          periodEnd:   pe ? pe.value : toYMD(req.PeriodEnd),
+          requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
         const bytes = atob(r.base64);
