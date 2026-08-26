@@ -556,6 +556,17 @@
             <button onclick="openFs()">⛶ ดูเต็มจอ</button>
           </div>
           ${renderTable(items, isAll)}
+          ${onePerson ? `
+          <button type="button" class="btn btn-primary" id="xlsBtn"
+                  onclick="exportExcel()" style="margin-top:14px;">📥 ดาวน์โหลด Excel</button>
+          <div class="hint" style="margin-top:7px;text-align:center;">
+            ไฟล์ตัวจริงตามฟอร์มบริษัท · ${periodMode && periodRange
+              ? 'รอบ ' + periodRange.rangeLabel
+              : MONTHS_FULL[selMonth-1] + ' ' + y}
+          </div>` : `
+          <div class="hint" style="margin-top:12px;text-align:center;">
+            เลือกรายบุคคลด้านบน เพื่อดาวน์โหลด Excel
+          </div>`}
         </div>
       </div>`;
 
@@ -638,6 +649,36 @@
     }
     window.openFs = openFs; window.closeFs = closeFs;
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFs(); });
+
+    /* ═══ ดาวน์โหลด Excel ตัวจริงจากหน้านี้เลย ═══ */
+    window.exportExcel = async function () {
+      const em = currentStaffEmail();
+      if (!em) return showToast('เลือกรายบุคคลก่อน แล้วค่อยดาวน์โหลด', 'error');
+      const btn = document.getElementById('xlsBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...'; }
+      try {
+        const r = await apiPost('exportStaffReport', {
+          staffEmail: em, year: parseInt(ySel.value), month: selMonth, requesterEmail: session.Email
+        });
+        if (r.error) throw new Error(r.error);
+        if (!r.base64) throw new Error('ไม่มีข้อมูลไฟล์');
+        const bytes = atob(r.base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: r.mimeType ||
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = r.filename || 'export.xlsx';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast('ดาวน์โหลดแล้ว · ' + (r.periodLabel || ''), 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '📥 ดาวน์โหลด Excel'; }
+      }
+    };
 
     function renderTable(items, groupByPerson) {
       const cell = v => v ? Math.round(v).toLocaleString() : '';
