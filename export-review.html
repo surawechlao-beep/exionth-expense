@@ -141,11 +141,11 @@
             <label>ช่วงรอบ <span class="optional-tag">ปรับได้</span></label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <input type="date" id="periodStartInput"
-                value="${req.PeriodStart ? String(req.PeriodStart).substr(0,10) : ''}"
-                max="${new Date().toISOString().substr(0,10)}">
+                value="${toYMD(req.PeriodStart)}"
+                max="${todayYMD()}">
               <input type="date" id="periodEndInput"
-                value="${req.PeriodEnd ? String(req.PeriodEnd).substr(0,10) : ''}"
-                max="${new Date().toISOString().substr(0,10)}">
+                value="${toYMD(req.PeriodEnd)}"
+                max="${todayYMD()}">
             </div>
             <div class="hint">
               ${req.PeriodStart
@@ -218,8 +218,8 @@
         return showToast('วันจบอยู่ก่อนวันเริ่ม', 'error');
       }
 
-      const origS = detail.request.PeriodStart ? String(detail.request.PeriodStart).substr(0,10) : '';
-      const origE = detail.request.PeriodEnd ? String(detail.request.PeriodEnd).substr(0,10) : '';
+      const origS = toYMD(detail.request.PeriodStart);
+      const origE = toYMD(detail.request.PeriodEnd);
       const moved = decision === 'Approved' && ((periodStart && periodStart !== origS) || (periodEnd && periodEnd !== origE));
 
       let msg;
