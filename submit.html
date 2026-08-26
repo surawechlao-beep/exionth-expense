@@ -50,6 +50,7 @@
 
     // ─── กันข้อมูลหาย: เซฟร่างลงเครื่องทุกครั้งที่แก้ ───
     // ไม่เซฟไฟล์แนบ (base64 ใหญ่เกิน localStorage) — เก็บแค่ชื่อไว้เตือน
+    let currentBatchId = null;   // รหัสชุดของการกดส่งครั้งนี้ — ใช้ซ้ำถ้าต้องยิงใหม่
     const DRAFT_KEY = 'exion_draft_' + String(session.Email || '').toLowerCase();
 
     function saveDraft() {
@@ -403,9 +404,28 @@
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
       showLoading('กำลังส่ง ' + items.length + ' รายการ...');
+
+      /*
+       * 🔑 รหัสชุด — สร้างครั้งเดียวต่อการกดส่ง 1 ครั้ง
+       *
+       * เดิม server เดาว่ารายการไหนซ้ำจากเนื้อหา (ประเภท+วันที่+ยอด)
+       * ค่าทางด่วนไป-กลับวันเดียวกันยอดเท่ากันก็โดนมองว่าซ้ำแล้วหายไป
+       *
+       * ตอนนี้ยึดรหัสนี้แทน — เน็ตหลุดแล้วกดส่งซ้ำ จะใช้รหัสเดิม
+       * server เห็นว่าเขียนไปแล้วก็ไม่เขียนซ้ำ ส่วนการกดส่งชุดใหม่ได้รหัสใหม่เสมอ
+       * จึงเข้าครบทุกใบต่อให้ยอดเท่ากันเป๊ะ
+       *
+       * เก็บใน currentBatchId เพื่อให้การกดส่งซ้ำหลังยิงไม่สำเร็จใช้รหัสเดิม
+       */
+      if (!currentBatchId) {
+        currentBatchId = 'BATCH-' + Date.now().toString(36).toUpperCase() + '-' +
+          Math.random().toString(36).substr(2, 6).toUpperCase();
+      }
+
       try {
         const result = await submitBatch({
           staffEmail: session.Email,
+          batchId: currentBatchId,
           items: items.map(it => ({
             category: it.category, expenseDate: it.expenseDate, venue: it.venue,
             occasion: it.occasion, attendees: it.attendees, amount: it.amount,
@@ -416,10 +436,20 @@
         hideLoading();
         if (result.error) throw new Error(result.error);
         clearDraft();
-        showToast('✅ ส่งสำเร็จ ' + result.items.length + ' รายการ', 'success');
+        currentBatchId = null;                     // ส่งสำเร็จแล้ว รอบหน้าใช้รหัสใหม่
+
+        const saved = (result.items || []).length;
+        if (result.alreadySubmitted) {
+          // ยิงซ้ำจากเน็ตหลุด — ของเดิมเข้าไปแล้วครบ ไม่ได้หายไปไหน
+          showToast('ชุดนี้ส่งสำเร็จไปแล้ว ' + saved + ' รายการ', 'success');
+        } else {
+          showToast('✅ ส่งสำเร็จ ' + saved + ' รายการ', 'success');
+        }
         setTimeout(() => location.href = 'status.html', 1400);
       } catch (err) {
-        hideLoading(); showToast(err.message, 'error');
+        hideLoading();
+        // ❗ ไม่ล้าง currentBatchId — กดส่งใหม่จะใช้รหัสเดิม ไม่เกิดรายการซ้ำ
+        showToast(err.message + ' — กดส่งอีกครั้งได้เลย ไม่เกิดรายการซ้ำ', 'error');
         btn.disabled = false;
       }
     }
