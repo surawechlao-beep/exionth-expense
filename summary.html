@@ -303,11 +303,70 @@
         <button class="btn btn-primary btn-sm" style="margin-top:14px;max-width:180px;" onclick="location.reload()">🔄 ลองใหม่</button></div>`;
     }
 
+    /* ══════════════════════════════════════════════════════════
+     *  โหมด "รอบเบิก" — ให้ตัวเลขบนหน้าจอตรงกับไฟล์ Excel เป๊ะ
+     * ──────────────────────────────────────────────────────────
+     *  เดิมหน้านี้แสดง "เดือนปฏิทิน" แต่ Excel ใช้ "รอบตัดยอด"
+     *  เช่นรอบ 24 ก.ค. – 25 ส.ค. ตัวเลขสองที่จึงไม่ตรงกัน
+     *  คนอ่านนึกว่าข้อมูลหาย ทั้งที่แค่คนละช่วงวัน
+     * ══════════════════════════════════════════════════════════ */
+    const ALLOWANCE_CATS = ['CAR', 'MOBILE', 'OVERSEAS', 'APT'];
+    let periodMode = true, periodRange = null, extraItems = [];
+
+    /** ดูอยู่คนเดียวหรือเปล่า — โหมดรอบใช้ได้เฉพาะรายคน เพราะแต่ละคนรอบไม่เหมือนกัน */
+    function currentStaffEmail() {
+      if (scope === '__all__') return '';
+      if (scope === '__self__') return session.Email;
+      const hit = (raw.items || []).find(r => r.StaffName === scope);
+      return hit ? String(hit.StaffEmail || '') : '';
+    }
+
+    async function refreshPeriod() {
+      periodRange = null; extraItems = [];
+      const em = currentStaffEmail();
+      if (!em || !periodMode) return;
+      try {
+        const p = await apiGet('getPeriodInfo', { email: em, year: ySel.value, month: selMonth });
+        if (!p || !p.rangeStart || !p.rangeEnd) return;
+        periodRange = p;
+        // รอบคาบเกี่ยวเดือนก่อน → ต้องดึงเดือนก่อนมาด้วย ไม่งั้นบิลต้นรอบหายไปเฉยๆ
+        const st = new Date(p.rangeStart + 'T00:00:00');
+        if (st.getFullYear() !== parseInt(ySel.value) || (st.getMonth() + 1) !== selMonth) {
+          const prev = await apiGet('getVisibleRequests',
+            { email: session.Email, year: st.getFullYear(), month: st.getMonth() + 1 });
+          if (prev && Array.isArray(prev.items)) extraItems = prev.items;
+        }
+      } catch (e) { periodRange = null; extraItems = []; }
+    }
+
+    async function render() { await refreshPeriod(); renderNow(); }
+
+    window.setPeriodMode = function (on) { periodMode = !!on; render(); };
+
     function getFiltered() {
       const y = parseInt(ySel.value);
-      return raw.items.filter(r => {
+      const usePeriod = !!(periodMode && periodRange);
+      const ps = usePeriod ? new Date(periodRange.rangeStart + 'T00:00:00') : null;
+      const pe = usePeriod ? new Date(periodRange.rangeEnd + 'T23:59:59') : null;
+
+      // รวมข้อมูลเดือนก่อนเข้ามาด้วยเมื่ออยู่โหมดรอบ · ตัด ID ซ้ำออก
+      let pool = raw.items;
+      if (usePeriod && extraItems.length) {
+        const seen = {};
+        pool = raw.items.concat(extraItems).filter(r => {
+          const k = r.ID; if (!k || seen[k]) return false; seen[k] = 1; return true;
+        });
+      }
+
+      return pool.filter(r => {
         const d = new Date(r.ExpenseDate || r.Timestamp);
-        if (isNaN(d) || d.getFullYear() !== y || d.getMonth()+1 !== selMonth) return false;
+        if (isNaN(d)) return false;
+        if (usePeriod) {
+          if (ALLOWANCE_CATS.indexOf(String(r.Category || '').toUpperCase()) >= 0) {
+            // ค่าเหมารายเดือน ยึดเดือนของวันตัดรอบ เหมือนที่ server ทำ
+            if (d.getFullYear() !== pe.getFullYear() || d.getMonth() !== pe.getMonth()) return false;
+          } else if (d < ps || d > pe) return false;
+        } else if (d.getFullYear() !== y || d.getMonth() + 1 !== selMonth) return false;
         if (fStatus && r.Status !== fStatus) return false;
         if (scope === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
         if (scope === '__all__') return true;
@@ -315,7 +374,7 @@
       }).sort((a,b) => new Date(a.ExpenseDate||a.Timestamp) - new Date(b.ExpenseDate||b.Timestamp));
     }
 
-    function render() {
+    function renderNow() {
       const ld = document.getElementById('loading');
       ld.classList.remove('loading'); ld.style.display = 'none';
       const c = document.getElementById('content');
@@ -329,9 +388,27 @@
       const isAll = scope === '__all__';
       const scopeLbl = isAll ? 'ทุกคนที่ดูแล' : (scope === '__self__' ? (raw.myName || 'ตัวเอง') : scope);
 
-      let html = `
+      const onePerson = currentStaffEmail();
+      const periodBar = onePerson ? `
+        <div class="card" style="padding:12px 14px;">
+          <div class="segs">
+            <button type="button" class="${periodMode ? 'on' : ''}" onclick="setPeriodMode(true)">📅 รอบเบิก</button>
+            <button type="button" class="${!periodMode ? 'on' : ''}" onclick="setPeriodMode(false)">🗓 เดือนปฏิทิน</button>
+          </div>
+          <div class="hint" style="margin-top:8px;">${periodMode
+            ? (periodRange
+                ? 'ตรงกับไฟล์ Excel · <b>' + periodRange.rangeLabel + '</b>'
+                : 'ยังไม่เคยปิดรอบ — แสดงทั้งเดือนไปก่อน')
+            : '<b>⚠️ ทั้งเดือนปฏิทิน — ตัวเลขอาจไม่ตรงกับไฟล์ Excel</b>'}</div>
+        </div>` : '';
+
+      const heroLbl = (periodMode && periodRange && onePerson)
+        ? (scopeLbl + ' · ' + periodRange.rangeLabel)
+        : (scopeLbl + ' · ' + MONTHS_FULL[selMonth-1] + ' ' + y);
+
+      let html = periodBar + `
         <div class="count-hero">
-          <div class="lbl">${scopeLbl} · ${MONTHS_FULL[selMonth-1]} ${y}</div>
+          <div class="lbl">${heroLbl}</div>
           <div class="num">${Math.round(total).toLocaleString()}</div>
           <div class="sub">บาท · ${items.length} รายการ</div>
         </div>
