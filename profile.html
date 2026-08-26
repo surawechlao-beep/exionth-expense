@@ -267,10 +267,15 @@
       const month = parseInt(document.getElementById('exportMonth').value);
       showLoading('กำลังสร้างตัวอย่าง...');
       try {
-        const r = await apiPost('downloadDraftExport', { staffEmail: session.Email, year, month, requesterEmail: session.Email });
+        // ส่งช่วงวันที่เพิ่งเลือกไปด้วย ไม่งั้นตัวอย่างจะใช้เดือนปฏิทินแทน
+        const periodStart = (document.getElementById('cutoffStart') || {}).value || '';
+        const periodEnd   = (document.getElementById('cutoffEnd') || {}).value || '';
+        const r = await apiPost('downloadDraftExport', {
+          staffEmail: session.Email, year, month, periodStart, periodEnd, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        dl(r); showToast('โหลดตัวอย่างแล้ว — มีลายน้ำ ใช้เบิกจริงไม่ได้ ✅', 'success');
+        dl(r);
+        showToast(`ตัวอย่าง ${r.periodLabel || ''} · ${r.itemCount} รายการ · ${Number(r.totalAmount||0).toLocaleString()} บาท`, 'success');
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
