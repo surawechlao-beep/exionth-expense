@@ -47,6 +47,7 @@
 
     const preId = new URLSearchParams(location.search).get('id');
     let preApprove = null, items = [], itemSeq = 0;
+    let periodEnd = '';   // วันตัดรอบปัจจุบัน ใช้เตือนตอนลงวันที่เลยรอบ
     const CAT_TH = { ENT:'🍽 ค่ารับรอง', GOLF:'⛳ กอล์ฟ' };
 
     async function load() {
@@ -60,6 +61,12 @@
         document.getElementById('loading').style.display = 'none';
         document.getElementById('main').style.display = 'block';
         renderInfo();
+        try {
+          const now = new Date();
+          const pi = await apiGet('getPeriodInfo',
+            { email: session.Email, year: now.getFullYear(), month: now.getMonth() + 1 });
+          if (pi && pi.rangeEnd) periodEnd = pi.rangeEnd;
+        } catch (e) { periodEnd = ''; }
         addItem();
         document.getElementById('addBtn').addEventListener('click', addItem);
         document.getElementById('submitBtn').addEventListener('click', onSubmit);
@@ -111,7 +118,13 @@
       const prev = items.length ? items[items.length-1] : null;
       const it = {
         id: 'item_' + itemSeq,
-        date: prev ? prev.date : todayYMD(),   // เวลาไทย
+        /*
+         * 🔴 วันที่ตั้งต้นต้องเป็น "วันที่เกิดค่าใช้จ่ายจริง" จากใบ Pre-Approve
+         *    เดิมตั้งเป็นวันนี้ — เลี้ยงลูกค้าวันที่ 19 แต่มาส่งบิลวันที่ 26
+         *    บิลเลยลงวันที่ 26 ซึ่งเลยวันตัดรอบ (25) ไปแล้ว
+         *    ผลคือค่ารับรองไม่โผล่ใน Excel ทั้งที่อนุมัติครบทุกขั้น
+         */
+        date: prev ? prev.date : (toYMD(preApprove && preApprove.ExpenseDate) || todayYMD()),
         description: '', amount: 0, receipts: [], _dup: !!prev
       };
       items.push(it);
@@ -236,6 +249,11 @@
       syncDom();
       for (const it of items) {
         if (!it.date) return showToast('ใส่วันที่ให้ครบ', 'error');
+        // ⚠️ ลงวันที่เลยวันตัดรอบ = บิลจะไปโผล่รอบหน้า ไม่ใช่รอบนี้ ต้องบอกก่อนกดส่ง
+        if (periodEnd && it.date > periodEnd) {
+          if (!confirm('บิลลงวันที่ ' + it.date + ' ซึ่งเลยวันตัดรอบ (' + periodEnd + ') ไปแล้ว\n\n' +
+                       'บิลนี้จะไปอยู่ในรอบถัดไป ไม่ใช่รอบปัจจุบัน\n\nยืนยันส่งแบบนี้?')) return;
+        }
         if (!it.description || !it.description.trim()) return showToast('ใส่รายละเอียดให้ครบ', 'error');
         if (!it.amount || it.amount <= 0) return showToast('ใส่จำนวนเงินให้ครบ', 'error');
         if (!it.receipts.length) return showToast('แนบใบเสร็จทุกบิล', 'error');
