@@ -120,7 +120,9 @@
       }
 
       const shown = getVisible();
-      if (shown.length === 0) {
+      // ⚠️ ถ้าไม่มีคำขอรายรายการ แต่ยังมี Export ค้าง ต้องไม่ return ทิ้ง
+      //    ไม่งั้นผู้อนุมัติจะมองไม่เห็นคำขอ Export เลย → พนักงานไม่ได้เงิน
+      if (shown.length === 0 && !exportPending.length) {
         list.innerHTML = `<div class="empty"><div class="icon-wrap">🔍</div>
           <div class="title">ไม่พบรายการที่ตรงกับตัวกรอง</div>
           <button class="btn btn-secondary btn-sm" style="margin-top:14px;max-width:200px;" onclick="clearInboxFilters()">🗑 ล้างตัวกรอง</button></div>`;
