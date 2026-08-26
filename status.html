@@ -228,7 +228,7 @@
       if (!r) return;
       document.getElementById('detailTitle').textContent = catLabel(r.Category) + ' — ' + Number(r.Amount||0).toLocaleString() + ' ฿';
       const rows = [
-        ['รหัส', r.ID], ['วันที่', r.ExpenseDate ? String(r.ExpenseDate).substr(0,10) : '-'],
+        ['รหัส', r.ID], ['วันที่', toYMD(r.ExpenseDate) || '-'],
         ['สถานะ', statusTH(r.Status)], ['สถานที่ / รายละเอียด', r.Venue || '-'],
         ['ลูกค้า', r.Customer || '-'], ['ผู้ติดต่อ', r.CustomerContact || '-'],
         ['ต้นทาง', r.Origin || '-'], ['ปลายทาง', r.Destination || '-'],
@@ -270,7 +270,7 @@
         <div class="warn-box">⚠️ ถ้าประเภทนี้ต้องอนุมัติ — หลังแก้ไขจะกลับเป็น <b>รออนุมัติ</b> ให้หัวหน้าอนุมัติใหม่<br>
           <span style="font-weight:400;font-size:12px;">เดือนที่ส่งบัญชีไปแล้ว (Export อนุมัติ) จะแก้ไม่ได้ ระบบจะแจ้งเตือน</span></div>
         <div class="field"><label>ประเภท</label><select id="e_cat">${opts}</select></div>
-        <div class="field"><label>วันที่</label><input type="date" id="e_date" value="${r.ExpenseDate ? String(r.ExpenseDate).substr(0,10) : ''}"></div>
+        <div class="field"><label>วันที่</label><input type="date" id="e_date" value="${toYMD(r.ExpenseDate)}"></div>
         <div class="field"><label>จำนวนเงิน (THB)</label><input type="number" id="e_amount" step="0.01" inputmode="decimal" value="${r.Amount || ''}"></div>
         <div class="field"><label>สถานที่ / รายละเอียด</label><input type="text" id="e_venue" value="${r.Venue || ''}"></div>
         <div class="field"><label>ลูกค้า</label><input type="text" id="e_customer" value="${r.Customer || ''}"></div>
