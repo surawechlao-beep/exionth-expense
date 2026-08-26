@@ -414,7 +414,7 @@
           ${isSenior || isGM ? `
           <a href="senior-inbox.html" class="tile">
             <div class="ib ib-orange">${icon('bell')}</div>
-            <div><div class="lb">รออนุมัติ (Senior)</div><div class="sb" id="snrCount">กำลังโหลด...</div></div>
+            <div><div class="lb">รออนุมัติ</div><div class="sb" id="snrCount">กำลังโหลด...</div></div>
             <span class="cnt-badge" id="snrBadge" style="display:none;">0</span>
           </a>
           <a href="all-requests.html" class="tile">
@@ -469,7 +469,8 @@
         const [myReqs, mgrInbox, snrInbox] = await Promise.all([
           fetchMyRequests(session.Email).catch(() => []),
           (session.isManager && !session.isGM && !session.isSenior) ? fetchManagerInbox(session.Email).catch(() => []) : Promise.resolve([]),
-          (session.isSenior || session.isGM) ? fetchSeniorInbox(session.Email).catch(() => []) : Promise.resolve([])
+          // 🔴 เดิมใช้ fetchSeniorInbox ซึ่งว่างเสมอ → หัวหน้าที่เป็น Senior ด้วยเห็นเลข 0 ตลอด
+          (session.isSenior || session.isGM) ? fetchPendingApprovals(session.Email).catch(() => []) : Promise.resolve([])
         ]);
 
         const mgrN = Array.isArray(mgrInbox) ? mgrInbox.length : 0;
