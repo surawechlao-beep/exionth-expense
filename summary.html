@@ -304,16 +304,25 @@
     }
 
     /* ══════════════════════════════════════════════════════════
-     *  โหมด "รอบเบิก" — ให้ตัวเลขบนหน้าจอตรงกับไฟล์ Excel เป๊ะ
+     *  ช่วงวันที่จะเบิก — เลือกเองทั้งวันเริ่มและวันจบ
      * ──────────────────────────────────────────────────────────
-     *  เดิมหน้านี้แสดง "เดือนปฏิทิน" แต่ Excel ใช้ "รอบตัดยอด"
-     *  เช่นรอบ 24 ก.ค. – 25 ส.ค. ตัวเลขสองที่จึงไม่ตรงกัน
-     *  คนอ่านนึกว่าข้อมูลหาย ทั้งที่แค่คนละช่วงวัน
+     *  กฎเดียว ไม่มีข้อยกเว้น:
+     *      เลือกตั้งแต่วันไหน ถึงวันไหน → เอาทุกรายการในช่วงนั้น
+     *  เลือกถึงวันที่ 26 ก็ได้ของวันที่ 26 ด้วย ทุกประเภทเหมือนกันหมด
+     *
+     *  ตัวเลขบนหน้านี้ = ตัวเลขในไฟล์ Excel เสมอ เพราะใช้ช่วงวันเดียวกัน
      * ══════════════════════════════════════════════════════════ */
-    const ALLOWANCE_CATS = ['CAR', 'MOBILE', 'OVERSEAS', 'APT'];
-    let periodMode = true, periodRange = null, extraItems = [];
+    let dFrom = '', dTo = '', extraItems = [], rangeReady = false;
 
-    /** ดูอยู่คนเดียวหรือเปล่า — โหมดรอบใช้ได้เฉพาะรายคน เพราะแต่ละคนรอบไม่เหมือนกัน */
+    /** 2026-08-26 → 26 ส.ค. 2569 */
+    function fmtTH(v) {
+      if (!v) return '-';
+      const d = new Date(String(v).length === 10 ? v + 'T00:00:00' : v);
+      if (isNaN(d)) return '-';
+      return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    }
+
+    /** ดูอยู่คนเดียวหรือเปล่า — เลือกช่วงวันได้เฉพาะรายคน เพราะแต่ละคนรอบไม่เหมือนกัน */
     function currentStaffEmail() {
       if (scope === '__all__') return '';
       if (scope === '__self__') return session.Email;
@@ -321,37 +330,72 @@
       return hit ? String(hit.StaffEmail || '') : '';
     }
 
-    async function refreshPeriod() {
-      periodRange = null; extraItems = [];
+    /** ตั้งค่าเริ่มต้นของช่วงวันจากรอบที่ระบบแนะนำ (ผู้ใช้แก้ทับได้) */
+    async function ensureRange(force) {
       const em = currentStaffEmail();
-      if (!em || !periodMode) return;
+      if (!em) { dFrom = dTo = ''; extraItems = []; rangeReady = false; return; }
+      if (!force && rangeReady && dFrom && dTo) return loadMonthsForRange();
       try {
         const p = await apiGet('getPeriodInfo', { email: em, year: ySel.value, month: selMonth });
-        if (!p || !p.rangeStart || !p.rangeEnd) return;
-        periodRange = p;
-        // รอบคาบเกี่ยวเดือนก่อน → ต้องดึงเดือนก่อนมาด้วย ไม่งั้นบิลต้นรอบหายไปเฉยๆ
-        const st = new Date(p.rangeStart + 'T00:00:00');
-        if (st.getFullYear() !== parseInt(ySel.value) || (st.getMonth() + 1) !== selMonth) {
-          const prev = await apiGet('getVisibleRequests',
-            { email: session.Email, year: st.getFullYear(), month: st.getMonth() + 1 });
-          if (prev && Array.isArray(prev.items)) extraItems = prev.items;
-        }
-      } catch (e) { periodRange = null; extraItems = []; }
+        dFrom = (p && p.rangeStart) || '';
+        dTo   = (p && p.rangeEnd)   || '';
+      } catch (e) { dFrom = dTo = ''; }
+      if (!dFrom || !dTo) {
+        const y = parseInt(ySel.value);
+        dFrom = y + '-' + String(selMonth).padStart(2,'0') + '-01';
+        dTo   = toYMD(new Date(y, selMonth, 0));
+      }
+      rangeReady = true;
+      await loadMonthsForRange();
     }
 
-    async function render() { await refreshPeriod(); renderNow(); }
+    /** ดึงข้อมูลทุกเดือนที่ช่วงวันคาบเกี่ยว ไม่งั้นรายการต้นช่วง/ท้ายช่วงหายไปเฉยๆ */
+    async function loadMonthsForRange() {
+      extraItems = [];
+      if (!dFrom || !dTo) return;
+      const s = new Date(dFrom + 'T00:00:00'), e = new Date(dTo + 'T00:00:00');
+      if (isNaN(s) || isNaN(e)) return;
+      const want = [];
+      const cur = new Date(s.getFullYear(), s.getMonth(), 1);
+      while (cur <= e && want.length < 14) {
+        const y = cur.getFullYear(), m = cur.getMonth() + 1;
+        if (!(y === parseInt(ySel.value) && m === selMonth)) want.push({ y: y, m: m });
+        cur.setMonth(cur.getMonth() + 1);
+      }
+      for (const w of want) {
+        try {
+          const r = await apiGet('getVisibleRequests', { email: session.Email, year: w.y, month: w.m });
+          if (r && Array.isArray(r.items)) extraItems = extraItems.concat(r.items);
+        } catch (e2) {}
+      }
+    }
 
-    window.setPeriodMode = function (on) { periodMode = !!on; render(); };
+    async function render() { await ensureRange(false); renderNow(); }
+
+    /** ผู้ใช้แก้ช่วงวันเอง → คำนวณใหม่ทันที */
+    window.applyRange = async function () {
+      const a = document.getElementById('dFrom'), b = document.getElementById('dTo');
+      if (!a || !b || !a.value || !b.value) return showToast('เลือกวันให้ครบทั้งสองช่อง', 'error');
+      if (b.value < a.value) return showToast('วันจบอยู่ก่อนวันเริ่ม', 'error');
+      dFrom = a.value; dTo = b.value; rangeReady = true;
+      const btn = document.getElementById('applyBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังคำนวณ...'; }
+      await loadMonthsForRange();
+      renderNow();
+    };
+
+    /** กลับไปใช้ช่วงที่ระบบแนะนำ */
+    window.resetRange = async function () { await ensureRange(true); renderNow(); };
 
     function getFiltered() {
+      const use = !!(dFrom && dTo && currentStaffEmail());
+      const ps = use ? new Date(dFrom + 'T00:00:00') : null;
+      const pe = use ? new Date(dTo + 'T23:59:59') : null;
       const y = parseInt(ySel.value);
-      const usePeriod = !!(periodMode && periodRange);
-      const ps = usePeriod ? new Date(periodRange.rangeStart + 'T00:00:00') : null;
-      const pe = usePeriod ? new Date(periodRange.rangeEnd + 'T23:59:59') : null;
 
-      // รวมข้อมูลเดือนก่อนเข้ามาด้วยเมื่ออยู่โหมดรอบ · ตัด ID ซ้ำออก
+      // รวมข้อมูลเดือนข้างเคียงที่ดึงมา · ตัด ID ซ้ำออก
       let pool = raw.items;
-      if (usePeriod && extraItems.length) {
+      if (use && extraItems.length) {
         const seen = {};
         pool = raw.items.concat(extraItems).filter(r => {
           const k = r.ID; if (!k || seen[k]) return false; seen[k] = 1; return true;
@@ -361,11 +405,8 @@
       return pool.filter(r => {
         const d = new Date(r.ExpenseDate || r.Timestamp);
         if (isNaN(d)) return false;
-        if (usePeriod) {
-          if (ALLOWANCE_CATS.indexOf(String(r.Category || '').toUpperCase()) >= 0) {
-            // ค่าเหมารายเดือน ยึดเดือนของวันตัดรอบ เหมือนที่ server ทำ
-            if (d.getFullYear() !== pe.getFullYear() || d.getMonth() !== pe.getMonth()) return false;
-          } else if (d < ps || d > pe) return false;
+        if (use) {
+          if (d < ps || d > pe) return false;              // กฎเดียว — อยู่ในช่วงที่เลือกเท่านั้น
         } else if (d.getFullYear() !== y || d.getMonth() + 1 !== selMonth) return false;
         if (fStatus && r.Status !== fStatus) return false;
         if (scope === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
@@ -390,20 +431,27 @@
 
       const onePerson = currentStaffEmail();
       const periodBar = onePerson ? `
-        <div class="card" style="padding:12px 14px;">
-          <div class="segs">
-            <button type="button" class="${periodMode ? 'on' : ''}" onclick="setPeriodMode(true)">📅 รอบเบิก</button>
-            <button type="button" class="${!periodMode ? 'on' : ''}" onclick="setPeriodMode(false)">🗓 เดือนปฏิทิน</button>
+        <div class="card" style="padding:13px 14px;">
+          <div class="sec-label" style="margin:0 0 9px;">📅 ช่วงวันที่จะเบิก</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="field" style="margin:0;"><label>ตั้งแต่วันที่</label>
+              <input type="date" id="dFrom" value="${dFrom}"></div>
+            <div class="field" style="margin:0;"><label>ถึงวันที่</label>
+              <input type="date" id="dTo" value="${dTo}"></div>
           </div>
-          <div class="hint" style="margin-top:8px;">${periodMode
-            ? (periodRange
-                ? 'ตรงกับไฟล์ Excel · <b>' + periodRange.rangeLabel + '</b>'
-                : 'ยังไม่เคยปิดรอบ — แสดงทั้งเดือนไปก่อน')
-            : '<b>⚠️ ทั้งเดือนปฏิทิน — ตัวเลขอาจไม่ตรงกับไฟล์ Excel</b>'}</div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button type="button" class="btn btn-secondary btn-sm" id="applyBtn"
+                    onclick="applyRange()" style="flex:1;">🔍 ดูตามช่วงนี้</button>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="resetRange()" style="flex:0 0 auto;">↺ ค่าแนะนำ</button>
+          </div>
+          <div class="hint" style="margin-top:8px;">
+            เอาทุกรายการที่อยู่ในช่วงนี้ · ตัวเลขตรงกับไฟล์ Excel เสมอ
+          </div>
         </div>` : '';
 
-      const heroLbl = (periodMode && periodRange && onePerson)
-        ? (scopeLbl + ' · ' + periodRange.rangeLabel)
+      const heroLbl = (onePerson && dFrom && dTo)
+        ? (scopeLbl + ' · ' + fmtTH(dFrom) + ' – ' + fmtTH(dTo))
         : (scopeLbl + ' · ' + MONTHS_FULL[selMonth-1] + ' ' + y);
 
       let html = periodBar + `
@@ -560,8 +608,8 @@
           <button type="button" class="btn btn-primary" id="xlsBtn"
                   onclick="exportExcel()" style="margin-top:14px;">📥 ดาวน์โหลด Excel</button>
           <div class="hint" style="margin-top:7px;text-align:center;">
-            ไฟล์ตัวจริงตามฟอร์มบริษัท · ${periodMode && periodRange
-              ? 'รอบ ' + periodRange.rangeLabel
+            ไฟล์ตัวจริงตามฟอร์มบริษัท · ${dFrom && dTo
+              ? fmtTH(dFrom) + ' – ' + fmtTH(dTo)
               : MONTHS_FULL[selMonth-1] + ' ' + y}
           </div>` : `
           <div class="hint" style="margin-top:12px;text-align:center;">
@@ -657,8 +705,10 @@
       const btn = document.getElementById('xlsBtn');
       if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...'; }
       try {
+        if (!dFrom || !dTo) return showToast('เลือกช่วงวันก่อน', 'error');
         const r = await apiPost('exportStaffReport', {
-          staffEmail: em, year: parseInt(ySel.value), month: selMonth, requesterEmail: session.Email
+          staffEmail: em, year: parseInt(ySel.value), month: selMonth, requesterEmail: session.Email,
+          periodStart: dFrom, periodEnd: dTo          // เลือกถึงวันไหน ไฟล์ก็ถึงวันนั้น
         });
         if (r.error) throw new Error(r.error);
         if (!r.base64) throw new Error('ไม่มีข้อมูลไฟล์');
