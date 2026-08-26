@@ -34,6 +34,32 @@ function formatCurrency(n) {
   });
 }
 
+/**
+ * แปลงค่าวันที่เป็น "YYYY-MM-DD" ตามเวลาไทยเสมอ — ใช้กับ <input type="date">
+ *
+ * ⚠️ ห้ามใช้ String(v).substr(0,10) กับค่าที่มาจาก server
+ *    Apps Script ส่ง Date กลับมาเป็น ISO แบบ UTC เช่น "2026-08-25T17:00:00.000Z"
+ *    ซึ่งจริงๆ คือ 26 ส.ค. 07:00 น. เวลาไทย → substr จะได้ 25 ส.ค. คือ "ถอยหลัง 1 วัน"
+ *    เคยทำให้วันตัดรอบเลื่อนเองและบิลวันสุดท้ายถูกนับซ้ำ
+ */
+function toYMD(v) {
+  if (!v) return '';
+  const s = String(v);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;          // เป็นรูปแบบที่ต้องการอยู่แล้ว
+  const d = new Date(s);
+  if (isNaN(d)) return '';
+  try {
+    // en-CA ให้รูปแบบ YYYY-MM-DD พอดี
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(d);
+  } catch (e) {
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+}
+function todayYMD() { return toYMD(new Date()); }
+
 function formatDate(d) {
   if (!d) return '-';
   const dt = new Date(d);
