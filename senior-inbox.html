@@ -47,7 +47,10 @@
       if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
       try {
         const [result, sig, exps] = await Promise.all([
-          fetchSeniorInbox(session.Email),
+          // 🔴 เดิมดึงแค่ getSeniorInbox ซึ่งตายไปแล้วตั้งแต่ v6.1 (กรอง ManagerStatus==='Approved')
+          //    หัวหน้าที่ถูกตั้งเป็น Senior ด้วย จึงมองไม่เห็นงานของทีมตัวเองเลยสักใบ
+          //    getPendingApprovals รวมทั้งกล่องหัวหน้าและของค้างเก่าให้ในตัวอยู่แล้ว
+          fetchPendingApprovals(session.Email),
           getMySignature(session.Email).catch(() => ({ hasSignature: false })),
           apiGet('getExportApprovalInbox', { email: session.Email }).catch(() => [])
         ]);
@@ -67,22 +70,22 @@
       list.classList.remove('loading');
 
       if (pending.length === 0 && exportPending.length === 0) {
-        list.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div><div class="title">เคลียร์หมดแล้ว!</div><div class="sub">ไม่มีคำขอรอ อนุมัติขั้นสุดท้าย</div></div>`;
+        list.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div><div class="title">เคลียร์หมดแล้ว!</div><div class="sub">ไม่มีคำขอรออนุมัติ</div></div>`;
         renderBottomNav('inbox');
         return;
       }
 
-      const total = pending.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const total = pending.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
       const batches = {};
       pending.forEach((r, idx) => {
         const bid = r.BatchID || r.ID;
         if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, mgrEmail: r.ManagerEmail, mgrStatus: r.ManagerStatus };
         batches[bid].items.push({ ...r, _idx: idx });
-        batches[bid].total += Number(r.Amount) || 0;
+        batches[bid].total += Number(r.Amount) || Number(r.PreApproveBudget) || 0;
       });
 
       let html = `<div class="count-hero">
-        <div class="lbl">รอ อนุมัติขั้นสุดท้าย</div>
+        <div class="lbl">รออนุมัติ</div>
         <div class="num">${pending.length}</div>
         <div class="sub">${Object.keys(batches).length} ชุด • รวม ${Math.round(total).toLocaleString()} THB</div>
       </div>`;
@@ -130,11 +133,11 @@
               <div class="title">${CAT_TH[r.Category] || r.Category}${over ? ' ⚠️' : ''}</div>
               <div class="meta">${formatDate(r.ExpenseDate)}${r.Venue ? ' • ' + r.Venue : ''}</div>
             </div>
-            <div class="right"><div class="amount">${Math.round(Number(r.Amount)).toLocaleString()}</div></div>
+            <div class="right"><div class="amount">${Math.round(Number(r.Amount) || Number(r.PreApproveBudget) || 0).toLocaleString()}</div></div>
           </div>`;
         });
         if (mySig.hasSignature) {
-          html += `<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="approveBatch('${bid}')">✅ อนุมัติขั้นสุดท้าย ทั้งชุด</button>`;
+          html += `<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px;" onclick="approveBatch('${bid}')">✅ อนุมัติทั้งชุด</button>`;
         }
         html += `</div>`;
       });
@@ -164,7 +167,7 @@
 
       let html = `<div class="detail-row">
         <div class="key">จำนวนเงิน</div>
-        <div class="val big">${Math.round(Number(r.Amount)).toLocaleString()} <span style="font-size:13px;color:var(--gray-500);font-weight:600;">THB</span></div>
+        <div class="val big">${Math.round(Number(r.Amount) || Number(r.PreApproveBudget) || 0).toLocaleString()} <span style="font-size:13px;color:var(--gray-500);font-weight:600;">THB</span></div>
       </div>` + rows.map(([k,v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
 
       if (r.PreApproveBudget && Number(r.Amount) > Number(r.PreApproveBudget)) {
@@ -200,7 +203,7 @@
       }
 
       html += `<div class="btn-row" style="margin-top:14px;">
-        <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">🎉 อนุมัติขั้นสุดท้าย</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">🎉 อนุมัติ</button>
         <button class="btn" style="flex:1;background:var(--danger);color:white;" onclick="decide('${r.ID}','Rejected')">❌ Reject</button>
       </div>`;
 
@@ -250,13 +253,15 @@
         signatureBase64 = sigPad.toDataURL();
       }
       if (decision === 'Rejected' && !remark) return showToast('ระบุเหตุผล', 'error');
-      if (!confirm(decision === 'Approved' ? 'อนุมัติขั้นสุดท้าย?' : 'Reject?')) return;
+      if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'Reject?')) return;
       showLoading('กำลังบันทึก...');
       try {
-        const result = await seniorApprove({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
+        // ⚠️ ต้องใช้ approve (legacyApprove) ไม่ใช่ seniorApprove ตรงๆ
+        //    ใบ Pre-Approve ต้องเข้า managerApprove ไม่งั้น Status ถูกเขียนทับ ส่งบิลจริงไม่ได้อีกเลย
+        const result = await approveRequest({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
         hideLoading();
         if (result && result.error) throw new Error(result.error);
-        showToast(decision === 'Approved' ? '🎉 อนุมัติขั้นสุดท้ายd!' : '❌ Rejected', 'success');
+        showToast(decision === 'Approved' ? '🎉 อนุมัติแล้ว!' : '❌ Rejected', 'success');
         closeModal();
         load();
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
@@ -264,11 +269,11 @@
 
     window.approveBatch = async (bid) => {
       const items = pending.filter(r => (r.BatchID || r.ID) === bid);
-      const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      const total = items.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
       const who = items[0] ? (items[0].StaffName || '') : '';
-      if (!confirm(`อนุมัติขั้นสุดท้าย ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท ?`)) return;
+      if (!confirm(`อนุมัติ ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท ?`)) return;
       try {
-        await runBatch(items, r => seniorApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email }), 'อนุมัติ');
+        await runBatch(items, r => approveRequest({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email }), 'อนุมัติ');
       } finally { load(); }
     };
 
