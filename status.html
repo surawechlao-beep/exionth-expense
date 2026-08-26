@@ -174,7 +174,7 @@
       const st = String(r.Status||'Pending');
 
       // 📋 Pre-Approve เป็นคนละเรื่องกับรายการเบิก — ต้องไปกรอกยอดจริงที่หน้าส่งบิล
-      if (st === 'PreApprove') return renderPreApproveItem(r);
+      if (st === 'PreApprove' || st === 'Finalized') return renderPreApproveItem(r);
 
       const cls = st === 'Approved' ? 'ok' : st === 'Rejected' ? 'bad' : 'warn';
       const stTH = st === 'Approved' ? '✅ อนุมัติ' : st === 'Rejected' ? '❌ ไม่อนุมัติ' : '⏳ รออนุมัติ';
@@ -199,9 +199,11 @@
 
     function renderPreApproveItem(r) {
       const ps = String(r.PreApproveStatus || 'Pending');
-      const ready = ps === 'Approved';
+      const done = String(r.Status || '') === 'Finalized';   // ส่งบิลจริงไปแล้ว
+      const ready = ps === 'Approved' && !done;
       const cls = ready ? 'ok' : ps === 'Rejected' ? 'bad' : 'warn';
-      const badge = ready ? '<span class="pill ok">✅ อนุมัติงบแล้ว</span>'
+      const badge = done ? '<span class="pill ok">✓ ส่งบิลแล้ว</span>'
+        : ready ? '<span class="pill ok">✅ อนุมัติงบแล้ว</span>'
         : ps === 'Rejected' ? '<span class="pill bad">❌ ไม่อนุมัติงบ</span>'
         : '<span class="pill warn">⏳ รออนุมัติงบ</span>';
       const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
@@ -214,14 +216,38 @@
           <span class="ri-amt">${Number(r.PreApproveBudget||0).toLocaleString()} ฿</span>
         </div>
         <div class="ri-meta">${meta}</div>
-        ${ready
+        ${done
+          ? `<div class="ri-meta" style="margin-top:8px;color:var(--gray-400);">✓ ส่งบิลใช้จริงไปแล้ว — ดูบิลได้ในรายการด้านล่าง</div>`
+          : ready
           ? `<div class="ok-box" style="margin:9px 0 0;font-size:12.5px;">📤 อนุมัติงบแล้ว — เหลือกรอกยอดจริงพร้อม<b>แนบใบเสร็จ</b></div>
-             <a href="finalize-claim.html?id=${r.ID}" class="btn btn-primary btn-sm" style="text-decoration:none;margin-top:9px;">📤 ส่งบิล + ยอดจริง</a>`
-          : `<div class="btn-row" style="margin-top:10px;">
+             <div class="btn-row" style="margin-top:9px;gap:8px;">
+               <a href="finalize-claim.html?id=${r.ID}" class="btn btn-primary btn-sm" style="flex:1;text-decoration:none;">📤 ส่งบิล + ยอดจริง</a>
+               <button class="btn btn-secondary btn-sm" style="flex:0 0 52px;padding-left:0;padding-right:0;color:#b91c1c;border-color:#fecaca;" onclick="cancelPre('${r.ID}')" title="ยกเลิกวงเงินนี้">🗑</button>
+             </div>`
+          : `<div class="btn-row" style="margin-top:10px;gap:8px;">
                <a href="pre-approves.html" class="btn btn-secondary btn-sm" style="flex:1;text-decoration:none;">👁 ดูที่หน้า Pre-Approve</a>
+               <button class="btn btn-secondary btn-sm" style="flex:0 0 52px;padding-left:0;padding-right:0;color:#b91c1c;border-color:#fecaca;" onclick="cancelPre('${r.ID}')" title="ยกเลิกวงเงินนี้">🗑</button>
              </div>`}
       </div>`;
     }
+
+    /*
+     * ยกเลิกวงเงินที่ขอไว้แต่ไม่ได้ใช้
+     * เดิมไม่มีปุ่มนี้ทั้งฝั่งพนักงานและหัวหน้า วงเงินเลยค้างในระบบตลอด
+     * แล้วระบบก็เตือนทุกสัปดาห์ว่า "ถ้าไม่ได้ใช้แล้วกรุณาแจ้งหัวหน้าเพื่อยกเลิก" ไม่รู้จบ
+     */
+    window.cancelPre = async (id) => {
+      const r = allReqs.find(x => x.ID === id);
+      const what = r ? `${catLabel(r.Category)} งบ ${Number(r.PreApproveBudget||0).toLocaleString()} ฿` : 'วงเงินนี้';
+      if (!confirm('ยกเลิก ' + what + ' ?\n\nยกเลิกแล้วกู้คืนไม่ได้ ถ้ายังต้องใช้ให้ขอใหม่')) return;
+      showLoading('กำลังยกเลิก...');
+      try {
+        const res = await apiPost('deleteRequest', { id, requesterEmail: session.Email });
+        hideLoading();
+        if (res.error) throw new Error(res.error);
+        showToast('ยกเลิกวงเงินแล้ว', 'success'); load();
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
 
     window.viewDetail = (id) => {
       const r = allReqs.find(x => x.ID === id);
@@ -253,6 +279,9 @@
       if (!r) return;
 
       // 📋 Pre-Approve ที่อนุมัติงบแล้ว → ไปหน้าส่งบิลใช้จริง (บังคับแนบใบเสร็จ)
+      if (r.Status === 'Finalized') {
+        return showToast('ใบนี้ส่งบิลไปแล้ว — ดูบิลจริงในรายการด้านล่าง', 'error');
+      }
       if (r.Status === 'PreApprove' && r.PreApproveStatus === 'Approved') {
         return location.href = 'finalize-claim.html?id=' + r.ID;
       }
@@ -262,6 +291,7 @@
 
       editFiles = [];
       const opts = categories.map(c => `<option value="${c.Code}" ${r.Category===c.Code?'selected':''}>${catLabel(c.Code)}</option>`).join('');
+      const isFuel = r.Category === 'FUEL';
       let existing = [];
       try { existing = JSON.parse(r.ReceiptURLs || '[]'); } catch { existing = []; }
       if (!existing.length && r.ReceiptURL) existing = [r.ReceiptURL];
@@ -271,7 +301,15 @@
           <span style="font-weight:400;font-size:12px;">เดือนที่ส่งบัญชีไปแล้ว (Export อนุมัติ) จะแก้ไม่ได้ ระบบจะแจ้งเตือน</span></div>
         <div class="field"><label>ประเภท</label><select id="e_cat">${opts}</select></div>
         <div class="field"><label>วันที่</label><input type="date" id="e_date" value="${toYMD(r.ExpenseDate)}"></div>
-        <div class="field"><label>จำนวนเงิน (THB)</label><input type="number" id="e_amount" step="0.01" inputmode="decimal" value="${r.Amount || ''}"></div>
+        <div class="field" id="e_kmField" style="display:${isFuel ? 'block' : 'none'};">
+          <label>ระยะทาง (กม.) <span class="required">*</span></label>
+          <input type="number" id="e_mileage" step="0.1" min="0" inputmode="decimal" value="${r.Mileage_KM || ''}">
+          <div class="hint">⛽ ค่าน้ำมันคิดจาก ระยะทาง × เรท — แก้ระยะทางแล้วยอดจะคำนวณใหม่ให้เอง</div>
+        </div>
+        <div class="field" id="e_amtField" style="display:${isFuel ? 'none' : 'block'};">
+          <label>จำนวนเงิน (THB)</label>
+          <input type="number" id="e_amount" step="0.01" inputmode="decimal" value="${r.Amount || ''}">
+        </div>
         <div class="field"><label>สถานที่ / รายละเอียด</label><input type="text" id="e_venue" value="${r.Venue || ''}"></div>
         <div class="field"><label>ลูกค้า</label><input type="text" id="e_customer" value="${r.Customer || ''}"></div>
         <div class="field"><label>ผู้ติดต่อ</label><input type="text" id="e_contact" value="${r.CustomerContact || ''}"></div>
@@ -294,6 +332,12 @@
         <button class="btn btn-primary" onclick="saveEdit('${r.ID}')" style="margin-top:6px;">💾 บันทึกการแก้ไข</button>`;
 
       document.getElementById('e_files').addEventListener('change', onEditFiles);
+      // เปลี่ยนประเภทเป็น/จาก FUEL แล้วต้องสลับช่องระยะทาง↔จำนวนเงิน
+      document.getElementById('e_cat').addEventListener('change', function (e) {
+        const fuel = e.target.value === 'FUEL';
+        document.getElementById('e_kmField').style.display  = fuel ? 'block' : 'none';
+        document.getElementById('e_amtField').style.display = fuel ? 'none' : 'block';
+      });
       document.getElementById('editModal').classList.add('show');
     };
 
@@ -320,9 +364,15 @@
     window.closeEdit = () => { editFiles = []; document.getElementById('editModal').classList.remove('show'); };
 
     window.saveEdit = async (id) => {
+      const catNow = document.getElementById('e_cat').value;
+      const kmEl = document.getElementById('e_mileage');
+      if (catNow === 'FUEL' && !(parseFloat(kmEl && kmEl.value) > 0)) {
+        return showToast('ใส่ระยะทางให้มากกว่า 0', 'error');
+      }
       const updates = {
-        Category: document.getElementById('e_cat').value,
+        Category: catNow,
         ExpenseDate: document.getElementById('e_date').value,
+        Mileage_KM: parseFloat(kmEl && kmEl.value) || 0,
         Amount: parseFloat(document.getElementById('e_amount').value) || 0,
         Venue: document.getElementById('e_venue').value,
         Customer: document.getElementById('e_customer').value,
