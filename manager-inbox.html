@@ -124,7 +124,9 @@
       const shown = getVisible();
       const total = shown.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
 
-      if (shown.length === 0) {
+      // ⚠️ ถ้าไม่มีคำขอรายรายการ แต่ยังมี Export ค้าง ต้องไม่ return ทิ้ง
+      //    ไม่งั้นหัวหน้ามองไม่เห็นคำขอ Export เลย → พนักงานไม่ได้เงิน
+      if (shown.length === 0 && !exportPending.length) {
         list.innerHTML = `<div class="empty"><div class="icon-wrap">🔍</div>
           <div class="title">ไม่พบรายการที่ตรงกับตัวกรอง</div>
           <button class="btn btn-secondary btn-sm" style="margin-top:14px;max-width:200px;" onclick="clearInboxFilters()">🗑 ล้างตัวกรอง</button></div>`;
@@ -328,23 +330,6 @@
 
     window.approveBatch = async (bid) => {
       const items = pending.filter(r => (r.BatchID || r.ID) === bid);
-      // ✨ v6.0 คำขอ Export เคยแจ้งทางอีเมลอย่างเดียว หัวหน้าเปิดแอปแล้วไม่เห็นอะไรเลย
-      if (exportPending.length) {
-        html += `<div class="sec-label" style="color:var(--accent);">📊 คำขอ Export รออนุมัติ (${exportPending.length})</div>`;
-        exportPending.forEach(ex => {
-          const days = Math.floor((Date.now() - new Date(ex.RequestedAt).getTime()) / 86400000);
-          html += `<a href="export-review.html?id=${ex.ID}" class="req-card warn" style="text-decoration:none;display:block;">
-            <div class="ri-top">
-              <span class="ri-cat">📊 ${ex.StaffName}</span>
-              ${days >= 2 ? `<span class="pill bad">ค้าง ${days} วัน</span>` : '<span class="pill warn">ใหม่</span>'}
-              <span class="ri-amt">${Number(ex.TotalAmount||0).toLocaleString()} ฿</span>
-            </div>
-            <div class="ri-meta">ใบเบิกเดือน ${ex.Month}/${ex.Year} · ${ex.ItemCount} รายการ · แตะเพื่อตรวจสอบ</div>
-          </a>`;
-        });
-        html += `<div class="sec-label">คำขอเบิกรายรายการ</div>`;
-      }
-
       if (!mySig.hasSignature) {
         showToast('ตั้งลายเซ็นใน Profile ก่อน เพื่อ approve ทั้งชุด', 'error');
         return showDetail(pending.indexOf(items[0]));
