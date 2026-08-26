@@ -111,7 +111,7 @@
       const prev = items.length ? items[items.length-1] : null;
       const it = {
         id: 'item_' + itemSeq,
-        date: prev ? prev.date : new Date().toISOString().split('T')[0],
+        date: prev ? prev.date : todayYMD(),   // เวลาไทย
         description: '', amount: 0, receipts: [], _dup: !!prev
       };
       items.push(it);
@@ -245,7 +245,7 @@
       showLoading('กำลังส่ง ' + items.length + ' บิล...');
       try {
         const r = await apiPost('finalizeClaim', {
-          preApproveId: preId,
+          preApproveId: preId, requesterEmail: session.Email,
           items: items.map(it => ({ date: it.date, description: it.description, amount: it.amount, receipts: it.receipts }))
         });
         hideLoading();
