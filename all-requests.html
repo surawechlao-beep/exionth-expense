@@ -148,10 +148,16 @@
       const p = items.filter(r => r.Status==='Pending').length;
       const a = items.filter(r => r.Status==='Approved').length;
       const rj = items.filter(r => r.Status==='Rejected').length;
-      const total = items.reduce((s,r) => s+(Number(r.Amount)||0), 0);
+      /*
+         🔴 ตัดใบ "ขอวงเงิน" ออกจากยอดรวม
+            finalizeClaim เขียนยอดรวมบิลจริงกลับลงแถว Pre-Approve ด้วย
+            ถ้าไม่ตัด ยอดรวมจะนับซ้ำสองเท่าของค่ารับรองทุกใบ
+      */
+      const money = items.filter(r => r.Status !== 'PreApprove' && r.Status !== 'Finalized');
+      const total = money.reduce((s,r) => s+(Number(r.Amount)||0), 0);
       document.getElementById('statsZone').innerHTML = `
         <div class="kpi-grid">
-          <div class="kpi red"><div class="label">💰 รวม</div><div class="value">${Math.round(total).toLocaleString()}</div><div class="delta">THB • ${items.length} รายการ</div></div>
+          <div class="kpi red"><div class="label">💰 รวม</div><div class="value">${Math.round(total).toLocaleString()}</div><div class="delta">THB • ${money.length} รายการ</div></div>
           <div class="kpi green"><div class="label">✅ Approved</div><div class="value">${a}</div><div class="delta">รายการ</div></div>
           <div class="kpi orange"><div class="label">⏳ Pending</div><div class="value">${p}</div><div class="delta">รายการ</div></div>
           <div class="kpi blue" style="background:linear-gradient(135deg,#64748B,#475569);"><div class="label">❌ Rejected</div><div class="value">${rj}</div><div class="delta">รายการ</div></div>
@@ -233,7 +239,13 @@
      * เดิมระบบจบที่ "Export อนุมัติ" แล้วเงียบ พนักงานไม่รู้ว่าเงินเข้าเมื่อไหร่
      * ตรงนี้ให้บัญชี/GM กดยืนยันว่าโอนแล้ว → พนักงานได้แจ้งเตือนทันที
      */
+    // เฉพาะฝ่ายบัญชีกับ GM เท่านั้นที่กดยืนยันการโอนได้ (คนเดียวเป็นได้ทั้งบัญชีและผู้บริหาร)
+    let canMarkPaid = false;
     async function loadUnpaid() {
+      try {
+        const role = await fetchMyRole(session.Email);
+        canMarkPaid = !!(role && (role.isAccountant || role.isGM));
+      } catch (e) { canMarkPaid = false; }
       let list = [];
       try {
         const r = await apiGet('getUnpaidExports', { email: session.Email });
@@ -258,9 +270,9 @@
               <span class="ri-amt">${Number(x.TotalAmount||0).toLocaleString()} ฿</span>
             </div>
             <div class="ri-meta">ใบเบิกเดือน ${x.Month}/${x.Year} · ${x.ItemCount} รายการ</div>
-            ${session.isViewer ? '' : `<button class="btn btn-primary btn-sm" style="margin-top:9px;"
+            ${canMarkPaid ? `<button class="btn btn-primary btn-sm" style="margin-top:9px;"
                     onclick="markPaid('${x.ID}','${String(x.StaffName).replace(/'/g,'')}',${Number(x.TotalAmount)||0})">
-              💵 ยืนยันว่าโอนแล้ว</button>`}
+              💵 ยืนยันว่าโอนแล้ว</button>` : ''}
           </div>`;
         }).join('')}
         </div>
