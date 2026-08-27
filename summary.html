@@ -407,6 +407,15 @@
       }
 
       return pool.filter(r => {
+        /*
+         * 🔴 ตัดแถว "ขอวงเงิน" ออกจากตารางค่าใช้จ่าย
+         *    PreApprove = ใบขอวงเงิน ยังไม่ใช่เงินที่จ่ายจริง
+         *    Finalized  = ใบขอวงเงินที่ส่งบิลแล้ว — ตัวเงินจริงอยู่ในแถวบิลใหม่
+         *    finalizeClaim เขียนยอดรวมกลับลงแถวเดิมด้วย ถ้าไม่ตัดออกจะเห็นซ้ำ 2 บรรทัด
+         *    และยอดรวมจะเบิ้ล (Excel ตัดออกอยู่แล้วเพราะเอาเฉพาะ Approved)
+         */
+        const st = String(r.Status || '');
+        if (st === 'PreApprove' || st === 'Finalized') return false;
         const d = new Date(r.ExpenseDate || r.Timestamp);
         if (isNaN(d)) return false;
         if (use) {
@@ -761,7 +770,8 @@
         { k:'rmk',   label:'Remark',    cls:'sm',  get:r => r.Venue || '' },
         { k:'st',    label:'Status',    cls:'ctr', get:r => {
             const c = r.Status==='Approved' ? '#16A34A' : r.Status==='Rejected' ? '#DC2626' : '#F59E0B';
-            const t = r.Status==='Approved' ? 'อนุมัติ' : r.Status==='Rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ';
+            const t = r.Status==='Approved' ? 'อนุมัติ' : r.Status==='Rejected' ? 'ไม่อนุมัติ'
+                    : r.Status==='Finalized' ? 'ส่งบิลแล้ว' : r.Status==='PreApprove' ? 'ขอวงเงิน' : 'รออนุมัติ';
             return '<span style="color:' + c + ';font-weight:800;font-size:10.5px;">' + t + '</span>';
           }}
       ];
