@@ -112,6 +112,38 @@ function showToast(msg, type = 'info') {
   }, 3000);
 }
 
+/* ══════════════════════════════════════════════════════
+ *  แอปที่กำลังใช้อยู่ — 'expense' หรือ 'petty'
+ *  เก็บแยกจาก session เพื่อให้สลับแอปได้โดยไม่ต้องล็อกอินใหม่
+ * ══════════════════════════════════════════════════════ */
+function getApp() {
+  /*
+   * 🔴 ต้องดูจาก "หน้าที่เปิดอยู่จริง" เป็นหลัก ไม่ใช่ค่าที่จำไว้
+   *
+   *    ถ้าดูจากค่าที่จำไว้อย่างเดียว จะเกิดเคสนี้:
+   *      ใช้ Petty Cash ค้างไว้ → ปิดแอป → เปิด index.html (หน้า Expense)
+   *      → เมนูล่างขึ้นเป็นของ Petty ทั้งที่อยู่หน้า Expense
+   *    หน้าของ Petty ขึ้นต้นด้วย pc- เสมอ จึงดูจากชื่อไฟล์ได้แน่นอนที่สุด
+   */
+  try {
+    const p = String(location.pathname || '').split('/').pop() || '';
+    if (p.indexOf('pc-') === 0) return 'petty';
+    if (p && p !== 'profile.html') return 'expense';   // หน้าอื่นทั้งหมด = Expense
+  } catch (e) {}
+  // profile.html ใช้ร่วมกันสองระบบ — ตรงนี้เท่านั้นที่ดูจากค่าที่จำไว้
+  try { return sessionStorage.getItem('exionth_app') || localStorage.getItem('exionth_app') || 'expense'; }
+  catch (e) { return 'expense'; }
+}
+function setApp(name) {
+  const v = (name === 'petty') ? 'petty' : 'expense';
+  try { sessionStorage.setItem('exionth_app', v); localStorage.setItem('exionth_app', v); } catch (e) {}
+  return v;
+}
+/** พาไปหน้าแรกของแอปที่เลือก */
+function goHomeOfApp(name) {
+  location.href = setApp(name) === 'petty' ? 'pc-home.html' : 'index.html';
+}
+
 /**
  * Render bottom navigation. Pass `active` = one of: home / new / status / inbox
  * Shows Inbox tab only if isGM=true in session.
@@ -144,6 +176,44 @@ async function renderBottomNav(active) {
   try { renderNotifBell(); } catch (e) {}
   const nav = document.createElement('nav');
   nav.className = 'bottom-nav';
+
+  /*
+   * 💵 v7.0 — ระบบมี 2 แอปในโค้ดชุดเดียว
+   *    expense = เบิกค่าใช้จ่าย (ออกเงินก่อน เบิกคืนทีหลัง)
+   *    petty   = เงินสดย่อย    (เอาเงินบริษัทจ่ายเลย)
+   *  เมนูล่างเปลี่ยนตามแอปที่เลือกตอนล็อกอิน · สลับได้จากหน้าแรก
+   */
+  if (getApp() === 'petty') {
+    const pItems = [
+      { key: 'pc-home', href: 'pc-home.html',    label: 'หน้าแรก', icon: 'home' },
+      { key: 'pc-new',  href: 'pc-request.html', label: 'ขอเบิก',  icon: 'plus' },
+      { key: 'pc-list', href: 'pc-list.html',    label: 'รายการ',  icon: 'list' },
+      { key: 'pc-fund', href: 'pc-fund.html',    label: 'กล่องเงิน', emoji: '💰' }
+    ];
+    pItems.push({ key: 'pc-inbox', href: 'pc-approve.html', label: 'รอดำเนินการ', icon: 'bell' });
+    pItems.push({ key: 'profile', href: 'profile.html', label: 'โปรไฟล์', icon: 'user' });
+    nav.innerHTML = pItems.map(it => `
+      <a href="${it.href}" class="nav-item ${it.key === active ? 'active' : ''}">
+        ${it.emoji ? `<span style="font-size:20px;line-height:1;">${it.emoji}</span>` : icon(it.icon)}
+        <span>${it.label}</span>
+      </a>`).join('');
+    document.body.appendChild(nav);
+    if (active !== 'pc-inbox') {
+      try {
+        const inbox = await fetchPettyInbox(session.Email);
+        const n = (inbox.toApprove || []).length + (inbox.toPay || []).length;
+        if (n > 0) {
+          // ใช้รูปแบบเดียวกับ badge ของเมนูเดิม (has-badge + data-badge)
+          const link = nav.querySelector('.nav-item[href="pc-approve.html"]');
+          if (link) {
+            link.classList.add('has-badge');
+            link.dataset.badge = n > 99 ? '99+' : n;
+          }
+        }
+      } catch (e) {}
+    }
+    return;
+  }
 
   const items = [
     { key: 'home',    href: 'index.html',        label: 'หน้าแรก', icon: 'home' },

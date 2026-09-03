@@ -145,3 +145,19 @@ function fileToBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+/* ── 💵 Petty Cash ── */
+async function fetchPettyHome(email, fundId)   { return apiGet('getPettyHome', { email, fundId: fundId || '' }); }
+async function fetchPettyLedger(email, fundId, scope) { return apiGet('getPettyLedger', { email, fundId: fundId || '', scope: scope || '' }); }
+async function fetchPettyInbox(email, fundId)  { return apiGet('getPettyInbox', { email, fundId: fundId || '' }); }
+async function fetchPettyCategories()          { return apiGet('getPettyCategories', {}); }
+async function submitPetty(payload)            { return apiPost('submitPetty', payload); }
+async function approvePetty(payload)           { return apiPost('approvePetty', payload); }
+async function payPetty(payload)               { return apiPost('payPetty', payload); }
+async function cancelPetty(payload)            { return apiPost('cancelPetty', payload); }
+async function requestPettyTopUp(payload)      { return apiPost('requestPettyTopUp', payload); }
+async function submitPettyCount(payload)       { return apiPost('submitPettyCount', payload); }
+
+/* ── 📋 Export รายการคำขอเป็น Excel ── */
+async function fetchExportableStaff(email) { return apiGet('getExportableStaff', { email }); }
+async function exportRequestList(payload)  { return apiPost('exportRequestList', payload); }
