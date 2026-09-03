@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" fill="none">
+  <text x="0" y="44" font-family="Impact, 'Kanit', sans-serif" font-weight="900" font-size="44" fill="#231F20" letter-spacing="-1">EX</text>
+  <text x="50" y="44" font-family="Impact, 'Kanit', sans-serif" font-weight="900" font-size="50" fill="#B7081D" letter-spacing="-2" font-style="italic">X</text>
+  <text x="78" y="44" font-family="Impact, 'Kanit', sans-serif" font-weight="900" font-size="44" fill="#231F20" letter-spacing="-1">ION</text>
+  <text x="48" y="70" font-family="'Kanit', sans-serif" font-weight="500" font-size="18" fill="#231F20" letter-spacing="2">THAILAND</text>
+  <line x1="20" y1="56" x2="48" y2="56" stroke="#B7081D" stroke-width="1.5"/>
+  <line x1="140" y1="56" x2="170" y2="56" stroke="#B7081D" stroke-width="1.5"/>
+</svg>
