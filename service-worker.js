@@ -2,7 +2,7 @@
  * Service Worker for PWA offline cache
  * Strategy: Network First for JS/HTML (always fresh) + Cache First for static assets
  */
-const CACHE_NAME = 'exionth-expense-v30';
+const CACHE_NAME = 'exionth-expense-v33';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,11 @@ const STATIC_ASSETS = [
   './summary.html',
   './finalize-claim.html',
   './export-review.html',
+  './pc-home.html',
+  './pc-request.html',
+  './pc-approve.html',
+  './pc-list.html',
+  './pc-fund.html',
   './manifest.json',
   './css/style.css',
   './js/config.js',
@@ -34,8 +39,16 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
+    /*
+     * 🔴 เดิมใช้ cache.addAll() ซึ่งถ้ามีไฟล์เดียวโหลดไม่ได้
+     *    (เช่นลืมอัปหน้าใดหน้าหนึ่ง) จะ reject ทั้งก้อน → SW ติดตั้งไม่สำเร็จ
+     *    → ผู้ใช้ค้างที่เวอร์ชันเก่าตลอดไปโดยไม่มีใครรู้
+     *    เปลี่ยนเป็นแคชทีละไฟล์ ไฟล์ไหนไม่มีก็ข้าม ที่เหลือยังทำงานปกติ
+     */
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+      .then(cache => Promise.all(
+        STATIC_ASSETS.map(url => cache.add(url).catch(() => null))
+      ))
       .then(() => self.skipWaiting())
   );
 });

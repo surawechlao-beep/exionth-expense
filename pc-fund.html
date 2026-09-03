@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>กล่องเงินสด — EXION</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">💰 กล่องเงินสด</span></h1>
+  </div>
+
+  <div class="container">
+    <div id="content" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    setApp('petty');
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    let home = null;
+    const money = n => Math.round(Number(n) || 0).toLocaleString();
+
+    async function load() {
+      try {
+        const h = await fetchPettyHome(session.Email);
+        if (h.error) throw new Error(h.error);
+        home = h;
+        render();
+      } catch (err) {
+        const c = document.getElementById('content');
+        c.classList.remove('loading');
+        c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+          <div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        renderBottomNav('pc-fund');
+      }
+    }
+
+    function render() {
+      const b = home.balance, f = home.fund;
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+
+      c.innerHTML = `
+        <div class="card">
+          <div class="card-head"><span class="ib ib-teal">💰</span>
+            <div><div class="ch-title">${f.Name}</div>
+              <div class="ch-sub">${f.Branch || '—'} · ผู้ถือเงิน ${b.holderName || f.HolderEmail}</div></div>
+          </div>
+          <div class="detail-list" style="margin-top:11px;">
+            <div class="dl-row"><span class="k">วงเงิน</span><span class="v">${money(b.limit)} บาท</span></div>
+            <div class="dl-row"><span class="k">เงินสดในกล่อง</span><span class="v">${money(b.cash)} บาท</span></div>
+            <div class="dl-row"><span class="k">อนุมัติแล้ว รอจ่าย</span><span class="v">${money(b.reserved)} บาท</span></div>
+            <div class="dl-row"><span class="k">ใช้ได้จริง</span><span class="v">${money(b.available)} บาท</span></div>
+            <div class="dl-row"><span class="k">ใช้ไปตั้งแต่เติมล่าสุด</span><span class="v">${money(b.spentSinceTopUp)} บาท</span></div>
+          </div>
+          <div class="info-box" style="margin-top:11px;">
+            ℹ️ กติกาเงินสดย่อย — <b>เงินสดในกล่อง + ใบเสร็จที่ยังไม่เบิกชดเชย = วงเงินเสมอ</b>
+          </div>
+        </div>
+
+        ${!home.isHolder ? `<div class="empty"><div class="icon-wrap">🔒</div>
+          <div class="title">ดูได้อย่างเดียว</div>
+          <div class="sub">เติมเงินและนับเงินได้เฉพาะผู้ถือเงินสด (${b.holderName || f.HolderEmail})</div></div>` : `
+
+        <div class="sec-label">💵 ขอเติมเงิน (เบิกชดเชย)</div>
+        <div class="card">
+          <div class="field">
+            <label>จำนวนเงินที่ขอเติม (บาท)</label>
+            <input type="number" id="topAmt" inputmode="decimal" step="0.01" min="0" value="${b.suggestTopUp || ''}">
+            <div class="hint">เติมได้สูงสุด ${money(b.suggestTopUp)} บาท — เติมแล้วจะกลับเป็นวงเงิน ${money(b.limit)} บาทพอดี</div>
+          </div>
+          <div class="field">
+            <label>หมายเหตุ <span class="optional-tag">ไม่บังคับ</span></label>
+            <input type="text" id="topNote" placeholder="เช่น เบิกชดเชยรอบเดือนสิงหาคม">
+          </div>
+          <button class="btn btn-primary" onclick="doTopUp()">📥 ส่งขอเติมเงิน</button>
+          <div class="hint" style="margin-top:7px;">ต้องรออนุมัติก่อน แล้วค่อยกด "รับเงินเข้ากล่องแล้ว" ตอนได้เงินจริง</div>
+        </div>
+
+        <div class="sec-label">⚖️ นับเงินตรวจสอบ</div>
+        <div class="card">
+          <div class="field">
+            <label>นับเงินสดในกล่องได้เท่าไหร่ (บาท)</label>
+            <input type="number" id="cntAmt" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+            <div class="hint">ระบบบอกว่าควรมี <b>${money(b.cash)} บาท</b></div>
+          </div>
+          <div id="diffBox"></div>
+          <div class="field" id="reasonWrap" style="display:none;">
+            <label>สาเหตุที่ไม่ตรง *</label>
+            <input type="text" id="cntReason" placeholder="เช่น ทอนเงินผิด / ลืมบันทึกค่าแท็กซี่">
+          </div>
+          <button class="btn btn-secondary" onclick="doCount()">⚖️ บันทึกผลการนับ</button>
+          <div class="hint" style="margin-top:7px;">ถ้ายอดไม่ตรง ระบบจะสร้างรายการปรับปรุงและแจ้ง GM กับบัญชีอัตโนมัติ</div>
+        </div>`}`;
+
+      const cnt = document.getElementById('cntAmt');
+      if (cnt) cnt.addEventListener('input', showDiff);
+      renderBottomNav('pc-fund');
+    }
+
+    function showDiff() {
+      const v = parseFloat(document.getElementById('cntAmt').value);
+      const box = document.getElementById('diffBox');
+      const wrap = document.getElementById('reasonWrap');
+      if (isNaN(v)) { box.innerHTML = ''; wrap.style.display = 'none'; return; }
+      const diff = Math.round((v - home.balance.cash) * 100) / 100;
+      if (Math.abs(diff) < 0.01) {
+        box.innerHTML = `<div class="ok-box">✅ ตรงกับระบบพอดี</div>`;
+        wrap.style.display = 'none';
+      } else {
+        box.innerHTML = `<div class="card" style="background:var(--warn-bg);border:none;padding:11px 13px;margin:0 0 11px;">
+          <b style="color:var(--gray-800);">${diff > 0 ? '💰 เงินเกิน' : '⚠️ เงินขาด'} ${money(Math.abs(diff))} บาท</b>
+          <div style="font-size:11.5px;color:var(--gray-600);margin-top:3px;">
+            ระบบ ${money(home.balance.cash)} · นับได้ ${money(v)}</div></div>`;
+        wrap.style.display = 'block';
+      }
+    }
+
+    window.doTopUp = async function () {
+      const amt = parseFloat(document.getElementById('topAmt').value);
+      if (!(amt > 0)) return showToast('ใส่จำนวนเงิน', 'error');
+      if (!confirm('ขอเติมเงิน ' + money(amt) + ' บาท?')) return;
+      showLoading('กำลังส่ง...');
+      try {
+        const r = await requestPettyTopUp({
+          actorEmail: session.Email, amount: amt,
+          note: document.getElementById('topNote').value
+        });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast('ส่งขออนุมัติแล้ว ✅', 'success');
+        setTimeout(load, 900);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
+
+    window.doCount = async function () {
+      const counted = parseFloat(document.getElementById('cntAmt').value);
+      if (isNaN(counted) || counted < 0) return showToast('ใส่ยอดที่นับได้', 'error');
+      const reason = (document.getElementById('cntReason') || {}).value || '';
+      showLoading('กำลังบันทึก...');
+      try {
+        const r = await submitPettyCount({ actorEmail: session.Email, counted: counted, reason: reason });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        if (r.needReason) { showToast(r.message, 'error'); return; }
+        showToast(r.matched ? '✅ ยอดตรงกับระบบ' :
+          'บันทึกส่วนต่าง ' + money(Math.abs(r.diff)) + ' บาทแล้ว', 'success');
+        setTimeout(load, 900);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>เงินสดย่อย — EXION</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">💵 เงินสดย่อย</span></h1>
+  </div>
+
+  <div class="container">
+    <div id="content" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    setApp('petty');
+    let home = null;
+
+    const CAT_TH = {};
+    const ST = {
+      Pending:   { t: 'รออนุมัติ',   c: 'warn' },
+      Approved:  { t: 'รอรับเงิน',   c: 'ok'   },
+      Paid:      { t: 'จ่ายแล้ว',    c: 'ok'   },
+      Rejected:  { t: 'ไม่อนุมัติ',  c: 'bad'  },
+      Cancelled: { t: 'ยกเลิก',      c: ''     }
+    };
+    const money = n => Math.round(Number(n) || 0).toLocaleString();
+
+    async function load() {
+      try {
+        const [h, cats] = await Promise.all([
+          fetchPettyHome(session.Email),
+          fetchPettyCategories().catch(() => [])
+        ]);
+        if (h.error) throw new Error(h.error);
+        (Array.isArray(cats) ? cats : []).forEach(c => { CAT_TH[c.Code] = c.NameTH || c.Code; });
+        home = h;
+        render();
+      } catch (err) { fail(err.message); }
+    }
+
+    function fail(msg) {
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+      const notSetUp = /ยังไม่ได้ตั้งกล่องเงินสด/.test(msg);
+      c.innerHTML = `<div class="empty"><div class="icon-wrap">${notSetUp ? '💰' : '⚠️'}</div>
+        <div class="title">${notSetUp ? 'ยังไม่ได้เปิดใช้งาน' : 'โหลดไม่สำเร็จ'}</div>
+        <div class="sub">${msg}</div>
+        <a href="index.html" onclick="setApp('expense')" class="btn btn-secondary btn-sm"
+           style="margin-top:16px;max-width:240px;text-decoration:none;">← กลับไป Exion Expense</a></div>`;
+      renderBottomNav('pc-home');
+    }
+
+    function render() {
+      const b = home.balance, f = home.fund;
+      const pct = b.limit > 0 ? Math.max(0, Math.min(100, (b.cash / b.limit) * 100)) : 0;
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+
+      c.innerHTML = `
+        <div class="count-hero">
+          <div class="lbl">${f.Name}${f.Branch ? ' · ' + f.Branch : ''}</div>
+          <div class="num">${money(b.cash)}</div>
+          <div class="sub">บาท · เงินสดในกล่อง</div>
+          <div style="margin-top:12px;height:7px;border-radius:99px;background:rgba(255,255,255,.25);overflow:hidden;">
+            <div style="height:100%;width:${pct.toFixed(1)}%;background:#fff;border-radius:99px;"></div>
+          </div>
+          <div class="sub" style="margin-top:7px;opacity:.9;">วงเงิน ${money(b.limit)} บาท · ${pct.toFixed(0)}%</div>
+        </div>
+
+        ${b.lowCash ? `<div class="card" style="border-left:4px solid var(--warn);">
+          <div style="font-size:13px;font-weight:700;color:var(--gray-800);">⚠️ เงินสดเหลือน้อย</div>
+          <div style="font-size:12px;color:var(--gray-500);margin-top:4px;">
+            เหลือ ${money(b.cash)} จากวงเงิน ${money(b.limit)} บาท — ควรขอเติมเงิน</div>
+          ${home.isHolder ? `<a href="pc-fund.html" class="btn btn-primary btn-sm"
+             style="margin-top:11px;max-width:200px;text-decoration:none;">💰 ขอเติมเงิน</a>` : ''}
+        </div>` : ''}
+
+        <div class="kpi-grid">
+          <div class="kpi ${b.reserved ? 'warn' : ''}"><div class="n">${money(b.reserved)}</div><div class="l">อนุมัติแล้ว รอจ่าย</div></div>
+          <div class="kpi ok"><div class="n">${money(b.available)}</div><div class="l">ใช้ได้จริง</div></div>
+          <div class="kpi ${b.pendingOut ? 'warn' : ''}"><div class="n">${money(b.pendingOut)}</div><div class="l">รออนุมัติ</div></div>
+          <div class="kpi"><div class="n">${money(b.spentSinceTopUp)}</div><div class="l">ใช้ไปตั้งแต่เติมล่าสุด</div></div>
+        </div>
+
+        <div class="tiles">
+          <a href="pc-request.html" class="tile">
+            <div class="ib ib-red">${icon('plus')}</div>
+            <div><div class="lb">ขอเบิกเงินสด</div><div class="sb">กรอกรายการ + แนบใบเสร็จ</div></div>
+          </a>
+          <a href="pc-list.html" class="tile">
+            <div class="ib ib-blue">${icon('list')}</div>
+            <div><div class="lb">รายการเคลื่อนไหว</div><div class="sb">${b.txCount} รายการทั้งหมด</div></div>
+          </a>
+          ${(home.toApprove || home.toPay) ? `
+          <a href="pc-approve.html" class="tile">
+            <div class="ib ib-orange">${icon('bell')}</div>
+            <div><div class="lb">รอดำเนินการ</div>
+              <div class="sb">${home.toApprove ? home.toApprove + ' รออนุมัติ' : ''}${home.toApprove && home.toPay ? ' · ' : ''}${home.toPay ? home.toPay + ' รอจ่ายเงิน' : ''}</div></div>
+            <span class="cnt-badge">${home.toApprove + home.toPay}</span>
+          </a>` : ''}
+          ${home.isHolder ? `
+          <a href="pc-fund.html" class="tile">
+            <div class="ib ib-teal">💰</div>
+            <div><div class="lb">กล่องเงินสด</div><div class="sb">เติมเงิน · นับเงินตรวจสอบ</div></div>
+          </a>` : ''}
+        </div>
+
+        ${home.recent && home.recent.length ? `
+        <div class="sec-label">รายการล่าสุด</div>
+        <div class="card" style="padding:6px 0;">
+          ${home.recent.map(rowHtml).join('')}
+        </div>
+        <a href="pc-list.html" class="btn btn-secondary btn-sm"
+           style="margin-top:10px;text-decoration:none;">ดูทั้งหมด →</a>` : `
+        <div class="empty"><div class="icon-wrap">📭</div>
+          <div class="title">ยังไม่มีรายการเคลื่อนไหว</div>
+          <a href="pc-request.html" class="btn btn-primary btn-sm"
+             style="margin-top:14px;max-width:220px;text-decoration:none;">➕ ขอเบิกเงินสด</a></div>`}
+
+        <div class="sec-label">ระบบอื่น</div>
+        <div class="tiles">
+          <a href="javascript:void(0)" onclick="goHomeOfApp('expense')" class="tile">
+            <div class="ib ib-purple">🧾</div>
+            <div><div class="lb">Exion Expense</div><div class="sb">เบิกค่าใช้จ่าย — ออกเงินก่อน เบิกคืนทีหลัง</div></div>
+          </a>
+        </div>`;
+      renderBottomNav('pc-home');
+    }
+
+    function rowHtml(r) {
+      const isIn = String(r.Type).toUpperCase() !== 'OUT';
+      const st = ST[r.Status] || { t: r.Status, c: '' };
+      const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
+      const day = d && !isNaN(d) ? d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-';
+      return `
+        <div style="display:flex;gap:11px;align-items:center;padding:11px 15px;border-bottom:1px solid var(--gray-100);">
+          <span style="font-size:19px;line-height:1;">${isIn ? '📥' : '📤'}</span>
+          <span style="flex:1;min-width:0;">
+            <span style="display:block;font-size:13px;font-weight:700;color:var(--gray-800);
+                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.Purpose || CAT_TH[r.Category] || r.Category}</span>
+            <span style="display:block;font-size:11px;color:var(--gray-500);margin-top:2px;">
+              ${day} · ${r.RequesterName || ''}</span>
+          </span>
+          <span style="text-align:right;">
+            <span style="display:block;font-size:14px;font-weight:800;color:${isIn ? 'var(--ok)' : 'var(--accent)'};">
+              ${isIn ? '+' : '−'}${money(r.Amount)}</span>
+            <span class="pill ${st.c}" style="font-size:9.5px;margin-top:2px;">${st.t}</span>
+          </span>
+        </div>`;
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>รอดำเนินการ — เงินสดย่อย</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">รอดำเนินการ</span></h1>
+  </div>
+
+  <div class="container">
+    <div id="content" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    setApp('petty');
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    let data = null;
+    const CAT_TH = {};
+    const money = n => Math.round(Number(n) || 0).toLocaleString();
+    const thDate = v => { const d = v ? new Date(v) : null;
+      return d && !isNaN(d) ? d.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) : '-'; };
+
+    async function load() {
+      try {
+        const [d, cs] = await Promise.all([
+          fetchPettyInbox(session.Email),
+          fetchPettyCategories().catch(() => [])
+        ]);
+        if (d.error) throw new Error(d.error);
+        (Array.isArray(cs) ? cs : []).forEach(c => { CAT_TH[c.Code] = c.NameTH || c.Code; });
+        data = d;
+        render();
+      } catch (err) {
+        const c = document.getElementById('content');
+        c.classList.remove('loading');
+        c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+          <div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        renderBottomNav('pc-inbox');
+      }
+    }
+
+    function render() {
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+      const ap = data.toApprove || [], pay = data.toPay || [], inn = data.toReceive || [];
+
+      if (!ap.length && !pay.length && !inn.length) {
+        c.innerHTML = `<div class="empty"><div class="icon-wrap">🎉</div>
+          <div class="title">เคลียร์หมดแล้ว!</div><div class="sub">ไม่มีรายการรอดำเนินการ</div></div>`;
+        renderBottomNav('pc-inbox');
+        return;
+      }
+
+      const b = data.balance;
+      let html = `
+        <div class="card" style="padding:12px 15px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:20px;">💰</span>
+            <span style="flex:1;">
+              <span style="display:block;font-size:11.5px;color:var(--gray-500);">เงินสดในกล่อง</span>
+              <span style="display:block;font-size:18px;font-weight:800;color:var(--gray-800);">${money(b.cash)} บาท</span>
+            </span>
+            <span style="text-align:right;font-size:11px;color:var(--gray-400);line-height:1.5;">
+              กันไว้ ${money(b.reserved)}<br>ใช้ได้ ${money(b.available)}</span>
+          </div>
+        </div>`;
+
+      if (ap.length) {
+        const sum = ap.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+        html += `<div class="sec-label">⏳ รออนุมัติ (${ap.length}) · ${money(sum)} บาท</div>` +
+                ap.map(r => card(r, 'approve')).join('');
+      }
+      if (pay.length) {
+        const sum = pay.reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+        html += `<div class="sec-label">💵 อนุมัติแล้ว รอจ่ายเงินสด (${pay.length}) · ${money(sum)} บาท</div>` +
+                pay.map(r => card(r, 'pay')).join('');
+      }
+      if (inn.length) {
+        html += `<div class="sec-label">📥 เติมเงิน — รออนุมัติแล้ว รอรับเงินจริง (${inn.length})</div>` +
+                inn.map(r => card(r, 'pay')).join('');
+      }
+      c.innerHTML = html;
+      renderBottomNav('pc-inbox');
+    }
+
+    function card(r, mode) {
+      const isIn = String(r.Type).toUpperCase() === 'IN';
+      const files = (() => { try { return JSON.parse(r.ReceiptURLs || '[]'); } catch (e) { return []; } })();
+      return `
+        <div class="card" style="border-left:4px solid ${mode === 'pay' ? 'var(--ok)' : 'var(--warn)'};">
+          <div style="display:flex;align-items:flex-start;gap:10px;">
+            <span style="font-size:20px;line-height:1.2;">${isIn ? '📥' : '📤'}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;color:var(--gray-800);">${r.Purpose || CAT_TH[r.Category] || r.Category}</div>
+              <div style="font-size:11.5px;color:var(--gray-500);margin-top:3px;">
+                ${CAT_TH[r.Category] || r.Category} · ${thDate(r.ExpenseDate)}</div>
+            </div>
+            <div style="font-size:17px;font-weight:800;color:${isIn ? 'var(--ok)' : 'var(--accent)'};white-space:nowrap;">
+              ${money(r.Amount)} ฿</div>
+          </div>
+
+          <div class="detail-list" style="margin-top:10px;">
+            <div class="dl-row"><span class="k">ผู้ขอ</span><span class="v">${r.RequesterName || r.RequesterEmail}</span></div>
+            ${r.OnBehalfBy ? `<div class="dl-row"><span class="k">บันทึกโดย</span><span class="v">${String(r.OnBehalfBy).split('@')[0]}</span></div>` : ''}
+            ${r.Payee ? `<div class="dl-row"><span class="k">จ่ายให้</span><span class="v">${r.Payee}</span></div>` : ''}
+            <div class="dl-row"><span class="k">ใบเสร็จ</span><span class="v">${files.length ? files.length + ' ไฟล์' : '— ไม่มี —'}</span></div>
+          </div>
+
+          ${files.length ? `<button class="btn btn-secondary btn-sm" style="margin-top:9px;"
+             onclick="viewReceipt('${r.ID}')">👁 ดูใบเสร็จ</button>` : ''}
+          <div id="rc_${r.ID}"></div>
+
+          ${mode === 'approve' ? `
+          <div style="display:flex;gap:9px;margin-top:11px;">
+            <button class="btn btn-primary" style="flex:1;" onclick="decide('${r.ID}','Approved')">✅ อนุมัติ</button>
+            <button class="btn" style="flex:1;background:var(--danger);color:#fff;" onclick="decide('${r.ID}','Rejected')">❌ ไม่อนุมัติ</button>
+          </div>` : `
+          <button class="btn btn-primary" style="margin-top:11px;" onclick="doPay('${r.ID}','${money(r.Amount)}')">
+            ${isIn ? '📥 รับเงินเข้ากล่องแล้ว' : '💵 จ่ายเงินสดแล้ว'}
+          </button>`}
+        </div>`;
+    }
+
+    window.viewReceipt = async function (id) {
+      const box = document.getElementById('rc_' + id);
+      if (box.dataset.loaded) { box.innerHTML = ''; box.dataset.loaded = ''; return; }
+      box.innerHTML = '<div class="hint" style="margin-top:8px;">กำลังโหลด...</div>';
+      try {
+        const r = await apiGet('getReceiptImage', { id: id, viewerEmail: session.Email, fileIndex: 0 });
+        if (r.error) throw new Error(r.error);
+        if (!r.dataUrl) { box.innerHTML = '<div class="hint">ไม่มีไฟล์</div>'; return; }
+        box.innerHTML = `<img src="${r.dataUrl}" style="width:100%;border-radius:12px;margin-top:9px;
+                          border:1px solid var(--gray-200);">
+          ${r.totalFiles > 1 ? `<div class="hint">มีทั้งหมด ${r.totalFiles} ไฟล์ — ดูไฟล์อื่นในชีท</div>` : ''}`;
+        box.dataset.loaded = '1';
+      } catch (e) { box.innerHTML = `<div class="hint" style="color:var(--danger);">${e.message}</div>`; }
+    };
+
+    window.decide = async function (id, decision) {
+      let remark = '';
+      if (decision === 'Rejected') {
+        remark = prompt('เหตุผลที่ไม่อนุมัติ (บังคับ)') || '';
+        if (!remark.trim()) return showToast('ต้องระบุเหตุผล', 'error');
+      } else if (!confirm('ยืนยันอนุมัติ?')) return;
+      showLoading('กำลังบันทึก...');
+      try {
+        const r = await approvePetty({ id, decision, approverEmail: session.Email, remark });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว' : '❌ ไม่อนุมัติ', 'success');
+        setTimeout(load, 700);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
+
+    window.doPay = async function (id, amt) {
+      if (!confirm('ยืนยันว่าจ่าย/รับเงินสด ' + amt + ' บาท เรียบร้อยแล้ว?\n\nยอดในกล่องจะเปลี่ยนทันที')) return;
+      showLoading('กำลังบันทึก...');
+      try {
+        const r = await payPetty({ id, actorEmail: session.Email });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast('บันทึกแล้ว · เหลือ ' + money((r.balance || {}).cash) + ' บาท', 'success');
+        setTimeout(load, 700);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
+
+    load();
+  </script>
+</body>
+</html>

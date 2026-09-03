@@ -229,6 +229,46 @@
     <div id="initialLoading" class="loading"><div class="spinner"></div></div>
   </div>
 
+  <!-- 💵 v7.0 เลือกแอปหลังล็อกอิน -->
+  <div id="appPicker" style="display:none;position:fixed;inset:0;z-index:9999;
+       background:rgba(15,23,42,.72);backdrop-filter:blur(6px);
+       align-items:center;justify-content:center;padding:22px;">
+    <div style="background:#fff;border-radius:22px;padding:24px 20px;max-width:400px;width:100%;
+         box-shadow:0 24px 60px rgba(0,0,0,.3);">
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:17px;font-weight:800;color:var(--gray-800);">เลือกระบบที่จะใช้</div>
+        <div style="font-size:12.5px;color:var(--gray-500);margin-top:4px;" id="apName">—</div>
+      </div>
+
+      <button type="button" onclick="pickApp('expense')" style="width:100%;text-align:left;border:2px solid var(--gray-200);
+              background:#fff;border-radius:16px;padding:15px 16px;display:flex;gap:13px;align-items:center;cursor:pointer;">
+        <span style="font-size:27px;line-height:1;">🧾</span>
+        <span style="flex:1;">
+          <span style="display:block;font-size:15px;font-weight:800;color:var(--gray-800);">Exion Expense</span>
+          <span style="display:block;font-size:11.5px;color:var(--gray-500);margin-top:2px;">
+            เบิกค่าใช้จ่าย — ออกเงินก่อน เบิกคืนทีหลัง</span>
+        </span>
+        <span style="color:var(--gray-300);font-size:19px;">›</span>
+      </button>
+
+      <button type="button" onclick="pickApp('petty')" style="width:100%;text-align:left;border:2px solid var(--gray-200);
+              background:#fff;border-radius:16px;padding:15px 16px;display:flex;gap:13px;align-items:center;
+              cursor:pointer;margin-top:11px;">
+        <span style="font-size:27px;line-height:1;">💵</span>
+        <span style="flex:1;">
+          <span style="display:block;font-size:15px;font-weight:800;color:var(--gray-800);">Petty Cash</span>
+          <span style="display:block;font-size:11.5px;color:var(--gray-500);margin-top:2px;">
+            เงินสดย่อย — เบิกเงินสดจากกล่องไปจ่ายเลย</span>
+        </span>
+        <span style="color:var(--gray-300);font-size:19px;">›</span>
+      </button>
+
+      <div style="text-align:center;font-size:11px;color:var(--gray-400);margin-top:15px;">
+        สลับระบบทีหลังได้จากหน้าแรก ไม่ต้องออกจากระบบ
+      </div>
+    </div>
+  </div>
+
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
@@ -306,7 +346,7 @@
         setSession(login);
         hideLoading();
         showToast('ตั้งรหัสสำเร็จ!', 'success');
-        showDashboard(login);
+        askApp(login);
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     });
 
@@ -321,9 +361,22 @@
         Object.assign(login, { role: role.role, isManager: role.isManager, isSenior: role.isSenior, isGM: role.isGM });
         setSession(login);
         hideLoading();
-        showDashboard(login);
+        askApp(login);
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     });
+
+    /* ── 💵 เลือกแอปหลังล็อกอิน ── */
+    function askApp(login) {
+      const box = document.getElementById('appPicker');
+      document.getElementById('apName').textContent = 'สวัสดี ' + (login.Name || '');
+      box.style.display = 'flex';
+    }
+    window.pickApp = function (name) {
+      document.getElementById('appPicker').style.display = 'none';
+      if (name === 'petty') { goHomeOfApp('petty'); return; }
+      setApp('expense');
+      showDashboard(getSession());
+    };
 
     document.getElementById('loginPwd').addEventListener('keydown', e => {
       if (e.key === 'Enter') document.getElementById('loginBtn').click();
@@ -382,6 +435,14 @@
           <a href="summary.html" class="tile">
             <div class="ib ib-purple">📊</div>
             <div><div class="lb">สรุปภาพรวม</div><div class="sb">Preview + สรุปยอด</div></div>
+          </a>
+        </div>
+
+        <div class="sec-label">ระบบอื่น</div>
+        <div class="tiles">
+          <a href="javascript:void(0)" onclick="goHomeOfApp('petty')" class="tile">
+            <div class="ib ib-teal">💵</div>
+            <div><div class="lb">Petty Cash</div><div class="sb">เงินสดย่อย — เบิกเงินสดไปจ่าย</div></div>
           </a>
         </div>
 

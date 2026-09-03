@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>รายการเคลื่อนไหว — เงินสดย่อย</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">รายการเคลื่อนไหว</span></h1>
+  </div>
+
+  <div class="container">
+    <div class="card" id="filterCard" style="display:none;">
+      <div class="seg" id="scopeSeg">
+        <button type="button" data-s="all" class="on">ทั้งกล่อง</button>
+        <button type="button" data-s="mine">ของฉัน</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div class="field" style="margin:0;"><label>ตั้งแต่</label><input type="date" id="dFrom"></div>
+        <div class="field" style="margin:0;"><label>ถึง</label><input type="date" id="dTo"></div>
+      </div>
+      <div class="field" style="margin:10px 0 0;"><label>สถานะ</label>
+        <select id="fStatus">
+          <option value="">ทั้งหมด</option>
+          <option value="Pending">รออนุมัติ</option>
+          <option value="Approved">รอรับเงิน</option>
+          <option value="Paid">จ่าย/รับแล้ว</option>
+          <option value="Rejected">ไม่อนุมัติ</option>
+          <option value="Cancelled">ยกเลิก</option>
+        </select>
+      </div>
+    </div>
+    <div id="content" class="loading"><div class="spinner"></div></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    setApp('petty');
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    let raw = null, scope = 'all';
+    const CAT_TH = {};
+    const ST = {
+      Pending:   { t:'รออนุมัติ',  c:'warn' },
+      Approved:  { t:'รอรับเงิน',  c:'ok'   },
+      Paid:      { t:'จ่าย/รับแล้ว', c:'ok' },
+      Rejected:  { t:'ไม่อนุมัติ', c:'bad'  },
+      Cancelled: { t:'ยกเลิก',     c:''     }
+    };
+    const money = n => Math.round(Number(n) || 0).toLocaleString();
+    const thDate = v => { const d = v ? new Date(v) : null;
+      return d && !isNaN(d) ? d.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) : '-'; };
+
+    async function load() {
+      try {
+        const [d, cs] = await Promise.all([
+          fetchPettyLedger(session.Email, '', scope),
+          fetchPettyCategories().catch(() => [])
+        ]);
+        if (d.error) throw new Error(d.error);
+        (Array.isArray(cs) ? cs : []).forEach(c => { CAT_TH[c.Code] = c.NameTH || c.Code; });
+        raw = d;
+        if (d.canSeeAll) document.getElementById('filterCard').style.display = 'block';
+        render();
+      } catch (err) {
+        const c = document.getElementById('content');
+        c.classList.remove('loading');
+        c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
+          <div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        renderBottomNav('pc-list');
+      }
+    }
+
+    document.getElementById('scopeSeg').querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => {
+        document.getElementById('scopeSeg').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        scope = b.dataset.s;
+        load();
+      });
+    });
+    ['dFrom', 'dTo', 'fStatus'].forEach(id =>
+      document.getElementById(id).addEventListener('change', render));
+
+    function visible() {
+      const from = document.getElementById('dFrom').value;
+      const to = document.getElementById('dTo').value;
+      const st = document.getElementById('fStatus').value;
+      return (raw.items || []).filter(r => {
+        if (st && r.Status !== st) return false;
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        if (isNaN(d)) return false;
+        if (from && d < new Date(from + 'T00:00:00')) return false;
+        if (to && d > new Date(to + 'T23:59:59')) return false;
+        return true;
+      });
+    }
+
+    function render() {
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+      const items = visible();
+      const b = raw.balance;
+
+      // ยอดที่ขยับเงินจริงเท่านั้น (Paid) — Pending/Approved ยังไม่ออกจากกล่อง
+      const paidOut = items.filter(r => r.Status === 'Paid' && String(r.Type).toUpperCase() === 'OUT')
+                           .reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+      const paidIn = items.filter(r => r.Status === 'Paid' && String(r.Type).toUpperCase() !== 'OUT')
+                          .reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+
+      let html = `
+        <div class="kpi-grid">
+          <div class="kpi"><div class="n">${items.length}</div><div class="l">รายการ</div></div>
+          <div class="kpi bad"><div class="n">${money(paidOut)}</div><div class="l">จ่ายออก</div></div>
+          <div class="kpi ok"><div class="n">${money(paidIn)}</div><div class="l">รับเข้า</div></div>
+          <div class="kpi"><div class="n">${money(b.cash)}</div><div class="l">คงเหลือตอนนี้</div></div>
+        </div>`;
+
+      if (!items.length) {
+        html += `<div class="empty"><div class="icon-wrap">🔍</div>
+          <div class="title">ไม่พบรายการ</div>
+          <a href="pc-request.html" class="btn btn-primary btn-sm"
+             style="margin-top:14px;max-width:220px;text-decoration:none;">➕ ขอเบิกเงินสด</a></div>`;
+        c.innerHTML = html;
+        renderBottomNav('pc-list');
+        return;
+      }
+
+      // จัดกลุ่มตามเดือน
+      const byMonth = {};
+      items.forEach(r => {
+        const d = new Date(r.ExpenseDate || r.Timestamp);
+        const k = isNaN(d) ? 'อื่นๆ' : d.toLocaleDateString('th-TH', { month:'long', year:'numeric' });
+        (byMonth[k] = byMonth[k] || []).push(r);
+      });
+      Object.keys(byMonth).forEach(m => {
+        const sum = byMonth[m].filter(r => r.Status === 'Paid' && String(r.Type).toUpperCase() === 'OUT')
+                              .reduce((s, r) => s + (Number(r.Amount) || 0), 0);
+        html += `<div style="display:flex;align-items:baseline;margin:16px 2px 8px;">
+            <span class="sec-label" style="margin:0;flex:1;">${m}</span>
+            <span style="font-size:12px;font-weight:700;color:var(--accent);">จ่ายออก ${money(sum)} ฿</span>
+          </div>`;
+        html += byMonth[m].map(card).join('');
+      });
+      c.innerHTML = html;
+      renderBottomNav('pc-list');
+    }
+
+    function card(r) {
+      const isIn = String(r.Type).toUpperCase() !== 'OUT';
+      const isAdj = String(r.Type).toUpperCase() === 'ADJUST';
+      const st = ST[r.Status] || { t: r.Status, c: '' };
+      const mine = String(r.RequesterEmail || '').toLowerCase() === String(session.Email).toLowerCase();
+      const canCancel = mine && (r.Status === 'Pending' || r.Status === 'Approved');
+      const amt = Number(r.Amount) || 0;
+      return `
+        <div class="card" style="border-left:4px solid ${r.Status === 'Paid' ? 'var(--ok)'
+            : r.Status === 'Rejected' ? 'var(--danger)' : 'var(--warn)'};">
+          <div style="display:flex;align-items:flex-start;gap:10px;">
+            <span style="font-size:19px;line-height:1.2;">${isAdj ? '⚖️' : isIn ? '📥' : '📤'}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13.5px;font-weight:800;color:var(--gray-800);">${r.Purpose || CAT_TH[r.Category] || r.Category}</div>
+              <div style="font-size:11px;color:var(--gray-500);margin-top:3px;">
+                ${thDate(r.ExpenseDate)} · ${CAT_TH[r.Category] || r.Category}
+                ${r.Payee ? ' · ' + r.Payee : ''}</div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:2px;">
+                ${r.RequesterName || ''}${r.OnBehalfBy ? ' (บันทึกโดย ' + String(r.OnBehalfBy).split('@')[0] + ')' : ''}</div>
+              ${r.ApproverRemark ? `<div style="font-size:11px;color:var(--gray-500);margin-top:4px;">💬 ${r.ApproverRemark}</div>` : ''}
+            </div>
+            <div style="text-align:right;white-space:nowrap;">
+              <div style="font-size:15px;font-weight:800;color:${amt < 0 ? 'var(--danger)' : isIn ? 'var(--ok)' : 'var(--accent)'};">
+                ${amt < 0 ? '−' : isIn ? '+' : '−'}${money(Math.abs(amt))}</div>
+              <span class="pill ${st.c}" style="font-size:9.5px;margin-top:3px;">${st.t}</span>
+            </div>
+          </div>
+          ${canCancel ? `<button class="btn btn-secondary btn-sm" style="margin-top:9px;"
+             onclick="doCancel('${r.ID}')">🗑 ยกเลิกรายการนี้</button>` : ''}
+        </div>`;
+    }
+
+    window.doCancel = async function (id) {
+      if (!confirm('ยกเลิกรายการนี้?')) return;
+      showLoading('กำลังยกเลิก...');
+      try {
+        const r = await cancelPetty({ id, actorEmail: session.Email });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        showToast('ยกเลิกแล้ว', 'success');
+        setTimeout(load, 600);
+      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+    };
+
+    load();
+  </script>
+</body>
+</html>

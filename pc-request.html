@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ขอเบิกเงินสด — EXION</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+</head>
+<body>
+  <div class="header">
+    <button class="back" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ขอเบิกเงินสด</span></h1>
+  </div>
+
+  <div class="container">
+    <div id="loading" class="loading"><div class="spinner"></div></div>
+    <div id="main" style="display:none;">
+      <div id="balBox"></div>
+      <div id="behalfBox"></div>
+      <div id="items"></div>
+      <button class="add-item-btn" id="addBtn" type="button">➕ เพิ่มรายการ</button>
+      <div id="sumBox"></div>
+      <button class="btn btn-primary" id="submitBtn" style="margin-top:14px;">✅ ส่งขออนุมัติ</button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    setApp('petty');
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    let cats = [], home = null, items = [], seq = 0, team = [];
+    let currentBatchId = null;   // 🔁 กันเน็ตหลุดแล้วยิงซ้ำ
+    const money = n => Math.round(Number(n) || 0).toLocaleString();
+    const catOf = code => cats.find(c => String(c.Code) === String(code)) || null;
+
+    async function init() {
+      try {
+        const [h, cs] = await Promise.all([fetchPettyHome(session.Email), fetchPettyCategories()]);
+        if (h.error) throw new Error(h.error);
+        home = h; cats = Array.isArray(cs) ? cs : [];
+        if (!cats.length) throw new Error('ยังไม่ได้ตั้งประเภทค่าใช้จ่ายเงินสดย่อย');
+
+        // ผู้ถือเงินบันทึกแทนคนอื่นได้
+        if (home.isHolder || home.canSeeAll) {
+          try {
+            const t = await apiGet('getAllRequests', { email: session.Email }).catch(() => []);
+            const names = {};
+            (Array.isArray(t) ? t : []).forEach(r => {
+              if (r.StaffEmail && r.StaffName) names[String(r.StaffEmail).toLowerCase()] = r.StaffName;
+            });
+            team = Object.keys(names).map(e => ({ email: e, name: names[e] })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+          } catch (e) { team = []; }
+        }
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('main').style.display = 'block';
+        renderBal(); renderBehalf(); addItem();
+        document.getElementById('addBtn').addEventListener('click', addItem);
+        document.getElementById('submitBtn').addEventListener('click', onSubmit);
+        renderBottomNav('pc-new');
+      } catch (err) {
+        const l = document.getElementById('loading');
+        l.classList.remove('loading');
+        l.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">เปิดไม่ได้</div>
+          <div class="sub">${err.message}</div>
+          <a href="pc-home.html" class="btn btn-secondary btn-sm" style="margin-top:14px;max-width:200px;text-decoration:none;">← กลับ</a></div>`;
+        renderBottomNav('pc-new');
+      }
+    }
+
+    function renderBal() {
+      const b = home.balance;
+      document.getElementById('balBox').innerHTML = `
+        <div class="card" style="padding:13px 15px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:22px;">💰</span>
+            <span style="flex:1;">
+              <span style="display:block;font-size:11.5px;color:var(--gray-500);">เงินที่เบิกได้ตอนนี้</span>
+              <span style="display:block;font-size:19px;font-weight:800;color:var(--gray-800);">${money(b.available)} บาท</span>
+            </span>
+            <span style="text-align:right;font-size:11px;color:var(--gray-400);line-height:1.5;">
+              ในกล่อง ${money(b.cash)}<br>กันไว้ ${money(b.reserved)}
+            </span>
+          </div>
+        </div>`;
+    }
+
+    function renderBehalf() {
+      if (!team.length) return;
+      document.getElementById('behalfBox').innerHTML = `
+        <div class="card">
+          <div class="field" style="margin:0;">
+            <label>บันทึกแทนใคร <span class="optional-tag">ผู้ถือเงินเท่านั้น</span></label>
+            <select id="onBehalf">
+              <option value="">— ตัวเอง (${session.Name}) —</option>
+              ${team.filter(t => t.email !== String(session.Email).toLowerCase())
+                    .map(t => `<option value="${t.email}">${t.name}</option>`).join('')}
+            </select>
+            <div class="hint">เลือกเมื่อพนักงานมาขอเงินสดที่โต๊ะ แล้วคุณกรอกให้</div>
+          </div>
+        </div>`;
+    }
+
+    function addItem() {
+      syncDom();
+      seq++;
+      const prev = items.length ? items[items.length - 1] : null;
+      const it = { id: 'it_' + seq, category: '', expenseDate: prev ? prev.expenseDate : todayYMD(),
+                   payee: '', purpose: '', amount: 0, note: '', receipts: [] };
+      items.push(it);
+      renderItems();
+    }
+    window.removeItem = function (id) {
+      syncDom();
+      if (items.length <= 1) return showToast('ต้องมีอย่างน้อย 1 รายการ', 'error');
+      items = items.filter(x => x.id !== id);
+      renderItems();
+    };
+
+    function syncDom() {
+      items.forEach(it => {
+        const g = k => document.getElementById(it.id + '_' + k);
+        if (g('cat')) it.category = g('cat').value;
+        if (g('date')) it.expenseDate = g('date').value;
+        if (g('payee')) it.payee = g('payee').value;
+        if (g('purpose')) it.purpose = g('purpose').value;
+        if (g('amount')) it.amount = parseFloat(g('amount').value) || 0;
+        if (g('note')) it.note = g('note').value;
+      });
+    }
+
+    function renderItems() {
+      document.getElementById('items').innerHTML = items.map((it, i) => {
+        const cat = catOf(it.category);
+        const rule = cat ? String(cat.NeedReceipt || '').toUpperCase() : '';
+        const cap = cat ? Number(cat.MaxAmount) || 0 : 0;
+        return `
+        <div class="card">
+          <div class="card-head">
+            <span class="ib ib-red">${i + 1}</span>
+            <div><div class="ch-title">รายการที่ ${i + 1}</div>
+              <div class="ch-sub">${cat ? (cat.NameTH || cat.Code) : 'เลือกประเภทก่อน'}</div></div>
+            ${items.length > 1 ? `<button type="button" class="btn btn-secondary btn-sm"
+               onclick="removeItem('${it.id}')" style="margin-left:auto;max-width:52px;">🗑</button>` : ''}
+          </div>
+
+          <div class="field"><label>ประเภท *</label>
+            <select id="${it.id}_cat">
+              <option value="">— เลือก —</option>
+              ${cats.map(c => `<option value="${c.Code}" ${c.Code === it.category ? 'selected' : ''}>${c.NameTH || c.Code}</option>`).join('')}
+            </select>
+            ${cap ? `<div class="hint">เพดาน ${money(cap)} บาทต่อรายการ · เกินกว่านี้ให้เบิกผ่าน Exion Expense</div>` : ''}
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="field" style="margin:0;"><label>วันที่ *</label>
+              <input type="date" id="${it.id}_date" value="${it.expenseDate}" max="${todayYMD()}"></div>
+            <div class="field" style="margin:0;"><label>จำนวนเงิน (บาท) *</label>
+              <input type="number" id="${it.id}_amount" inputmode="decimal" step="0.01" min="0"
+                     value="${it.amount || ''}" placeholder="0.00"></div>
+          </div>
+
+          <div class="field"><label>จ่ายค่าอะไร *</label>
+            <input type="text" id="${it.id}_purpose" value="${it.purpose}" placeholder="เช่น ซื้อกระดาษ A4 5 รีม"></div>
+
+          <div class="field"><label>จ่ายให้ใคร / ร้าน <span class="optional-tag">ไม่บังคับ</span></label>
+            <input type="text" id="${it.id}_payee" value="${it.payee}" placeholder="เช่น ออฟฟิศเมท สาขาพระราม 9"></div>
+
+          ${rule !== 'NO' && rule !== '' ? `
+          <div class="field"><label>ใบเสร็จ ${rule === 'YES' ? '*' : '<span class="optional-tag">แนบก็ได้</span>'}</label>
+            <label class="upload-area" for="${it.id}_files">
+              <div class="icon-wrap">📎</div>
+              <div class="text">แตะเพื่อแนบไฟล์</div>
+              <div class="sub">ภาพ / PDF · แนบได้หลายไฟล์</div>
+            </label>
+            <input type="file" id="${it.id}_files" accept="image/*,application/pdf" multiple style="display:none;">
+            <div id="${it.id}_chips" class="chips"></div>
+          </div>` : ''}
+        </div>`;
+      }).join('');
+
+      items.forEach(it => {
+        const cat = document.getElementById(it.id + '_cat');
+        if (cat) cat.addEventListener('change', () => { syncDom(); renderItems(); });
+        const amt = document.getElementById(it.id + '_amount');
+        if (amt) amt.addEventListener('input', () => { syncDom(); renderSum(); });
+        const files = document.getElementById(it.id + '_files');
+        if (files) files.addEventListener('change', e => onFiles(it, e.target.files));
+        drawChips(it);
+      });
+      renderSum();
+    }
+
+    async function onFiles(it, fileList) {
+      syncDom();
+      for (const f of Array.from(fileList || [])) {
+        if (f.size > 5 * 1024 * 1024) { showToast(f.name + ' ใหญ่เกิน 5 MB', 'error'); continue; }
+        try {
+          const base64 = await readAsDataURL(f);
+          it.receipts.push({ name: f.name, base64: base64 });
+        } catch (e) { showToast('อ่านไฟล์ไม่ได้: ' + f.name, 'error'); }
+      }
+      drawChips(it);
+    }
+    function readAsDataURL(file) {
+      return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+    }
+    window.dropFile = function (itemId, idx) {
+      const it = items.find(x => x.id === itemId);
+      if (!it) return;
+      it.receipts.splice(idx, 1);
+      drawChips(it);
+    };
+    function drawChips(it) {
+      const box = document.getElementById(it.id + '_chips');
+      if (!box) return;
+      box.innerHTML = it.receipts.map((f, i) =>
+        `<span class="file-chip">📄 ${String(f.name).slice(0, 22)}
+           <button type="button" onclick="dropFile('${it.id}',${i})">✕</button></span>`).join('');
+    }
+
+    function renderSum() {
+      const total = items.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      const avail = home.balance.available;
+      const over = total > avail;
+      document.getElementById('sumBox').innerHTML = `
+        <div class="card" style="margin-top:12px;${over ? 'border-left:4px solid var(--danger);' : ''}">
+          <div style="display:flex;align-items:center;">
+            <span style="flex:1;font-size:13px;color:var(--gray-500);">รวม ${items.length} รายการ</span>
+            <span style="font-size:21px;font-weight:800;color:${over ? 'var(--danger)' : 'var(--accent)'};">${money(total)} บาท</span>
+          </div>
+          ${over ? `<div style="font-size:12px;color:var(--danger);margin-top:7px;font-weight:600;">
+            ⚠️ เกินเงินที่เบิกได้ (${money(avail)} บาท) — ให้ผู้ถือเงินเติมเงินก่อน</div>` : ''}
+        </div>`;
+    }
+
+    async function onSubmit() {
+      syncDom();
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i], n = 'รายการที่ ' + (i + 1) + ': ';
+        const cat = catOf(it.category);
+        if (!cat) return showToast(n + 'เลือกประเภทก่อน', 'error');
+        if (!it.expenseDate) return showToast(n + 'ใส่วันที่', 'error');
+        if (!(Number(it.amount) > 0)) return showToast(n + 'ใส่จำนวนเงิน', 'error');
+        if (!String(it.purpose || '').trim()) return showToast(n + 'ใส่ว่าจ่ายค่าอะไร', 'error');
+        const cap = Number(cat.MaxAmount) || 0;
+        if (cap && Number(it.amount) > cap)
+          return showToast(n + (cat.NameTH || cat.Code) + ' เกินเพดาน ' + money(cap) + ' บาท', 'error');
+        if (String(cat.NeedReceipt || '').toUpperCase() === 'YES' && !it.receipts.length)
+          return showToast(n + 'ต้องแนบใบเสร็จ', 'error');
+      }
+      const total = items.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      if (total > home.balance.available)
+        return showToast('เกินเงินที่เบิกได้ (' + money(home.balance.available) + ' บาท)', 'error');
+
+      const behalf = (document.getElementById('onBehalf') || {}).value || '';
+      const who = behalf ? (team.find(t => t.email === behalf) || {}).name : session.Name;
+      if (!confirm('ขอเบิกเงินสด ' + money(total) + ' บาท\n' + items.length + ' รายการ · ให้ ' + who + '\n\nยืนยันส่งขออนุมัติ?')) return;
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      showLoading('กำลังส่ง...');
+      if (!currentBatchId) currentBatchId = 'PCB-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      try {
+        const r = await submitPetty({
+          actorEmail: session.Email,
+          requesterEmail: behalf || session.Email,
+          batchId: currentBatchId,
+          items: items.map(it => ({
+            category: it.category, expenseDate: it.expenseDate, amount: it.amount,
+            payee: it.payee, purpose: it.purpose, note: it.note, receipts: it.receipts
+          }))
+        });
+        hideLoading();
+        if (r.error) throw new Error(r.error);
+        currentBatchId = null;   // ส่งสำเร็จ รอบหน้าได้รหัสใหม่
+        showToast('ส่งขออนุมัติแล้ว ' + (r.items || []).length + ' รายการ ✅', 'success');
+        setTimeout(() => location.href = 'pc-list.html', 1300);
+      } catch (err) {
+        // ⚠️ ไม่ล้างรหัสชุด — กดส่งใหม่จะใช้รหัสเดิม ไม่เกิดรายการซ้ำ
+        hideLoading();
+        showToast(err.message, 'error');
+        btn.disabled = false;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

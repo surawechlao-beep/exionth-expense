@@ -149,7 +149,7 @@
       <div class="mbar" id="mbar"></div>
 
       <div id="scopeWrap" style="display:none;">
-        <div class="segs" id="scopeSeg">
+        <div class="seg" id="scopeSeg">
           <button type="button" data-s="__self__" class="on">👤 ตัวเอง</button>
           <button type="button" data-s="__all__">👥 ทุกคน</button>
         </div>
@@ -158,7 +158,7 @@
         </div>
       </div>
 
-      <div class="segs" id="stSeg">
+      <div class="seg" id="stSeg">
         <button type="button" data-st="" class="on">ทั้งหมด</button>
         <button type="button" data-st="Approved">✅ อนุมัติ</button>
         <button type="button" data-st="Pending">⏳ รออนุมัติ</button>
@@ -282,6 +282,12 @@
 
     /** เปลี่ยนเดือน/ปี → ดึงใหม่จาก server (กรองฝั่ง server) */
     async function reload() {
+      /*
+       * 🔴 เปลี่ยนเดือน/ปี ต้องคำนวณช่วงวันใหม่ด้วย
+       *    เดิมไม่รีเซ็ต rangeReady → กดเดือนอื่นแล้วช่วงวันยังค้างเดือนเก่า
+       *    ตารางเลยว่างเปล่าทั้งที่มีข้อมูล
+       */
+      rangeReady = false;
       const ld = document.getElementById('loading');
       document.getElementById('content').style.display = 'none';
       ld.style.display = ''; ld.classList.add('loading');

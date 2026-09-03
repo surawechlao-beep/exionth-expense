@@ -38,6 +38,19 @@
       <button class="btn btn-secondary btn-sm" style="margin-top:12px;" onclick="clearFilters()">🗑 ล้างตัวกรอง</button>
     </div>
 
+    <div class="card" id="exportCard">
+      <div class="sec-label" style="margin:0 0 10px;">📥 โหลดเป็น Excel</div>
+      <div class="field" id="whoWrap" style="display:none;margin:0 0 10px;">
+        <label>ของใคร</label>
+        <select id="expWho"></select>
+      </div>
+      <button class="btn btn-primary" id="expBtn" onclick="doExportList()">📥 โหลด Excel</button>
+      <div class="hint" style="margin-top:7px;">
+        เลข Job · ลูกค้า · ผู้ติดต่อ · ประเภท · ผู้ร่วม · วันที่ · ยอดพรี · ยอดจริง<br>
+        ใช้ช่วงวันและสถานะจากตัวกรองด้านบน
+      </div>
+    </div>
+
     <div id="kpiZone"></div>
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
@@ -70,6 +83,49 @@
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
 
+    /* ── 📥 โหลดรายการคำขอเป็น Excel ── */
+    async function loadExportPeople() {
+      try {
+        const list = await fetchExportableStaff(session.Email);
+        if (!Array.isArray(list) || list.length <= 1) return;   // ไม่มีลูกทีม = ไม่ต้องโชว์
+        const sel = document.getElementById('expWho');
+        sel.innerHTML = list.map(p => `<option value="${p.email}">${p.name}</option>`).join('');
+        document.getElementById('whoWrap').style.display = 'block';
+      } catch (e) { /* โหลดรายชื่อไม่ได้ก็ยังโหลดของตัวเองได้ */ }
+    }
+
+    window.doExportList = async function () {
+      const btn = document.getElementById('expBtn');
+      const who = (document.getElementById('expWho') || {}).value || session.Email;
+      btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...';
+      try {
+        const r = await exportRequestList({
+          requesterEmail: session.Email,
+          staffEmail: who,
+          dateFrom: document.getElementById('dateFrom').value,
+          dateTo:   document.getElementById('dateTo').value,
+          status:   document.getElementById('filterStatus').value
+        });
+        if (r.error) throw new Error(r.error);
+        if (!r.base64) throw new Error('ไม่มีข้อมูลไฟล์');
+        const bytes = atob(r.base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: r.mimeType ||
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = r.filename || 'requests.xlsx';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast('โหลดแล้ว · ' + r.count + ' รายการ', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = '📥 โหลด Excel';
+      }
+    };
+
     window.load = load;
     async function load() {
       try {
@@ -80,6 +136,7 @@
         sel.innerHTML = '<option value="">ทั้งหมด</option>';
         categories.forEach(c => { const o=document.createElement('option'); o.value=c.Code; o.textContent=catLabel(c.Code); sel.appendChild(o); });
         applyFilters();
+        loadExportPeople();
       } catch (err) {
         document.getElementById('list').classList.remove('loading');
         document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
@@ -312,6 +369,8 @@
         </div>
         <div class="field"><label>สถานที่ / รายละเอียด</label><input type="text" id="e_venue" value="${r.Venue || ''}"></div>
         <div class="field"><label>ลูกค้า</label><input type="text" id="e_customer" value="${r.Customer || ''}"></div>
+        <div class="field"><label>เลข Job <span class="optional-tag">ไม่บังคับ</span></label>
+          <input type="text" id="e_jobNo" value="${r.JobNo || ''}" placeholder="เช่น J2026-0142"></div>
         <div class="field"><label>ผู้ติดต่อ</label><input type="text" id="e_contact" value="${r.CustomerContact || ''}"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="field"><label>ต้นทาง</label><input type="text" id="e_origin" value="${r.Origin || ''}"></div>
@@ -377,6 +436,7 @@
         Venue: document.getElementById('e_venue').value,
         Customer: document.getElementById('e_customer').value,
         CustomerContact: document.getElementById('e_contact').value,
+        JobNo: (document.getElementById('e_jobNo') || {}).value || '',
         Origin: document.getElementById('e_origin').value,
         Destination: document.getElementById('e_dest').value
       };

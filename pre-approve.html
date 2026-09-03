@@ -71,6 +71,11 @@
       </div>
 
       <div class="field">
+        <label>เลข Job <span class="optional-tag">ไม่บังคับ</span></label>
+        <input type="text" id="jobNo" placeholder="เช่น J2026-0142">
+      </div>
+
+      <div class="field">
         <label>โอกาส / วัตถุประสงค์ <span class="required">*</span></label>
         <textarea id="occasion" rows="3" placeholder="เช่น พบเพื่อ Demo โครงการ Q3"></textarea>
       </div>
@@ -105,7 +110,7 @@
     async function init() {
       const bb = document.getElementById('backBtn');
       if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
-      document.getElementById('expenseDate').value = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      document.getElementById('expenseDate').value = toYMD(new Date(Date.now() + 86400000));   // พรุ่งนี้ ตามเวลาไทย
 
       document.querySelectorAll('#custTypeSeg button').forEach(b => {
         b.addEventListener('click', () => {
@@ -150,7 +155,8 @@
       try {
         const result = await submitPreApprove({
           staffEmail: session.Email, category, expenseDate, venue,
-          customer, customerContact, occasion, attendees, budget
+          customer, customerContact, occasion, attendees, budget,
+          jobNo: (document.getElementById('jobNo') || {}).value || ''
         });
         if (result.error) throw new Error(result.error);
         hideLoading();
