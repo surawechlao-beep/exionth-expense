@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">Inbox (GM)</span></h1>
   </div>
 
@@ -31,7 +31,7 @@
 
   <div id="modal" class="modal">
     <div class="modal-content">
-      <div class="modal-head"><h3 id="modalTitle">รายละเอียด</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="modal-head"><h3 id="modalTitle">รายละเอียด</h3><button class="modal-close" aria-label="ปิด" onclick="closeModal()">✕</button></div>
       <div id="modalContent"></div>
     </div>
   </div>
@@ -47,8 +47,8 @@
     let mySig = { hasSignature: false };
     let sigPad = null;
 
-    const CAT_TH = { FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม', ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ', CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทร ตปท.', APT:'ที่พัก' };
-    const CAT_IC = { FUEL:'⛽', EXPRESS:'🛣️', PARK:'🅿️', HOTEL:'🏨', ENT:'🍽️', GOLF:'⛳', TRAVEL:'✈️', OTHER:'📦', CAR:'🚗', MOBILE:'📱', OVERSEAS:'☎️', APT:'🏠' };
+    const CAT_TH = catMap();   // 🔴 รวมไว้ที่ js/app.js แล้ว ห้ามก๊อปตารางมาไว้ในหน้าอีก
+    const CAT_IC = CAT_ICON_TH;
 
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
@@ -66,7 +66,7 @@
         pending = Array.isArray(result) ? result : [];
         render();
       } catch (err) {
-        document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">${err.message}</div></div>`;
+        renderError('list', err.message, load);
         renderBottomNav('inbox');
       }
     }
@@ -220,7 +220,7 @@
       if (urls.length > 0) {
         html += `<div style="margin-top:16px;"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">📎 ใบเสร็จ (${urls.length})</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`;
         for (let i=0;i<urls.length;i++) html += `<button class="btn btn-secondary btn-sm" onclick="loadReceipt('${r.ID}',${i})">🔒 ไฟล์ ${i+1}</button>`;
-        html += `</div><img id="rcptImg" class="preview-img" style="display:none;"></div>`;
+        html += `</div><img id="rcptImg" class="preview-img" alt="ใบเสร็จ" style="display:none;"></div>`;
       }
 
       html += `<div class="field" style="margin-top:18px;"><label>หมายเหตุ <span style="color:var(--gray-400);font-weight:400;">(ถ้ามี)</span></label><textarea id="remark" rows="2"></textarea></div>`;

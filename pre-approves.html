@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">Pre-Approve ของฉัน</span></h1>
   </div>
 
@@ -26,7 +26,8 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
-    const CAT_TH = { ENT:'🍽 ค่ารับรอง', GOLF:'⛳ กอล์ฟ' };
+    // หน้านี้ใช้แค่ 2 ประเภท แต่ยังดึงชื่อจากตารางกลาง คำจะได้ไม่เพี้ยนกัน
+    const CAT_TH = { ENT: catLabel('ENT'), GOLF: catLabel('GOLF') };
 
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
@@ -75,10 +76,8 @@
         list.innerHTML = html;
         renderBottomNav('');
       } catch (err) {
-        const list = document.getElementById('list');
-        list.classList.remove('loading');
-        list.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div><div class="title">${err.message}</div></div>`;
-        renderBottomNav('');
+        renderError('list', err.message, load);
+        renderBottomNav('pre');
       }
     }
 

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ตาราง MSBC — เงินสดย่อย</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+  <style>
+    /* ต้องจำกัดความสูง หัวตารางที่ตั้ง sticky ไว้ถึงจะค้างจริงตอนเลื่อน */
+    .msbc-wrap { overflow: auto; max-height: 68vh; -webkit-overflow-scrolling: touch;
+                 border: 1px solid var(--gray-200); border-radius: 10px; background: #fff; }
+    table.msbc { border-collapse: collapse; font-size: 12px; min-width: 1080px; width: 100%; }
+    table.msbc th { background: #D9D9D9; font-weight: 700; padding: 7px 8px; text-align: center;
+                    white-space: nowrap; border: 1px solid #bbb; position: sticky; top: 0; z-index: 2; }
+    table.msbc td { padding: 5px 8px; border: 1px solid #ddd; vertical-align: top; }
+    table.msbc td[contenteditable]:focus { outline: 2px solid var(--accent); background: #fff8f8; }
+    table.msbc tr:nth-child(even) td { background: #fafafa; }
+    table.msbc tr:nth-child(even) td[contenteditable]:focus { background: #fff8f8; }
+    .c-no    { width: 34px;  text-align: center; color: var(--gray-500); }
+    .c-amt   { width: 92px;  text-align: right; white-space: nowrap; }
+    .c-dep   { width: 74px;  text-align: center; }
+    .c-date  { width: 92px;  text-align: center; white-space: nowrap; }
+    .c-del   { width: 44px;  text-align: center; padding: 0 !important; }
+    .c-del button { width: 100%; min-height: 40px; border: 0; background: none; cursor: pointer;
+                    color: var(--gray-400); font-size: 14px; font-family: inherit; border-radius: 8px; }
+    .c-del button:hover { color: var(--danger); background: var(--warn-bg); }
+    .warnDept { background: #FFF3CD !important; box-shadow: inset 0 0 0 1px #E0A800; }
+    table.msbc select { border: none; background: transparent; font: inherit; width: 100%; }
+    .tfoot td { font-weight: 800; background: #f0f0f0 !important; }
+    .mini { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+    .mini td { padding: 5px 9px; border-bottom: 1px solid var(--gray-100); }
+    .mini td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .mini tr:last-child td { font-weight: 800; border-bottom: none; border-top: 2px solid var(--gray-200); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">📋 ตาราง MSBC</span></h1>
+  </div>
+
+  <div class="container">
+    <div id="gate" class="loading"><div class="spinner"></div></div>
+
+    <div id="main" style="display:none;">
+      <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="margin:0;"><label>ตั้งแต่</label><input type="date" id="dFrom"></div>
+          <div class="field" style="margin:0;"><label>ถึง</label><input type="date" id="dTo"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:11px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="incPending" checked style="width:17px;height:17px;">
+          รวมรายการที่ยังไม่จ่าย (Pending)
+        </label>
+        <div class="field" style="margin:11px 0 0;">
+          <label>หัวรายงาน <span class="optional-tag">แก้ได้</span></label>
+          <input type="text" id="title" placeholder="(F) Other Operation Expense #1 of SEP 2026">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px;">
+          <button class="btn btn-secondary btn-sm" id="sinceBtn" style="margin:0;display:none;">🧾 ตั้งแต่เคลียร์บิลล่าสุด</button>
+          <button class="btn btn-secondary btn-sm" id="reloadBtn" style="margin:0;">🔄 ดึงข้อมูลใหม่</button>
+        </div>
+      </div>
+
+      <div id="warnBox"></div>
+
+      <div class="card" style="padding:11px 13px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+          <button class="btn btn-primary btn-sm" id="copyBtn" style="margin:0;">📋 ก๊อปทั้งตาราง</button>
+          <button class="btn btn-secondary btn-sm" id="xlsBtn" style="margin:0;">📥 โหลด Excel</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;cursor:pointer;color:var(--gray-600);">
+          <input type="checkbox" id="withHead" style="width:16px;height:16px;">
+          ก๊อปหัวคอลัมน์มาด้วย
+        </label>
+        <div class="hint" style="margin-top:6px;">
+          คลิกช่องไหนก็พิมพ์แก้ได้ · กด ✕ ท้ายแถวเพื่อตัดออก · ยอดสรุปคิดตามที่แก้ล่าสุด
+        </div>
+      </div>
+
+      <div class="sec-label">ตาราง <span id="cnt" style="color:var(--gray-400);font-weight:600;"></span></div>
+      <div class="msbc-wrap"><table class="msbc" id="tbl"></table></div>
+
+      <div class="sec-label">สรุป</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;">
+        <div class="card" style="padding:11px 4px;"><table class="mini" id="mDept"></table></div>
+        <div class="card" style="padding:11px 4px;"><table class="mini" id="mStat"></table></div>
+      </div>
+      <div class="card"><table class="mini" id="mBal"></table></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    setApp('petty');
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    /* ลำดับคอลัมน์ต้องตรงกับไฟล์ที่บัญชีใช้เป๊ะ ไม่งั้นวางแล้วเลื่อน */
+    const COLS = [
+      { k:'supplier',       h:'Suppliers',        cls:'' },
+      { k:'description',    h:'Description',      cls:'' },
+      { k:'amount',         h:'Amount',           cls:'c-amt' },
+      { k:'department',     h:'Department',       cls:'c-dep' },
+      { k:'preparedBy',     h:'Prepared By',      cls:'' },
+      { k:'status',         h:'Status',           cls:'c-dep' },
+      { k:'paymentDate',    h:'Payment date',     cls:'c-date' },
+      { k:'processingDate', h:'Processing Date',  cls:'c-date' },
+      { k:'dueDate',        h:'Payment due date', cls:'c-date' },
+      { k:'remark',         h:'Remark',           cls:'' }
+    ];
+
+    let rows = [], meta = null;
+    const money = n => (Math.round((Number(n) || 0) * 100) / 100)
+                        .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const num = v => Number(String(v == null ? 0 : v).replace(/,/g, '')) || 0;
+    const esc = s => String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    /* ตัด tab/ขึ้นบรรทัดออก ไม่งั้นวางใน Excel แล้วช่องแตก */
+    const flat = s => String(s == null ? '' : s).replace(/[\t\r\n]+/g, ' ').trim();
+
+    function ymd(d) {
+      const p = n => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+
+    async function load() {
+      const g = document.getElementById('gate');
+      document.getElementById('main').style.display = 'none';
+      g.style.display = 'block'; g.className = 'loading';
+      g.innerHTML = '<div class="spinner"></div>';
+      try {
+        const d = await fetchPettyMSBC(session.Email, {
+          dateFrom: document.getElementById('dFrom').value,
+          dateTo:   document.getElementById('dTo').value,
+          includePending: document.getElementById('incPending').checked
+        });
+        if (d.error) throw new Error(d.error);
+        meta = d;
+        rows = (d.items || []).slice();
+        const t = document.getElementById('title');
+        if (!t.value) t.value = d.titleSuggest || '';
+        /* ทางลัด: บิลที่ยังไม่เคลียร์ = ตั้งแต่วันเคลียร์ล่าสุดถึงวันนี้ */
+        const since = (d.live || {}).lastTopUpAt || '';
+        document.getElementById('sinceBtn').style.display = since ? 'block' : 'none';
+        document.getElementById('sinceBtn').dataset.since = since;
+        g.style.display = 'none';
+        document.getElementById('main').style.display = 'block';
+        renderWarn(); renderTable(); renderSums();
+        renderBottomNav('pc-fund');
+      } catch (err) {
+        g.classList.remove('loading');
+        g.innerHTML = '<div class="empty"><div class="icon-wrap">⚠️</div>' +
+          '<div class="title">เปิดไม่ได้</div><div class="sub">' + esc(err.message) + '</div>' +
+          '<a href="pc-home.html" class="btn btn-secondary btn-sm" style="margin-top:14px;max-width:200px;text-decoration:none;">← กลับ</a></div>';
+        renderBottomNav('pc-fund');
+      }
+    }
+
+    function renderWarn() {
+      const u = (meta && meta.unmapped) || [];
+      document.getElementById('warnBox').innerHTML = !u.length ? '' :
+        '<div class="card" style="background:var(--warn-bg);border:none;padding:11px 13px;">' +
+        '<b style="color:var(--gray-800);">⚠️ แผนกที่ยังไม่มีรหัส MSBC</b>' +
+        '<div style="font-size:12px;color:var(--gray-600);margin-top:4px;line-height:1.6;">' +
+        u.map(esc).join(' · ') + '<br>ตอนนี้ใส่ชื่อเดิมลงไปก่อน — เพิ่มในชีท <b>Settings</b> ' +
+        'คีย์ <code>PETTY_DEPT_MAP</code> เช่น <code>Sales=VS, Service=CS</code></div></div>';
+    }
+
+    function renderTable() {
+      let h = '<thead><tr><th class="c-no">No.</th>' +
+              COLS.map(c => '<th>' + c.h + '</th>').join('') + '<th class="c-del"></th></tr></thead><tbody>';
+      rows.forEach((r, i) => {
+        h += '<tr data-i="' + i + '"><td class="c-no">' + (i + 1) + '</td>';
+        COLS.forEach(c => {
+          if (c.k === 'status') {
+            h += '<td class="' + c.cls + '"><select data-i="' + i + '" data-k="status">' +
+                 ['Paid', 'Pending'].map(s =>
+                   '<option' + (r.status === s ? ' selected' : '') + '>' + s + '</option>').join('') +
+                 '</select></td>';
+          } else {
+            const v = c.k === 'amount' ? money(r.amount) : (r[c.k] || '');
+            const bad = c.k === 'department' && r.deptUnmapped ? ' warnDept' : '';
+            h += '<td class="' + c.cls + bad + '" contenteditable="true" data-i="' + i +
+                 '" data-k="' + c.k + '">' + esc(v) + '</td>';
+          }
+        });
+        h += '<td class="c-del"><button type="button" data-del="' + i +
+               '" aria-label="ตัดแถวที่ ' + (i + 1) + ' ออก" title="ตัดแถวนี้ออก">✕</button></td></tr>';
+      });
+      h += '</tbody>';
+      document.getElementById('tbl').innerHTML = h;
+      document.getElementById('cnt').textContent = rows.length + ' รายการ';
+    }
+
+    /* แก้ในช่อง → เก็บกลับเข้าตัวแปรทันที ปุ่มก๊อป/โหลดจะได้ค่าล่าสุดเสมอ */
+    document.getElementById('tbl').addEventListener('input', e => {
+      const td = e.target.closest('[data-k]');
+      if (!td || td.tagName === 'SELECT') return;
+      const i = +td.dataset.i, k = td.dataset.k;
+      if (!rows[i]) return;
+      rows[i][k] = k === 'amount' ? num(td.textContent) : td.textContent;
+      if (k === 'department') { rows[i].deptUnmapped = false; td.classList.remove('warnDept'); }
+      if (k === 'amount') renderSums();
+    });
+    document.getElementById('tbl').addEventListener('change', e => {
+      if (e.target.tagName !== 'SELECT') return;
+      const i = +e.target.dataset.i;
+      if (rows[i]) { rows[i].status = e.target.value; renderSums(); }
+    });
+    /* Enter ในช่องแก้ = จบการแก้ ไม่ใช่ขึ้นบรรทัดใหม่ (ขึ้นบรรทัดแล้ววางใน Excel ช่องแตก) */
+    document.getElementById('tbl').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.hasAttribute('contenteditable')) { e.preventDefault(); e.target.blur(); }
+    });
+    document.getElementById('tbl').addEventListener('click', e => {
+      const d = e.target.closest('[data-del]');
+      if (!d) return;
+      rows.splice(+d.dataset.del, 1);
+      renderTable(); renderSums();
+    });
+
+    function renderSums() {
+      const byDept = {}, byStat = { Paid: 0, Pending: 0 };
+      let total = 0;
+      rows.forEach(r => {
+        const a = num(r.amount);
+        const k = String(r.department || '').trim() || '(ไม่ระบุ)';
+        byDept[k] = (byDept[k] || 0) + a;
+        byStat[r.status === 'Paid' ? 'Paid' : 'Pending'] += a;
+        total += a;
+      });
+      document.getElementById('mDept').innerHTML =
+        '<tr><td><b>Department</b></td><td><b>Amount</b></td></tr>' +
+        Object.keys(byDept).sort().map(k =>
+          '<tr><td>' + esc(k) + '</td><td>' + money(byDept[k]) + '</td></tr>').join('') +
+        '<tr><td>TOTAL</td><td>' + money(total) + '</td></tr>';
+      document.getElementById('mStat').innerHTML =
+        '<tr><td><b>Status</b></td><td><b>Amount</b></td></tr>' +
+        '<tr><td>Paid</td><td>' + money(byStat.Paid) + '</td></tr>' +
+        '<tr><td>Pending</td><td>' + money(byStat.Pending) + '</td></tr>' +
+        '<tr><td>TOTAL</td><td>' + money(total) + '</td></tr>';
+      const limit = (meta && meta.topUp) || 0;
+      document.getElementById('mBal').innerHTML =
+        '<tr><td>Petty Cash Account - Top Up to meet</td><td>' + money(limit) + '</td></tr>' +
+        '<tr><td>Operation Expense</td><td>' + money(total) + '</td></tr>' +
+        '<tr><td>Balance</td><td>' + money(limit - total) + '</td></tr>';
+      document.getElementById('cnt').textContent = rows.length + ' รายการ · ' + money(total) + ' ฿';
+    }
+
+    function buildTSV() {
+      const out = [];
+      if (document.getElementById('withHead').checked) {
+        out.push(['No.'].concat(COLS.map(c => c.h)).join('\t'));
+      }
+      rows.forEach((r, i) => {
+        out.push([i + 1].concat(COLS.map(c =>
+          c.k === 'amount' ? num(r.amount).toFixed(2) : flat(r[c.k])
+        )).join('\t'));
+      });
+      return out.join('\n');
+    }
+
+    document.getElementById('copyBtn').addEventListener('click', async () => {
+      if (!rows.length) return showToast('ไม่มีรายการให้ก๊อป', 'error');
+      const tsv = buildTSV();
+      try {
+        await navigator.clipboard.writeText(tsv);
+        showToast('ก๊อป ' + rows.length + ' แถวแล้ว — ไปวางใน MSBC ได้เลย', 'success');
+      } catch (e) {
+        /* บางเบราว์เซอร์/หน้าที่ไม่ใช่ https ใช้ clipboard API ไม่ได้ — ถอยไปวิธีเดิม */
+        let ok = false;
+        if (typeof document.execCommand === 'function') {
+          const ta = document.createElement('textarea');
+          ta.value = tsv;
+          ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+          document.body.appendChild(ta);
+          ta.select();
+          try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+          document.body.removeChild(ta);
+        }
+        showToast(ok ? 'ก๊อป ' + rows.length + ' แถวแล้ว' : 'ก๊อปไม่สำเร็จ — ลากคลุมตารางแล้วกด Ctrl+C',
+                  ok ? 'success' : 'error');
+      }
+    });
+
+    document.getElementById('xlsBtn').addEventListener('click', async () => {
+      if (!rows.length) return showToast('ไม่มีรายการให้โหลด', 'error');
+      const btn = document.getElementById('xlsBtn');
+      btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...';
+      try {
+        const r = await exportPettyMSBC({
+          requesterEmail: session.Email,
+          fundId: (meta.fund || {}).FundID || '',
+          title: document.getElementById('title').value,
+          rows: rows.map(x => ({
+            supplier: x.supplier, description: x.description, amount: num(x.amount),
+            department: x.department, preparedBy: x.preparedBy, status: x.status,
+            paymentDate: x.paymentDate, processingDate: x.processingDate,
+            dueDate: x.dueDate, remark: x.remark
+          }))
+        });
+        if (r.error) throw new Error(r.error);
+        if (!r.base64) throw new Error('ไม่มีข้อมูลไฟล์');
+        const bytes = atob(r.base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: r.mimeType ||
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = r.filename || 'msbc.xlsx';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        showToast('โหลดไฟล์แล้ว ✅', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = '📥 โหลด Excel';
+      }
+    });
+
+    document.getElementById('reloadBtn').addEventListener('click', load);
+    document.getElementById('sinceBtn').addEventListener('click', e => {
+      const s = e.currentTarget.dataset.since;
+      if (!s) return;
+      document.getElementById('dFrom').value = s;
+      document.getElementById('dTo').value = ymd(new Date());
+      load();
+    });
+    ['dFrom', 'dTo', 'incPending'].forEach(id =>
+      document.getElementById(id).addEventListener('change', load));
+
+    // ค่าเริ่มต้น = เดือนนี้
+    const now = new Date();
+    document.getElementById('dFrom').value = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+    document.getElementById('dTo').value = ymd(now);
+    load();
+  </script>
+</body>
+</html>

@@ -51,7 +51,7 @@
     .rk-fill { height:100%; border-radius:999px; transition:width .6s cubic-bezier(.4,0,.2,1); }
     .rk-right { text-align:right; flex-shrink:0; }
     .rk-amt { font-size:14px; font-weight:800; color:var(--gray-900); font-variant-numeric:tabular-nums; }
-    .rk-pct { font-size:10.5px; color:var(--gray-400); }
+    .rk-pct { font-size:11px; color:var(--gray-400); }
 
     /* ── โดนัทประเภทค่าใช้จ่าย ── */
     .donut-wrap { display:flex; align-items:center; gap:16px; margin-top:14px; }
@@ -62,7 +62,7 @@
       align-items:center; justify-content:center; pointer-events:none;
     }
     .donut-mid .n { font-size:19px; font-weight:800; letter-spacing:-.03em; color:var(--gray-900); line-height:1.1; }
-    .donut-mid .l { font-size:9.5px; color:var(--gray-400); font-weight:600; }
+    .donut-mid .l { font-size:11px; color:var(--gray-400); font-weight:600; }
     .legend { flex:1; min-width:0; }
     .lg-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12px; }
     .lg-dot { width:11px; height:11px; border-radius:4px; flex-shrink:0; }
@@ -86,7 +86,7 @@
              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .pright { text-align:right; flex-shrink:0; }
     .pamt { font-weight:800; font-size:17px; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
-    .pcnt { font-size:10.5px; color:var(--gray-400); }
+    .pcnt { font-size:11px; color:var(--gray-400); }
     .pchev { color:var(--gray-300); font-size:13px; margin-left:2px; transition:transform .2s; }
     .pcard.open .pchev { transform:rotate(90deg); }
     .pbody { display:none; padding:0 14px 14px; border-top:1px solid var(--gray-100); }
@@ -102,7 +102,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ทีมของฉัน</span></h1>
   </div>
 
@@ -130,9 +130,7 @@
     const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
-    const CAT_TH = { FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', TOLL:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'ที่พัก',
-      ENT:'ค่ารับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ', CAR:'ค่ารถเหมา',
-      MOBILE:'โทรศัพท์', OVERSEAS:'โทร ตปท.', APT:'ที่พักรายเดือน', MILE:'เบี้ยเลี้ยงรถ' };
+    const CAT_TH = catMap();   // 🔴 รวมไว้ที่ js/app.js แล้ว ห้ามก๊อปตารางมาไว้ในหน้าอีก
 
     // สีประจำตัว — คนละสีชัดเจน ไล่ตามลำดับในทีม ไม่สุ่ม จะได้คงที่ทุกครั้งที่เปิด
     const PALETTE = ['#B7081D','#2563EB','#16A34A','#D97706','#7C3AED',
@@ -361,7 +359,7 @@
           <span class="lg-dot" style="background:${CAT_COLORS[i % CAT_COLORS.length]};"></span>
           <span class="lg-name">${CAT_TH[c.code] || c.code}</span>
           <span class="lg-val">${Math.round(c.amt).toLocaleString()}</span>
-          <span style="color:var(--gray-400);font-size:10.5px;min-width:32px;text-align:right;">${(c.amt/total*100).toFixed(0)}%</span>
+          <span style="color:var(--gray-400);font-size:11px;min-width:32px;text-align:right;">${(c.amt/total*100).toFixed(0)}%</span>
         </div>`).join('');
 
       return `<div class="donut-wrap">

@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='pre-approves.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='pre-approves.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ส่งบิลใช้จริง</span></h1>
   </div>
 
@@ -48,7 +48,8 @@
     const preId = new URLSearchParams(location.search).get('id');
     let preApprove = null, items = [], itemSeq = 0;
     let periodEnd = '';   // วันตัดรอบปัจจุบัน ใช้เตือนตอนลงวันที่เลยรอบ
-    const CAT_TH = { ENT:'🍽 ค่ารับรอง', GOLF:'⛳ กอล์ฟ' };
+    // หน้านี้ใช้แค่ 2 ประเภท แต่ยังดึงชื่อจากตารางกลาง คำจะได้ไม่เพี้ยนกัน
+    const CAT_TH = { ENT: catLabel('ENT'), GOLF: catLabel('GOLF') };
 
     async function load() {
       if (!preId) return fail('ไม่พบรหัส Pre-Approve');
@@ -90,7 +91,7 @@
           <div class="ch-sub">งบที่อนุมัติไว้แล้ว</div></div>
           <div style="margin-left:auto;text-align:right;">
             <div style="font-size:19px;font-weight:800;color:var(--accent);">${budget.toLocaleString()}</div>
-            <div style="font-size:10px;color:var(--gray-400);">THB</div>
+            <div style="font-size:11px;color:var(--gray-400);">THB</div>
           </div>
         </div>
         <div class="detail-list" style="margin-top:10px;">

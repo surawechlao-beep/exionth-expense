@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">ตรวจสอบ Export</span></h1>
   </div>
 
@@ -30,7 +30,7 @@
     const exportId = new URLSearchParams(location.search).get('id');
     let detail = null;
     const MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-    const CAT_TH = { FUEL:'⛽ น้ำมัน', ENT:'🍽 รับรอง', GOLF:'⛳ กอล์ฟ', TOLL:'🛣 ทางด่วน', PARK:'🅿️ จอดรถ', HOTEL:'🏨 ที่พัก', EXPRESS:'📦 ขนส่ง', MILE:'🚗 เบี้ยเลี้ยงรถ', OTHER:'📄 อื่นๆ' };
+    const CAT_TH = catMap(true);   // 🔴 รวมไว้ที่ js/app.js แล้ว ห้ามก๊อปตารางมาไว้ในหน้าอีก
 
     async function load() {
       if (!exportId) return fail('ไม่พบรหัสคำขอ');

@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">คำขอของฉัน</span></h1>
   </div>
 
@@ -57,14 +57,14 @@
 
   <div id="editModal" class="modal">
     <div class="modal-content">
-      <div class="modal-head"><h3>✏️ แก้ไขคำขอ</h3><button class="modal-close" onclick="closeEdit()">✕</button></div>
+      <div class="modal-head"><h3>✏️ แก้ไขคำขอ</h3><button class="modal-close" aria-label="ปิด" onclick="closeEdit()">✕</button></div>
       <div id="editContent"></div>
     </div>
   </div>
 
   <div id="detailModal" class="modal">
     <div class="modal-content">
-      <div class="modal-head"><h3 id="detailTitle">รายละเอียด</h3><button class="modal-close" onclick="closeDetail()">✕</button></div>
+      <div class="modal-head"><h3 id="detailTitle">รายละเอียด</h3><button class="modal-close" aria-label="ปิด" onclick="closeDetail()">✕</button></div>
       <div id="detailContent"></div>
     </div>
   </div>
@@ -77,8 +77,8 @@
     const session = requireLogin();
     let allReqs = [], categories = [], filteredReqs = [];
 
-    const CAT_TH = { FUEL:'⛽ น้ำมัน', ENT:'🍽 รับรอง', GOLF:'⛳ กอล์ฟ', TOLL:'🛣 ทางด่วน', PARK:'🅿️ ที่จอดรถ', HOTEL:'🏨 ที่พัก', EXPRESS:'📦 ขนส่ง', MILE:'🚗 เบี้ยเลี้ยงรถ', OTHER:'📄 อื่นๆ' };
-    const catLabel = c => CAT_TH[c] || ('📄 ' + (c||'-'));
+    const CAT_TH = catMap(true);   // 🔴 รวมไว้ที่ js/app.js แล้ว ห้ามก๊อปตารางมาไว้ในหน้าอีก
+    // catLabel() อยู่ใน js/app.js แล้ว — ประกาศซ้ำจะพังทั้งหน้า
 
     const bb = document.getElementById('backBtn');
     if (bb && typeof icon === 'function') bb.innerHTML = icon('back');

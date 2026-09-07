@@ -20,15 +20,6 @@
     .mchip.on { background:linear-gradient(135deg,#B7081D,#8B0616); color:#fff; border-color:transparent;
                 box-shadow:0 4px 12px rgba(183,8,29,.26); }
 
-    /* ── ปุ่มขอบเขต / สถานะ ── */
-    .segs { display:flex; gap:7px; margin-top:11px; }
-    .segs button {
-      flex:1; padding:9px 6px; border:1.5px solid var(--gray-200); background:#fff;
-      border-radius:12px; font-size:12px; font-weight:700; color:var(--gray-600);
-      cursor:pointer; font-family:inherit; min-height:42px; transition:all .14s;
-    }
-    .segs button.on { background:linear-gradient(135deg,#B7081D,#8B0616); color:#fff;
-                      border-color:transparent; box-shadow:0 4px 12px rgba(183,8,29,.26); }
 
     .trend {
       display:inline-flex; align-items:center; gap:5px; margin-top:9px;
@@ -49,7 +40,7 @@
     .rk-fill { height:100%; border-radius:999px; transition:width .6s cubic-bezier(.4,0,.2,1); }
     .rk-right { text-align:right; }
     .rk-amt { font-size:14px; font-weight:800; color:var(--gray-900); font-variant-numeric:tabular-nums; }
-    .rk-pct { font-size:10.5px; color:var(--gray-400); }
+    .rk-pct { font-size:11px; color:var(--gray-400); }
 
     /* ── กราฟรายวัน ── */
     .daily { display:flex; align-items:flex-end; gap:2px; height:110px; margin-top:14px; }
@@ -59,10 +50,10 @@
             min-height:2px; transition:height .5s cubic-bezier(.4,0,.2,1); }
     .dbar.zero { background:var(--gray-100); }
     .daily-x { display:flex; gap:2px; margin-top:5px; }
-    .daily-x span { flex:1; text-align:center; font-size:8.5px; color:var(--gray-400); }
+    .daily-x span { flex:1; text-align:center; font-size:11px; color:var(--gray-400); }
     .dtip {
       position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
-      background:var(--gray-900); color:#fff; font-size:10.5px; font-weight:700;
+      background:var(--gray-900); color:#fff; font-size:11px; font-weight:700;
       padding:4px 8px; border-radius:6px; white-space:nowrap; display:none; z-index:5; margin-bottom:4px;
     }
     .dcol.show .dtip { display:block; }
@@ -74,7 +65,7 @@
     .donut-mid { position:absolute; inset:0; display:flex; flex-direction:column;
                  align-items:center; justify-content:center; pointer-events:none; }
     .donut-mid .n { font-size:19px; font-weight:800; letter-spacing:-.03em; color:var(--gray-900); line-height:1.1; }
-    .donut-mid .l { font-size:9.5px; color:var(--gray-400); font-weight:600; }
+    .donut-mid .l { font-size:11px; color:var(--gray-400); font-weight:600; }
     .legend { flex:1; min-width:0; }
     .lg-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12px; }
     .lg-dot { width:11px; height:11px; border-radius:4px; flex-shrink:0; }
@@ -87,7 +78,7 @@
     .cust-row:last-child { border-bottom:none; }
     .cust-rank { width:22px; height:22px; border-radius:7px; background:var(--gray-100);
                  color:var(--gray-600); display:flex; align-items:center; justify-content:center;
-                 font-size:10.5px; font-weight:800; flex-shrink:0; }
+                 font-size:11px; font-weight:800; flex-shrink:0; }
     .cust-name { flex:1; color:var(--gray-800); font-weight:600; overflow:hidden;
                  text-overflow:ellipsis; white-space:nowrap; }
     .cust-amt { font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
@@ -104,7 +95,7 @@
 
     table.xl { min-width:900px; }
     table.xl td.ctr, table.xl th.ctr { text-align:center; }
-    table.xl td.sm { font-size:10.5px; }
+    table.xl td.sm { font-size:11px; }
     table.xl td, table.xl th { white-space:nowrap; }
     table.xl td.sm, table.xl td:nth-child(4), table.xl td:nth-child(5) { white-space:normal; }
     table.xl tr.person-hdr td { background:linear-gradient(90deg,#B7081D,#7A0512); color:#fff;
@@ -136,7 +127,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='index.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">สรุปภาพรวม</span></h1>
   </div>
 
@@ -194,11 +185,7 @@
     const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const MONTHS_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
-    const CAT_TH = {
-      FUEL:'น้ำมัน', EXPRESS:'ทางด่วน', PARK:'ที่จอดรถ', HOTEL:'โรงแรม',
-      ENT:'รับรอง', GOLF:'กอล์ฟ', TRAVEL:'เดินทาง', OTHER:'อื่นๆ',
-      CAR:'ค่ารถเหมา', MOBILE:'โทรศัพท์', OVERSEAS:'โทรตปท.', APT:'ที่พัก'
-    };
+    const CAT_TH = catMap();   // 🔴 รวมไว้ที่ js/app.js แล้ว ห้ามก๊อปตารางมาไว้ในหน้าอีก
     const PALETTE = ['#B7081D','#2563EB','#16A34A','#D97706','#7C3AED',
                      '#0D9488','#DB2777','#0891B2','#65A30D','#E11D48','#4F46E5','#EA580C'];
     const CAT_COLORS = ['#B7081D','#F59E0B','#2563EB','#16A34A','#7C3AED',
@@ -688,7 +675,7 @@
           <span class="lg-dot" style="background:${CAT_COLORS[i % CAT_COLORS.length]};"></span>
           <span class="lg-name">${CAT_TH[c.cat] || c.cat}</span>
           <span class="lg-val">${Math.round(c.amt).toLocaleString()}</span>
-          <span style="color:var(--gray-400);font-size:10.5px;min-width:32px;text-align:right;">${(c.amt/total*100).toFixed(0)}%</span>
+          <span style="color:var(--gray-400);font-size:11px;min-width:32px;text-align:right;">${(c.amt/total*100).toFixed(0)}%</span>
         </div>`).join('');
       return `<div class="donut-wrap">
         <div class="donut">
@@ -778,7 +765,7 @@
             const c = r.Status==='Approved' ? '#16A34A' : r.Status==='Rejected' ? '#DC2626' : '#F59E0B';
             const t = r.Status==='Approved' ? 'อนุมัติ' : r.Status==='Rejected' ? 'ไม่อนุมัติ'
                     : r.Status==='Finalized' ? 'ส่งบิลแล้ว' : r.Status==='PreApprove' ? 'ขอวงเงิน' : 'รออนุมัติ';
-            return '<span style="color:' + c + ';font-weight:800;font-size:10.5px;">' + t + '</span>';
+            return '<span style="color:' + c + ';font-weight:800;font-size:11px;">' + t + '</span>';
           }}
       ];
       const cols = COLS;

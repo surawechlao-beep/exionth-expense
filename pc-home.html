@@ -81,16 +81,19 @@
         ${b.lowCash ? `<div class="card" style="border-left:4px solid var(--warn);">
           <div style="font-size:13px;font-weight:700;color:var(--gray-800);">⚠️ เงินสดเหลือน้อย</div>
           <div style="font-size:12px;color:var(--gray-500);margin-top:4px;">
-            เหลือ ${money(b.cash)} จากวงเงิน ${money(b.limit)} บาท — ควรขอเติมเงิน</div>
-          ${home.isHolder ? `<a href="pc-fund.html" class="btn btn-primary btn-sm"
-             style="margin-top:11px;max-width:200px;text-decoration:none;">💰 ขอเติมเงิน</a>` : ''}
+            เหลือ ${money(b.cash)} บาท ต่ำกว่าเส้นเตือน ${money(b.lowAlert)} บาท —
+            ${home.isAccountant ? 'ถึงเวลาเคลียร์บิล' : 'แจ้งฝ่ายบัญชีให้เคลียร์บิล'}</div>
+          ${home.isAccountant ? `<a href="pc-fund.html" class="btn btn-primary btn-sm"
+             style="margin-top:11px;max-width:220px;text-decoration:none;">🧾 ไปเคลียร์บิล</a>`
+           : home.isHolder ? `<a href="pc-fund.html" class="btn btn-secondary btn-sm"
+             style="margin-top:11px;max-width:200px;text-decoration:none;">💰 ดูกล่องเงิน</a>` : ''}
         </div>` : ''}
 
         <div class="kpi-grid">
           <div class="kpi ${b.reserved ? 'warn' : ''}"><div class="n">${money(b.reserved)}</div><div class="l">อนุมัติแล้ว รอจ่าย</div></div>
           <div class="kpi ok"><div class="n">${money(b.available)}</div><div class="l">ใช้ได้จริง</div></div>
           <div class="kpi ${b.pendingOut ? 'warn' : ''}"><div class="n">${money(b.pendingOut)}</div><div class="l">รออนุมัติ</div></div>
-          <div class="kpi"><div class="n">${money(b.spentSinceTopUp)}</div><div class="l">ใช้ไปตั้งแต่เติมล่าสุด</div></div>
+          <div class="kpi"><div class="n">${money(b.spentSinceTopUp)}</div><div class="l">บิลที่ยังไม่เคลียร์</div></div>
         </div>
 
         <div class="tiles">
@@ -155,7 +158,7 @@
           <span style="text-align:right;">
             <span style="display:block;font-size:14px;font-weight:800;color:${isIn ? 'var(--ok)' : 'var(--accent)'};">
               ${isIn ? '+' : '−'}${money(r.Amount)}</span>
-            <span class="pill ${st.c}" style="font-size:9.5px;margin-top:2px;">${st.t}</span>
+            <span class="pill ${st.c}" style="font-size:11px;margin-top:2px;">${st.t}</span>
           </span>
         </div>`;
     }

@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='pc-home.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">รายการเคลื่อนไหว</span></h1>
   </div>
 
@@ -73,10 +73,7 @@
         if (d.canSeeAll) document.getElementById('filterCard').style.display = 'block';
         render();
       } catch (err) {
-        const c = document.getElementById('content');
-        c.classList.remove('loading');
-        c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
-          <div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        renderError('content', err.message, load);
         renderBottomNav('pc-list');
       }
     }
@@ -180,7 +177,7 @@
             <div style="text-align:right;white-space:nowrap;">
               <div style="font-size:15px;font-weight:800;color:${amt < 0 ? 'var(--danger)' : isIn ? 'var(--ok)' : 'var(--accent)'};">
                 ${amt < 0 ? '−' : isIn ? '+' : '−'}${money(Math.abs(amt))}</div>
-              <span class="pill ${st.c}" style="font-size:9.5px;margin-top:3px;">${st.t}</span>
+              <span class="pill ${st.c}" style="font-size:11px;margin-top:3px;">${st.t}</span>
             </div>
           </div>
           ${canCancel ? `<button class="btn btn-secondary btn-sm" style="margin-top:9px;"

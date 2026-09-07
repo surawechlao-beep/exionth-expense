@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="header">
-    <button class="back" onclick="location.href='pc-home.html'" id="backBtn"></button>
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='pc-home.html'" id="backBtn"></button>
     <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">รอดำเนินการ</span></h1>
   </div>
 
@@ -45,10 +45,7 @@
         data = d;
         render();
       } catch (err) {
-        const c = document.getElementById('content');
-        c.classList.remove('loading');
-        c.innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>
-          <div class="title">โหลดไม่สำเร็จ</div><div class="sub">${err.message}</div></div>`;
+        renderError('content', err.message, load);
         renderBottomNav('pc-inbox');
       }
     }
@@ -143,7 +140,7 @@
         const r = await apiGet('getReceiptImage', { id: id, viewerEmail: session.Email, fileIndex: 0 });
         if (r.error) throw new Error(r.error);
         if (!r.dataUrl) { box.innerHTML = '<div class="hint">ไม่มีไฟล์</div>'; return; }
-        box.innerHTML = `<img src="${r.dataUrl}" style="width:100%;border-radius:12px;margin-top:9px;
+        box.innerHTML = `<img src="${r.dataUrl}" alt="ใบเสร็จ" style="width:100%;border-radius:12px;margin-top:9px;
                           border:1px solid var(--gray-200);">
           ${r.totalFiles > 1 ? `<div class="hint">มีทั้งหมด ${r.totalFiles} ไฟล์ — ดูไฟล์อื่นในชีท</div>` : ''}`;
         box.dataset.loaded = '1';
