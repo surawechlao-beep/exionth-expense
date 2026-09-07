@@ -157,6 +157,16 @@ async function payPetty(payload)               { return apiPost('payPetty', payl
 async function cancelPetty(payload)            { return apiPost('cancelPetty', payload); }
 async function requestPettyTopUp(payload)      { return apiPost('requestPettyTopUp', payload); }
 async function submitPettyCount(payload)       { return apiPost('submitPettyCount', payload); }
+async function fetchPettyMSBC(email, opt) {
+  opt = opt || {};
+  return apiGet('getPettyMSBC', {
+    email, fundId: opt.fundId || '', dateFrom: opt.dateFrom || '', dateTo: opt.dateTo || '',
+    includePending: opt.includePending === false ? 'false' : 'true'
+  });
+}
+async function exportPettyMSBC(payload)        { return apiPost('exportPettyMSBC', payload); }
+async function setPettyFundConfig(payload)     { return apiPost('setPettyFundConfig', payload); }
+async function clearPettyBills(payload)        { return apiPost('clearPettyBills', payload); }
 
 /* ── 📋 Export รายการคำขอเป็น Excel ── */
 async function fetchExportableStaff(email) { return apiGet('getExportableStaff', { email }); }

@@ -77,6 +77,63 @@ const STATUS_TH = {
   finalized:  '✓ ส่งบิลแล้ว',
   preapprove: '📋 รออนุมัติงบ'
 };
+/**
+ * กล่อง "โหลดไม่สำเร็จ" มาตรฐาน — มีปุ่มลองใหม่เสมอ
+ * 🔴 ก่อนหน้านี้ 8 หน้าเขียนกล่อง error เองคนละแบบ และเป็นทางตัน
+ *    ผู้ใช้เจอเน็ตกระตุกทีเดียวต้องปิดแอปเปิดใหม่
+ * 🔴 4 หน้าลืม classList.remove('loading') ด้วย กล่องเลยเว้นว่างเบ้อเริ่ม
+ * ใช้ textContent กับข้อความ error — ถ้าหลังบ้านส่งอะไรแปลกมาก็ไม่กลายเป็น HTML
+ */
+function renderError(el, message, onRetry) {
+  const c = typeof el === 'string' ? document.getElementById(el) : el;
+  if (!c) return;
+  c.classList.remove('loading');
+  const box = document.createElement('div');
+  box.className = 'empty';
+  box.innerHTML = '<div class="icon-wrap">⚠️</div>' +
+                  '<div class="title">โหลดไม่สำเร็จ</div><div class="sub"></div>';
+  box.querySelector('.sub').textContent = message || 'ไม่ทราบสาเหตุ';
+  if (typeof onRetry === 'function') {
+    const b = document.createElement('button');
+    b.className = 'btn btn-secondary btn-sm';
+    b.style.cssText = 'margin-top:14px;max-width:200px;';
+    b.textContent = '🔄 ลองใหม่';
+    b.addEventListener('click', onRetry);
+    box.appendChild(b);
+  }
+  c.innerHTML = '';
+  c.appendChild(box);
+}
+
+/* ═══════════ ชื่อประเภทค่าใช้จ่าย — แหล่งเดียวของทั้งระบบ ═══════════
+ * 🔴 เคยก๊อปตารางนี้ไว้ 9 หน้า แล้วแก้ไม่ครบ จน EXPRESS กลายเป็น "ทางด่วน"
+ *    ทั้งที่ Code.gs และไฟล์ Excel ที่ส่งบัญชีใช้ "ขนส่ง" มาตลอด
+ *    บางหน้าถึงขั้นมี TOLL กับ EXPRESS ชื่อ "ทางด่วน" เหมือนกันทั้งคู่ แยกไม่ออก
+ * ⚠️ ต้องตรงกับ REQ_EXPORT_CAT_TH ใน Code.gs เสมอ — แก้ที่ไหนแก้ทั้งสองที่
+ */
+const CAT_NAME_TH = {
+  FUEL: 'น้ำมัน', ENT: 'ค่ารับรอง', GOLF: 'กอล์ฟ', TOLL: 'ทางด่วน', PARK: 'ที่จอดรถ',
+  HOTEL: 'ที่พัก', EXPRESS: 'ขนส่ง', MILE: 'เบี้ยเลี้ยงรถ', CAR: 'ค่ารถเหมา',
+  MOBILE: 'ค่าโทรศัพท์', OVERSEAS: 'โทร ตปท.', APT: 'ค่าที่พักรายเดือน',
+  TRAVEL: 'เดินทาง', OTHER: 'อื่นๆ'
+};
+const CAT_ICON_TH = {
+  FUEL: '⛽', ENT: '🍽', GOLF: '⛳', TOLL: '🛣', PARK: '🅿️', HOTEL: '🏨',
+  EXPRESS: '📦', MILE: '🚗', CAR: '🚙', MOBILE: '📱', OVERSEAS: '☎️',
+  APT: '🏠', TRAVEL: '✈️', OTHER: '📄'
+};
+function catTH(code)   { return CAT_NAME_TH[code] || String(code || '-'); }
+function catIcon(code) { return CAT_ICON_TH[code] || '📄'; }
+function catLabel(code) { return catIcon(code) + ' ' + catTH(code); }
+/** ตารางพร้อมใช้ — catMap() ข้อความล้วน · catMap(true) มีอีโมจินำหน้า */
+function catMap(withIcon) {
+  const o = {};
+  Object.keys(CAT_NAME_TH).forEach(function (k) {
+    o[k] = withIcon ? catLabel(k) : CAT_NAME_TH[k];
+  });
+  return o;
+}
+
 function statusTH(status) {
   return STATUS_TH[String(status || '').toLowerCase()] || (status || '-');
 }
@@ -190,7 +247,9 @@ async function renderBottomNav(active) {
       { key: 'pc-list', href: 'pc-list.html',    label: 'รายการ',  icon: 'list' },
       { key: 'pc-fund', href: 'pc-fund.html',    label: 'กล่องเงิน', emoji: '💰' }
     ];
-    pItems.push({ key: 'pc-inbox', href: 'pc-approve.html', label: 'รอดำเนินการ', icon: 'bell' });
+    // 🔴 คำว่า "รอดำเนินการ" ยาวเกินสำหรับ 6 แท็บบนจอ 375px — คำแตกบรรทัด
+    //    ใช้คำเดียวกับฝั่ง Expense และเรียกว่า "รออนุมัติ"
+    pItems.push({ key: 'pc-inbox', href: 'pc-approve.html', label: 'รออนุมัติ', icon: 'bell' });
     pItems.push({ key: 'profile', href: 'profile.html', label: 'โปรไฟล์', icon: 'user' });
     nav.innerHTML = pItems.map(it => `
       <a href="${it.href}" class="nav-item ${it.key === active ? 'active' : ''}">
