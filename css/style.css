@@ -144,11 +144,7 @@ body.has-bottom-nav { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bo
 }
 
 /* ═══ SECTION LABEL ═══ */
-.sec-label {
-  font-size: 11px; font-weight: 800; color: var(--gray-400);
-  text-transform: uppercase; letter-spacing: .09em;
-  margin: 20px 4px 10px;
-}
+/* .sec-label ประกาศจริงอยู่ท้ายไฟล์ — เดิมมี 2 ชุดสีไม่ตรงกัน ลบชุดนี้ทิ้ง */
 
 /* ═══ USER GREET ═══ */
 .user-greet { display: flex; align-items: center; gap: 14px; }
@@ -892,7 +888,10 @@ a { color: var(--accent); }
 .warn-box { color: #92400E; font-size: 13px; font-weight: 600; }
 
 /* ── Segmented control ── */
-.seg { display: grid; grid-template-columns: repeat(2,1fr); gap: 7px; }
+/* 🔴 เดิมล็อก 2 ช่อง พอหน้าไหนใส่ 3 ปุ่ม ปุ่มที่ 3 ตกบรรทัดล่างครึ่งความกว้าง
+   เปลี่ยนเป็น flex ยืดเท่ากันทุกปุ่ม ใส่กี่ปุ่มก็ได้ */
+.seg { display: flex; gap: 7px; }
+.seg button { flex: 1; min-width: 0; }
 .seg button {
   padding: 11px 8px; border: 1.5px solid var(--gray-200); background: #fff;
   border-radius: 12px; font-size: 12.5px; font-weight: 700;
@@ -940,7 +939,10 @@ a { color: var(--accent); }
 .approver-step .as-who  { font-weight: 800; font-size: 11.5px; margin-top: 1px; }
 
 /* ── Excel table ── */
-.xl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--gray-200); border-radius: 12px; }
+/* 🔴 ตั้ง sticky ที่ th ไว้แต่ไม่เคยทำงาน เพราะกล่องไม่มีความสูงจำกัด เลยไม่เคยเลื่อนแนวตั้ง
+   ใส่ max-height แล้วหัวตารางถึงจะค้างจริงตอนเลื่อนดูแถวล่างๆ */
+.xl-wrap { overflow: auto; max-height: 68vh; -webkit-overflow-scrolling: touch;
+           border: 1px solid var(--gray-200); border-radius: 12px; }
 table.xl { border-collapse: collapse; width: 100%; font-size: 11.5px; }
 table.xl th {
   background: #FCE4E7; color: #7A0512; font-weight: 800;
