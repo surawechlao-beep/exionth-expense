@@ -16,6 +16,7 @@ function setSession(staff) {
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+  try { ccClear(); } catch (e) {}       // เครื่องเดียวกันคนละคน ต้องไม่เห็นของกัน
 }
 
 function requireLogin() {

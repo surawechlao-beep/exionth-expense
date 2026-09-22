@@ -26,13 +26,146 @@ async function fetchWithTimeout(url, opts = {}, ms = API_TIMEOUT_MS) {
   }
 }
 
-async function apiGet(action, params = {}) {
+/* ═══════════════════════════════════════════════════════════════
+ *  v8.1 แคชฝั่งเครื่อง — "โชว์ของเก่าก่อน แล้วอัปเดตเงียบๆ"
+ *
+ *  Apps Script มีค่าแรง 1-3 วิต่อคำสั่งที่ลดไม่ได้ (ต้องปลุกสคริปต์ทุกครั้ง)
+ *  ทางเดียวที่ทำให้ "รู้สึก" เร็วคือไม่ต้องรอมัน:
+ *    เปิดหน้า → วาดจากผลลัพธ์ครั้งก่อนทันที → ยิงขอของสดเบื้องหลัง
+ *    → ของสดมา ถ้าต่างจากเดิม ส่งสัญญาณ 'exion:fresh' ให้หน้าวาดใหม่
+ *
+ *  กันข้อมูลเงินค้าง: ทุกครั้งที่เขียน (apiPost) ล้างแคชทิ้งทั้งหมด
+ *  กติกาเดียวกับฝั่งเซิร์ฟเวอร์ — ลืมไม่ได้เพราะอยู่จุดเดียว
+ * ═══════════════════════════════════════════════════════════════ */
+const CC_PREFIX = 'exc:';
+const CC_MAX_BYTES = 250 * 1024;
+/* คำสั่งที่แคชได้ (อ่านอย่างเดียว) — ไม่อยู่ในนี้ = ยิงสดเสมอ */
+const CC_ACTIONS = {
+  // ค่า = อายุที่ "ไม่ต้องยิงใหม่เลย" (ms) · 0 = โชว์ของเก่าแต่ยิงของสดทุกครั้ง
+  getHomeData: 0, getMyRequests: 0, getPettyHome: 0, getPettyLedger: 0, getPettyInbox: 0,
+  getAccountingQueue: 0, getManagerInbox: 0, getSeniorInbox: 0, getExportApprovalInbox: 0,
+  getVisibleRequests: 0, getMyTeamRequests: 0, getAllRequests: 0, getMyExportRequests: 0,
+  getPettyMSBC: 0, getPettyBalance: 0,
+  getPendingApprovals: 45 * 1000,       // ป้ายตัวเลขบนเมนู — ไม่ต้องยิงใหม่ทุกครั้งที่เปลี่ยนหน้า
+  getMyNotifications: 45 * 1000,        // กระดิ่ง
+  getPeriodInfo: 5 * 60 * 1000,
+  getMyTeam: 10 * 60 * 1000, getExportableStaff: 10 * 60 * 1000,
+  getMyRole: 10 * 60 * 1000, getFuelRate: 10 * 60 * 1000, getCustomers: 10 * 60 * 1000,
+  getCategories: 24 * 60 * 60 * 1000,   // แทบไม่เปลี่ยน
+  getPettyCategories: 24 * 60 * 60 * 1000,
+  getMySignature: 24 * 60 * 60 * 1000,
+  getSettings: 60 * 60 * 1000
+};
+function ccKey(action, params) {
+  const p = Object.keys(params || {}).sort().map(k => k + '=' + params[k]).join('&');
+  return CC_PREFIX + action + '?' + p;
+}
+function ccGet(action, params) {
+  try {
+    const raw = localStorage.getItem(ccKey(action, params));
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    return { data: o.d, age: Date.now() - (o.t || 0) };
+  } catch (e) { return null; }
+}
+function ccPut(action, params, data) {
+  try {
+    const raw = JSON.stringify({ t: Date.now(), d: data });
+    if (raw.length > CC_MAX_BYTES) return;                  // ก้อนใหญ่เกินไม่เก็บ กันเต็ม localStorage
+    localStorage.setItem(ccKey(action, params), raw);
+  } catch (e) { /* localStorage เต็ม/ปิด — ก็แค่ไม่แคช */ }
+}
+function ccClear() {
+  try {
+    const dead = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(CC_PREFIX) === 0) dead.push(k);
+    }
+    dead.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+}
+
+/* แถบบางๆ ด้านบนตอนกำลังอัปเดตเบื้องหลัง — ให้รู้ว่าตัวเลขอาจขยับ */
+let _ccInflight = 0;
+function ccIndicator(on) {
+  try {
+    _ccInflight = Math.max(0, _ccInflight + (on ? 1 : -1));
+    let bar = document.getElementById('swrBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'swrBar';
+      bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;width:100%;z-index:9999;pointer-events:none;' +
+        'background:linear-gradient(90deg,transparent,#B7081D,transparent);background-size:200% 100%;' +
+        'animation:swrSlide 1s linear infinite;opacity:0;transition:opacity .2s;';
+      const st = document.createElement('style');
+      st.textContent = '@keyframes swrSlide{0%{background-position:200% 0}100%{background-position:-200% 0}}';
+      document.head.appendChild(st);
+      document.body.appendChild(bar);
+    }
+    bar.style.opacity = _ccInflight > 0 ? '1' : '0';
+  } catch (e) {}
+}
+
+/* ตอนวาดซ้ำจากสัญญาณ 'exion:fresh' ห้ามยิงเน็ตซ้อนอีกรอบ */
+let _ccReplay = false;
+
+async function apiGetRaw(action, params = {}) {
   const url = new URL(CONFIG.API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('secret', CONFIG.SECRET);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const response = await fetchWithTimeout(url.toString(), { method: 'GET', redirect: 'follow' });
   return await response.json();
+}
+
+async function apiGet(action, params = {}) {
+  const ttl = CC_ACTIONS[action];
+  if (ttl === undefined) return apiGetRaw(action, params);      // ไม่อยู่ในรายการ = ยิงสดเสมอ
+
+  const cached = ccGet(action, params);
+  const revalidate = () => apiGetRaw(action, params).then(d => {
+    if (d && !d.error) ccPut(action, params, d);
+    return d;
+  });
+
+  if (!cached) return revalidate();                              // ครั้งแรก ไม่มีของเก่า ต้องรอ
+  if (_ccReplay) return cached.data;                             // วาดซ้ำจากสัญญาณ — ไม่ยิงเน็ต
+  if (ttl > 0 && cached.age < ttl) return cached.data;           // ยังสดพอ ไม่ต้องยิง
+
+  // มีของเก่า → คืนทันที แล้วขอของสดเบื้องหลัง
+  ccIndicator(true);
+  revalidate().then(d => {
+    ccIndicator(false);
+    if (!d || d.error) return;
+    if (JSON.stringify(d) === JSON.stringify(cached.data)) return;   // เหมือนเดิม ไม่ต้องวาดใหม่
+    try { window.dispatchEvent(new CustomEvent('exion:fresh', { detail: { action, params, data: d } })); }
+    catch (e) {}
+  }).catch(() => ccIndicator(false));
+  return cached.data;
+}
+
+/**
+ * ให้หน้าเว็บวาดใหม่เมื่อของสดมา — เรียกครั้งเดียวตอนเปิดหน้า
+ *   onFresh(loadFn) : loadFn จะถูกเรียกซ้ำโดยที่ apiGet คืนของจากแคชล้วน ไม่ยิงเน็ตซ้อน
+ */
+function onFresh(loadFn) {
+  window.addEventListener('exion:fresh', async () => {
+    _ccReplay = true;
+    try { await loadFn(); } finally { _ccReplay = false; }
+  });
+}
+
+/** โหลดของที่หน้าถัดไปน่าจะใช้ รอไว้ล่วงหน้า — เปิดหน้านั้นแล้วไม่ต้องหมุน */
+function prefetch(list) {
+  try {
+    const run = () => list.forEach(([action, params]) => {
+      const c = ccGet(action, params);
+      if (c && c.age < 60 * 1000) return;                        // เพิ่งมีมาไม่ถึงนาที ไม่ต้อง
+      apiGetRaw(action, params).then(d => { if (d && !d.error) ccPut(action, params, d); }).catch(() => {});
+    });
+    'requestIdleCallback' in window ? requestIdleCallback(run, { timeout: 2500 }) : setTimeout(run, 800);
+  } catch (e) {}
 }
 
 async function apiPost(action, body = {}) {
@@ -46,7 +179,12 @@ async function apiPost(action, body = {}) {
     body: JSON.stringify({ action, secret: CONFIG.SECRET, ...body }),
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
   }, heavy ? 120000 : API_TIMEOUT_MS);
-  return await response.json();
+  const out = await response.json();
+  // 🔒 เขียนอะไรก็ตามสำเร็จ → ล้างแคชในเครื่องทิ้ง ผู้ใช้จะได้ไม่เห็นยอดเงินเก่า
+  const READ_ONLY = { getReceiptImage: 1, exportStaffReport: 1, exportRequestList: 1, exportPettyMSBC: 1,
+                      previewPeriod: 1, login: 1, downloadDraftExport: 1, downloadFinalExport: 1 };
+  if (!READ_ONLY[action] && out && !out.error) ccClear();
+  return out;
 }
 
 // --- Specific endpoints ---
