@@ -276,6 +276,8 @@ input[type="date"] { min-height: 46px; }
   cursor: pointer; transition: all .14s;
 }
 .btn-logout:active { background: var(--danger-light); color: var(--accent); border-color: #FCA5A5; transform: scale(.98); }
+/* 🔴 ไม่เคยกำหนดขนาด svg ในปุ่มออกจากระบบ → ไอคอนขยายเต็มจอเป็นรูปทรงยักษ์ */
+.btn-logout svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* ═══ CHIPS / FILTER TABS ═══ */
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
