@@ -86,7 +86,8 @@
               <span style="display:block;font-size:19px;font-weight:800;color:var(--gray-800);">${money(b.available)} บาท</span>
             </span>
             <span style="text-align:right;font-size:11px;color:var(--gray-400);line-height:1.5;">
-              ในกล่อง ${money(b.cash)}<br>กันไว้ ${money(b.reserved)}
+              ในกล่อง ${money(b.cash)}<br>${home.maxPerRequest
+                ? 'ครั้งละไม่เกิน ' + money(home.maxPerRequest) : 'กันไว้ ' + money(b.reserved)}
             </span>
           </div>
         </div>`;
@@ -234,15 +235,20 @@
     function renderSum() {
       const total = items.reduce((s, x) => s + (Number(x.amount) || 0), 0);
       const avail = home.balance.available;
-      const over = total > avail;
+      const cap = Number(home.maxPerRequest) || 0;
+      /* เตือนตั้งแต่ตอนกรอก ไม่ใช่กรอกครบแล้วกดส่งค่อยเด้งกลับ */
+      const overCap = cap > 0 && total > cap;
+      const over = total > avail || overCap;
       document.getElementById('sumBox').innerHTML = `
         <div class="card" style="margin-top:12px;${over ? 'border-left:4px solid var(--danger);' : ''}">
           <div style="display:flex;align-items:center;">
             <span style="flex:1;font-size:13px;color:var(--gray-500);">รวม ${items.length} รายการ</span>
             <span style="font-size:21px;font-weight:800;color:${over ? 'var(--danger)' : 'var(--accent)'};">${money(total)} บาท</span>
           </div>
-          ${over ? `<div style="font-size:12px;color:var(--danger);margin-top:7px;font-weight:600;">
-            ⚠️ เกินเงินที่เบิกได้ (${money(avail)} บาท) — ให้ผู้ถือเงินเติมเงินก่อน</div>` : ''}
+          ${overCap ? `<div style="font-size:12px;color:var(--danger);margin-top:7px;font-weight:600;">
+            ⚠️ เบิกได้ครั้งละไม่เกิน ${money(cap)} บาท — แยกส่งหลายครั้ง หรือเบิกผ่าน Exion Expense</div>` : ''}
+          ${total > avail ? `<div style="font-size:12px;color:var(--danger);margin-top:7px;font-weight:600;">
+            ⚠️ เกินเงินที่เบิกได้ (${money(avail)} บาท) — ให้ฝ่ายบัญชีเคลียร์บิลก่อน</div>` : ''}
         </div>`;
     }
 
@@ -262,6 +268,9 @@
           return showToast(n + 'ต้องแนบใบเสร็จ', 'error');
       }
       const total = items.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+      const capNow = Number(home.maxPerRequest) || 0;
+      if (capNow > 0 && total > capNow)
+        return showToast('เบิกได้ครั้งละไม่เกิน ' + money(capNow) + ' บาท', 'error');
       if (total > home.balance.available)
         return showToast('เกินเงินที่เบิกได้ (' + money(home.balance.available) + ' บาท)', 'error');
 
