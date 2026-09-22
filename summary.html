@@ -610,12 +610,18 @@
           </div>
           ${renderTable(items, isAll)}
           ${onePerson ? `
-          <button type="button" class="btn btn-primary" id="xlsBtn"
-                  onclick="exportExcel()" style="margin-top:14px;">📥 ดาวน์โหลด Excel</button>
-          <div class="hint" style="margin-top:7px;text-align:center;">
-            ไฟล์ตัวจริงตามฟอร์มบริษัท · <span id="xlsRange">${dFrom && dTo
+          <div class="sec-label" style="margin:16px 0 8px;">📥 ดาวน์โหลด Excel · <span id="xlsRange" style="font-weight:600;color:var(--gray-400);">${dFrom && dTo
               ? fmtTH(dFrom) + ' – ' + fmtTH(dTo)
-              : MONTHS_FULL[selMonth-1] + ' ' + y}</span>
+              : MONTHS_FULL[selMonth-1] + ' ' + y}</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+            <button type="button" class="btn btn-primary" id="xlsBtn"
+                    onclick="exportExcel()" style="margin:0;">📤 Export สำหรับขอเบิก</button>
+            <button type="button" class="btn btn-secondary" id="xlsAcctBtn"
+                    onclick="exportForAccounting()" style="margin:0;">🧾 Export สำหรับบัญชี</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px;">
+            <div class="hint" style="margin:0;text-align:center;">ฟอร์มบริษัท · เฉพาะที่อนุมัติแล้ว<br>ใช้ยื่นขอเบิกรอบเดือน</div>
+            <div class="hint" style="margin:0;text-align:center;">เลข Job · ลูกค้า · ผู้ติดต่อ · ผู้ร่วม<br>ยอดพรี · ยอดจริง · ให้บัญชีตรวจ</div>
           </div>` : `
           <div class="hint" style="margin-top:12px;text-align:center;">
             เลือกรายบุคคลด้านบน เพื่อดาวน์โหลด Excel
@@ -703,7 +709,45 @@
     window.openFs = openFs; window.closeFs = closeFs;
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFs(); });
 
-    /* ═══ ดาวน์โหลด Excel ตัวจริงจากหน้านี้เลย ═══ */
+    /* ═══ 🧾 Export สำหรับบัญชี — ย้ายมาจากหน้าคำขอ (v8.2) ═══
+     *  ใช้คน + ช่วงวัน + สถานะ เดียวกับที่เลือกบนหน้านี้ ไฟล์จะได้ตรงกับที่เห็น
+     */
+    window.exportForAccounting = async function () {
+      const em = currentStaffEmail();
+      if (!em) return showToast('เลือกรายบุคคลก่อน แล้วค่อยดาวน์โหลด', 'error');
+      const btn = document.getElementById('xlsAcctBtn');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังสร้างไฟล์...'; }
+      try {
+        const rg = liveRange();
+        if (!rg.from || !rg.to) return showToast('เลือกช่วงวันก่อน', 'error');
+        if (rg.to < rg.from) return showToast('วันจบอยู่ก่อนวันเริ่ม', 'error');
+        const stBtn = document.querySelector('#stSeg button.on');
+        const r = await exportRequestList({
+          requesterEmail: session.Email, staffEmail: em,
+          dateFrom: rg.from, dateTo: rg.to,
+          status: stBtn ? (stBtn.dataset.st || '') : ''
+        });
+        if (r.error) throw new Error(r.error);
+        if (!r.base64) throw new Error('ไม่มีข้อมูลไฟล์');
+        const bytes = atob(r.base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: r.mimeType ||
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = r.filename || 'requests.xlsx';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showToast('โหลดแล้ว · ' + r.count + ' รายการ', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🧾 Export สำหรับบัญชี'; }
+      }
+    };
+
+    /* ═══ 📤 Export สำหรับขอเบิก — ฟอร์มบริษัทตัวจริง ═══ */
     window.exportExcel = async function () {
       const em = currentStaffEmail();
       if (!em) return showToast('เลือกรายบุคคลก่อน แล้วค่อยดาวน์โหลด', 'error');
@@ -734,7 +778,7 @@
       } catch (err) {
         showToast(err.message, 'error');
       } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '📥 ดาวน์โหลด Excel'; }
+        if (btn) { btn.disabled = false; btn.textContent = '📤 Export สำหรับขอเบิก'; }
       }
     };
 
@@ -811,6 +855,8 @@
 
       return '<div class="xl-wrap"><table class="xl"><thead>' + th + '</thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>';
     }
+
+    onFresh(load);   // ของสดมา → วาดใหม่เงียบๆ
 
     if (session) { load(); renderBottomNav('summary'); }
   </script>

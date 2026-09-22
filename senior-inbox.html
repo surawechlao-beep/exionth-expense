@@ -280,6 +280,7 @@
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
     document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
     window.showDetail = showDetail; window.loadReceipt = loadReceipt; window.decide = decide; window.closeModal = closeModal;
+    onFresh(load);   // ของสดมา → วาดใหม่เงียบๆ
     if (session) load();
   </script>
 </body>

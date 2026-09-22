@@ -510,6 +510,9 @@
         body.innerHTML = ({ acct: renderAcct, gm: renderGM, mgr: renderMgr, staff: renderStaff })[kind](home, session)
           + commonMenus(session) + footer();
         wireHome(session);
+        // โหลดของที่หน้าถัดไปน่าจะใช้ รอไว้ล่วงหน้า — กด "คำขอ" หรือ "ส่งบิล" แล้วไม่ต้องหมุน
+        prefetch([['getMyRequests', { email: session.Email }], ['getCategories', {}],
+                  ['getPettyHome', { email: session.Email, fundId: '' }]]);
       } catch (err) {
         renderError('homeBody', err.message, () => showDashboard(session));
         document.getElementById('homeBody').insertAdjacentHTML('beforeend', commonMenus(session) + footer());
@@ -554,9 +557,9 @@
           <a href="pre-approves.html" class="tile"><div class="ib ib-orange">🍽️</div>
             <div><div class="lb">ขอวงเงินก่อน</div><div class="sb">รับรอง / กอล์ฟ${h.my && h.my.preApprove ? ' · รอ ' + h.my.preApprove : ''}</div></div></a>
           <a href="status.html" class="tile"><div class="ib ib-green">${icon('list')}</div>
-            <div><div class="lb">คำขอของฉัน</div><div class="sb">ดู · แก้ไข · โหลด Excel</div></div></a>
+            <div><div class="lb">คำขอของฉัน</div><div class="sb">ดู · แก้ไข · ลบ</div></div></a>
           <a href="summary.html" class="tile"><div class="ib ib-purple">📊</div>
-            <div><div class="lb">สรุปยอด</div><div class="sb">ดูก่อนขอเบิกรอบเดือน</div></div></a>
+            <div><div class="lb">สรุปยอด</div><div class="sb">Export ขอเบิก · Export บัญชี</div></div></a>
           <a href="profile.html" class="tile"><div class="ib ib-blue">📤</div>
             <div><div class="lb">ขอเบิกรอบเดือน</div><div class="sb">ส่งให้ GM เซ็น</div></div></a>
         </div>`;
@@ -778,6 +781,8 @@
       return 'สวัสดีตอนค่ำ';
     }
 
+    // ของสดมาทีหลัง → วาดหน้าแรกใหม่เงียบๆ (ไม่ยิงเน็ตซ้อน)
+    onFresh(() => { const ss = getSession(); if (ss && document.getElementById('homeBody')) return showDashboard(ss); });
     init();
   </script>
 </body>
