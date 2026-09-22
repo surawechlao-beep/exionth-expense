@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>คิวโอนเงิน — ฝ่ายบัญชี</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#B7081D">
+  <style>
+    .hero-acct { background: linear-gradient(135deg,#065F46,#047857 60%,#10B981); color: white; border-radius: 20px;
+                 padding: 18px 18px 16px; margin-bottom: 12px; box-shadow: 0 8px 22px rgba(4,120,87,.28); }
+    .hero-acct .l { font-size: 12px; opacity: .85; font-weight: 600; }
+    .hero-acct .n { font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 2px 0 8px; }
+    .hero-acct .s { display: flex; gap: 8px; }
+    .hero-acct .s div { flex: 1; background: rgba(255,255,255,.16); border-radius: 12px; padding: 8px 6px; text-align: center; }
+    .hero-acct .s b { display: block; font-size: 16px; } .hero-acct .s span { font-size: 11px; opacity: .85; }
+
+    .rows { background: white; border: 1px solid var(--gray-200); border-radius: 16px; overflow: hidden; margin-bottom: 12px; }
+    .row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-bottom: 1px solid var(--gray-100); }
+    .row:last-child { border-bottom: none; }
+    .row .ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+               font-size: 17px; font-weight: 800; flex-shrink: 0; background: linear-gradient(135deg,#DCFCE7,#BBF7D0); color: #166534; }
+    .row .tx { flex: 1; min-width: 0; }
+    .row .t1 { font-size: 14px; font-weight: 700; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .t2 { font-size: 11.5px; color: var(--gray-500); margin-top: 2px; }
+    .row .amt { font-size: 15px; font-weight: 800; color: var(--gray-900); white-space: nowrap; text-align: right; }
+    .row .amt small { display: block; font-size: 11px; font-weight: 600; color: var(--gray-400); }
+    .row .act { display: flex; gap: 6px; flex-shrink: 0; }
+    .row .act button { min-height: 38px; min-width: 42px; padding: 0 12px; border-radius: 11px; border: 1px solid var(--gray-200);
+                       background: white; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+    .row .act .ok { background: #16A34A; color: white; border-color: #16A34A; }
+    .row .act .ok:disabled { opacity: .5; }
+    .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .chip.warn { background: #FEF3C7; color: #92400E; } .chip.bad { background: #FEE2E2; color: #991B1B; }
+    .chip.ok { background: #DCFCE7; color: #166534; } .chip.info { background: #DBEAFE; color: #1E40AF; }
+    .sel { background: #FFFBEB; }
+    .bulk { position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 8px); z-index: 5;
+            display: none; align-items: center; gap: 10px; background: var(--gray-900); color: white;
+            border-radius: 14px; padding: 11px 14px; margin: 8px 0; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    .bulk b { flex: 1; font-size: 13.5px; }
+    .bulk button { min-height: 38px; padding: 0 14px; border-radius: 10px; border: 0; font: inherit; font-weight: 800; cursor: pointer;
+                   background: #16A34A; color: white; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="back" aria-label="ย้อนกลับ" onclick="location.href='index.html'" id="backBtn"></button>
+    <h1><img src="icons/logo.png" alt="EXION" class="logo"><span style="font-size:13px;font-weight:700;margin-left:6px;">🧾 คิวโอนเงิน</span></h1>
+  </div>
+
+  <div class="container">
+    <div id="hero"></div>
+    <div class="seg" id="tabs" style="margin-bottom:12px;">
+      <button type="button" data-t="unpaid" class="on">รอโอน</button>
+      <button type="button" data-t="waiting">รอ GM เซ็น</button>
+      <button type="button" data-t="paid">โอนแล้ว</button>
+    </div>
+    <div id="content" class="loading"><div class="spinner"></div></div>
+    <div class="bulk" id="bulk"><b id="bulkTxt"></b><button id="bulkBtn">✓ จ่ายแล้วทั้งหมด</button></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    const session = requireLogin();
+    const bb = document.getElementById('backBtn');
+    if (bb && typeof icon === 'function') bb.innerHTML = icon('back');
+
+    let Q = null, tab = 'unpaid';
+    const selected = new Set();
+    const money = n => Math.round(Number(n) || 0).toLocaleString();
+    const esc = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const MON_TH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const monLabel = (m, y) => (MON_TH[(Number(m) || 1) - 1] || m) + ' ' + (Number(y) + 543 - 2500);
+    const thD = v => { const d = v ? new Date(v) : null;
+      return d && !isNaN(d) ? d.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) : '-'; };
+    // initials() มีใน app.js แล้ว
+
+    async function load() {
+      const c = document.getElementById('content');
+      c.className = 'loading'; c.innerHTML = '<div class="spinner"></div>';
+      try {
+        const q = await fetchAccountingQueue(session.Email);
+        if (q.error) throw new Error(q.error);
+        Q = q; selected.clear();
+        renderHero(); render();
+      } catch (err) {
+        renderError('content', err.message, load);
+      }
+      renderBottomNav('acct');
+    }
+
+    function renderHero() {
+      const p = Q.petty;
+      document.getElementById('hero').innerHTML = `
+        <div class="hero-acct">
+          <div class="l">รอโอน ${Q.unpaid.length} ใบ</div>
+          <div class="n">${money(Q.unpaidTotal)} <span style="font-size:15px;font-weight:600;opacity:.85;">บาท</span></div>
+          <div class="s">
+            <div><b>${Q.waiting.length}</b><span>รอ GM เซ็น</span></div>
+            <div><b>${Q.paidThisMonth}</b><span>โอนแล้วเดือนนี้</span></div>
+            <div><b>${p ? money(p.cash) : '—'}</b><span>เงินสดย่อย</span></div>
+          </div>
+        </div>`;
+    }
+
+    document.getElementById('tabs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      document.getElementById('tabs').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); tab = b.dataset.t; selected.clear(); render();
+    }));
+
+    function render() {
+      const c = document.getElementById('content');
+      c.classList.remove('loading');
+      const list = Q[tab] || [];
+      if (!list.length) {
+        c.innerHTML = `<div class="empty"><div class="icon-wrap">${tab === 'unpaid' ? '✅' : tab === 'waiting' ? '⏳' : '📭'}</div>
+          <div class="title">${tab === 'unpaid' ? 'ไม่มีใบรอโอน' : tab === 'waiting' ? 'ไม่มีใบรอ GM' : 'ยังไม่มีประวัติ'}</div>
+          <div class="sub">${tab === 'unpaid' ? 'โอนครบทุกใบแล้ว' : ''}</div></div>`;
+        updateBulk(); return;
+      }
+      c.innerHTML = `<div class="rows">` + list.map(x => {
+        const late = x.days >= 3 && tab === 'unpaid';
+        return `
+        <div class="row ${selected.has(x.ID) ? 'sel' : ''}" data-id="${esc(x.ID)}">
+          ${tab === 'unpaid' ? `<input type="checkbox" data-sel="${esc(x.ID)}" ${selected.has(x.ID) ? 'checked' : ''}
+             style="width:20px;height:20px;flex-shrink:0;" aria-label="เลือก ${esc(x.StaffName)}">` : ''}
+          <div class="ic">${initials(x.StaffName)}</div>
+          <div class="tx">
+            <div class="t1">${esc(x.StaffName)}</div>
+            <div class="t2">${monLabel(x.Month, x.Year)} · ${x.ItemCount || 0} รายการ
+              ${tab === 'unpaid' ? (late ? ` · <span class="chip ${x.days >= 7 ? 'bad' : 'warn'}">รอ ${x.days} วัน</span>` : ` · รอ ${x.days} วัน`) : ''}
+              ${tab === 'paid' ? ` · <span class="chip ok">โอน ${thD(x.PaidAt)}</span>` : ''}
+              ${tab === 'waiting' ? ` · <span class="chip info">ส่งเมื่อ ${thD(x.RequestedAt)}</span>` : ''}
+            </div>
+          </div>
+          <div class="amt">${money(x.TotalAmount)}<small>บาท</small></div>
+          <div class="act">
+            <button data-dl="${esc(x.ID)}" title="โหลด Excel" aria-label="โหลด Excel">📥</button>
+            ${tab === 'unpaid' ? `<button class="ok" data-paid="${esc(x.ID)}" data-name="${esc(x.StaffName)}" data-amt="${x.TotalAmount}">✓ จ่ายแล้ว</button>` : ''}
+          </div>
+        </div>`; }).join('') + `</div>`;
+      wire(); updateBulk();
+    }
+
+    function updateBulk() {
+      const b = document.getElementById('bulk');
+      if (tab !== 'unpaid' || !selected.size) { b.style.display = 'none'; return; }
+      const sum = Q.unpaid.filter(x => selected.has(x.ID)).reduce((s, x) => s + x.TotalAmount, 0);
+      document.getElementById('bulkTxt').textContent = 'เลือก ' + selected.size + ' ใบ · ' + money(sum) + ' บาท';
+      b.style.display = 'flex';
+    }
+
+    async function markPaid(ids) {
+      showLoading('กำลังบันทึก ' + ids.length + ' ใบ...');
+      let okN = 0, fails = [];
+      for (const id of ids) {
+        try {
+          const r = await markExportPaid(session.Email, id);
+          if (r && r.error) throw new Error(r.error);
+          okN++;
+        } catch (e) { fails.push(e.message); }
+      }
+      hideLoading();
+      if (okN) showToast('💵 บันทึกแล้ว ' + okN + ' ใบ — แจ้งเซลล์แล้ว', 'success');
+      if (fails.length) showToast('พลาด ' + fails.length + ' ใบ: ' + fails[0], 'error');
+      setTimeout(load, 700);
+    }
+
+    function wire() {
+      document.querySelectorAll('[data-sel]').forEach(cb => cb.addEventListener('change', () => {
+        cb.checked ? selected.add(cb.dataset.sel) : selected.delete(cb.dataset.sel);
+        cb.closest('.row').classList.toggle('sel', cb.checked);
+        updateBulk();
+      }));
+      document.querySelectorAll('[data-paid]').forEach(b => b.addEventListener('click', () => {
+        if (!confirm('ยืนยันว่าโอนเงินให้ ' + b.dataset.name + ' ' + money(b.dataset.amt) + ' บาทแล้ว?\n\nระบบจะแจ้งเซลล์ทันที และย้อนกลับไม่ได้')) return;
+        markPaid([b.dataset.paid]);
+      }));
+      document.querySelectorAll('[data-dl]').forEach(b => b.addEventListener('click', async () => {
+        showLoading('กำลังสร้างไฟล์...');
+        try {
+          const r = await apiPost('downloadFinalExport', { exportId: b.dataset.dl, requesterEmail: session.Email });
+          hideLoading();
+          if (r.error) throw new Error(r.error);
+          if (!r.base64) throw new Error('ไม่มีไฟล์');
+          const bytes = atob(r.base64), arr = new Uint8Array(bytes.length);
+          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+          const url = URL.createObjectURL(new Blob([arr], { type: r.mimeType || 'application/octet-stream' }));
+          const a = document.createElement('a'); a.href = url; a.download = r.filename || 'export.xlsx';
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+        } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+      }));
+    }
+    document.getElementById('bulkBtn').addEventListener('click', () => {
+      const ids = [...selected];
+      if (!ids.length) return;
+      const sum = Q.unpaid.filter(x => selected.has(x.ID)).reduce((s, x) => s + x.TotalAmount, 0);
+      if (!confirm('ยืนยันว่าโอนเงินแล้ว ' + ids.length + ' ใบ รวม ' + money(sum) + ' บาท?\n\nระบบจะแจ้งเซลล์ทุกคน และย้อนกลับไม่ได้')) return;
+      markPaid(ids);
+    });
+
+    load();
+  </script>
+</body>
+</html>

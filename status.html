@@ -51,6 +51,7 @@
       </div>
     </div>
 
+    <div id="stageZone"></div>
     <div id="kpiZone"></div>
     <div id="list" class="loading"><div class="spinner"></div></div>
   </div>
@@ -126,6 +127,16 @@
       }
     };
 
+    /* v8.0 รอบเบิกล่าสุดถึงไหนแล้ว — ขอเบิก → GM เซ็น → โอนแล้ว */
+    async function loadStage() {
+      try {
+        const list = await apiGet('getMyExportRequests', { email: session.Email });
+        const latest = Array.isArray(list) && list.length ? list[0] : null;
+        const z = document.getElementById('stageZone');
+        if (!z) return;
+        z.innerHTML = latest ? '<div class="card" style="padding:12px 14px 6px;">' + exportStageHTML(exportStageOf(latest)) + '</div>' : '';
+      } catch (e) {}
+    }
     window.load = load;
     async function load() {
       try {
@@ -137,6 +148,7 @@
         categories.forEach(c => { const o=document.createElement('option'); o.value=c.Code; o.textContent=catLabel(c.Code); sel.appendChild(o); });
         applyFilters();
         loadExportPeople();
+        loadStage();
       } catch (err) {
         document.getElementById('list').classList.remove('loading');
         document.getElementById('list').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>

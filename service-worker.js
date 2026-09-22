@@ -2,7 +2,7 @@
  * Service Worker for PWA offline cache
  * Strategy: Network First for JS/HTML (always fresh) + Cache First for static assets
  */
-const CACHE_NAME = 'exionth-expense-v35';
+const CACHE_NAME = 'exionth-expense-v36';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
   './senior-inbox.html',
   './my-team.html',
   './all-requests.html',
+  './accounting.html',
   './reset-password.html',
   './summary.html',
   './finalize-claim.html',
