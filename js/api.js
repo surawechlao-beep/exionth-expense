@@ -167,6 +167,9 @@ async function fetchPettyMSBC(email, opt) {
 async function exportPettyMSBC(payload)        { return apiPost('exportPettyMSBC', payload); }
 async function setPettyFundConfig(payload)     { return apiPost('setPettyFundConfig', payload); }
 async function clearPettyBills(payload)        { return apiPost('clearPettyBills', payload); }
+/* ── 🏠 หน้าแรกแยกบทบาท (v8.0) ── */
+async function fetchHomeData(email)            { return apiGet('getHomeData', { email }); }
+async function fetchAccountingQueue(email)     { return apiGet('getAccountingQueue', { email }); }
 
 /* ── 📋 Export รายการคำขอเป็น Excel ── */
 async function fetchExportableStaff(email) { return apiGet('getExportableStaff', { email }); }

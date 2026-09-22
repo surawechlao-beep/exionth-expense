@@ -134,6 +134,39 @@ function catMap(withIcon) {
   return o;
 }
 
+/**
+ * v8.0 แถบสถานะรอบเบิกเดือน — ใช้ทั้งหน้าแรกและหน้าคำขอ
+ *   e = { Month, Year, TotalAmount, stage: none|waiting|approved|paid|rejected, PaidAt }
+ */
+function exportStageHTML(e) {
+  if (!e || e.stage === 'none') return '';
+  const MON = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const mon = (MON[(Number(e.Month) || 1) - 1] || e.Month) + ' ' + (Number(e.Year) + 543 - 2500);
+  const money = n => Math.round(Number(n) || 0).toLocaleString();
+  const thD = v => { const d = v ? new Date(v) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : ''; };
+  const steps = [['ขอเบิก', true], ['GM เซ็น', e.stage !== 'waiting'], ['โอนแล้ว', e.stage === 'paid']];
+  const bad = e.stage === 'rejected';
+  const nowIdx = e.stage === 'waiting' ? 1 : e.stage === 'approved' ? 2 : -1;
+  return '<div style="font-size:11.5px;color:var(--gray-500);margin:2px 4px 6px;">' +
+      'รอบ ' + mon + ' · ' + money(e.TotalAmount) + ' บาท' +
+      (e.stage === 'paid' ? ' · <b style="color:#166534;">โอนแล้ว ' + thD(e.PaidAt) + '</b>' : '') +
+      (e.stage === 'approved' ? ' · <b style="color:#1E40AF;">GM เซ็นแล้ว รอบัญชีโอน</b>' : '') +
+      (bad ? ' · <b style="color:#991B1B;">GM ไม่อนุมัติ — ดูเหตุผลในโปรไฟล์</b>' : '') +
+    '</div><div class="stage">' + steps.map(function (s, i) {
+      const cls = (bad && i === 1 ? 'bad' : (s[1] ? 'done' : '')) + (i === nowIdx && !bad ? ' now' : '');
+      return '<div class="st ' + cls + '"><div class="dot">' +
+             (bad && i === 1 ? '✕' : (s[1] ? '✓' : i + 1)) + '</div>' + s[0] + '</div>';
+    }).join('') + '</div>';
+}
+/** แปลงแถว MonthlyExports → ข้อมูลที่ exportStageHTML ใช้ */
+function exportStageOf(x) {
+  if (!x) return null;
+  const stage = x.PaidAt ? 'paid' : x.OverallStatus === 'Approved' ? 'approved'
+              : x.OverallStatus === 'Rejected' ? 'rejected' : 'waiting';
+  return { Month: x.Month, Year: x.Year, TotalAmount: x.TotalAmount, stage: stage, PaidAt: x.PaidAt || '' };
+}
+
 function statusTH(status) {
   return STATUS_TH[String(status || '').toLowerCase()] || (status || '-');
 }
@@ -288,6 +321,10 @@ async function renderBottomNav(active) {
     items.push({ key: 'inbox', href: 'senior-inbox.html', label: 'รออนุมัติ', icon: 'bell' });
   } else if (isManager) {
     items.push({ key: 'inbox', href: 'manager-inbox.html', label: 'รออนุมัติ', icon: 'bell' });
+  }
+  // v8.0 ฝ่ายบัญชีมีที่ทำงานของตัวเอง — คิวโอนเงิน
+  if (session.isAccountant || role === 'accountant') {
+    items.push({ key: 'acct', href: 'accounting.html', label: 'โอนเงิน', emoji: '💵' });
   }
   items.push({ key: 'profile', href: 'profile.html', label: 'โปรไฟล์', icon: 'user' });
 
