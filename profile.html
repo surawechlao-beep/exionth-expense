@@ -40,6 +40,8 @@
         </div>
         <div class="hint" id="cutoffHint" style="margin-top:6px;">—</div>
         <div id="cutoffWarn" style="margin-top:8px;"></div>
+        <!-- โชว์สดๆ ว่าไฟล์ที่จะได้ครอบคลุมช่วงไหน กี่รายการ — จะได้เห็นก่อนกด ไม่ต้องดาวน์โหลดมาเดา -->
+        <div id="rangePreview" class="info-box" style="margin-top:8px;font-size:12.5px;display:none;"></div>
       </div>
       <div id="exportStatusBox" style="margin-top:14px;"><div class="loading" style="padding:20px;"><div class="spinner"></div></div></div>
       <div id="exportActions" style="display:grid;gap:9px;margin-top:12px;"></div>
@@ -124,6 +126,14 @@
 
     // 📅 v6.3 เลือกช่วงรอบเองได้ทั้งวันเริ่มและวันจบ — ทับหรือเว้นแค่เตือน ไม่บล็อก
     let periodInfo = null;
+    /*
+     * 🐛 "ดาวน์โหลดตัวอย่างมาแล้วไม่ตรงกับที่กรอก"
+     *    เดิมทุกครั้งที่ข้อมูลรอบโหลดเสร็จ (หรือแตะเดือน/ปี) จะเอาค่าแนะนำเขียนทับช่องวันที่
+     *    → คนพิมพ์ 1 ส.ค. ไว้ แล้วค่ามันเด้งกลับเป็น 26 ส.ค. เงียบๆ ก่อนกดปุ่ม
+     *    ตอนนี้จำว่าผู้ใช้แตะช่องไหนแล้ว — ช่องที่แตะเองจะไม่ถูกทับ (รีเซ็ตเฉพาะตอนเปลี่ยนเดือน/ปี)
+     */
+    const userTouched = { start: false, end: false };
+    let rangeKey = '';                       // เดือน-ปีที่กำลังโชว์อยู่ — เปลี่ยนเมื่อไหร่ค่อยยอมเติมใหม่
     async function loadPeriodInfo() {
       const year = parseInt(document.getElementById('exportYear').value);
       const month = parseInt(document.getElementById('exportMonth').value);
@@ -131,22 +141,52 @@
       const sIn = document.getElementById('cutoffStart');
       const eIn = document.getElementById('cutoffEnd');
       const hint = document.getElementById('cutoffHint');
+      const key = year + '-' + month;
+      if (key !== rangeKey) { rangeKey = key; userTouched.start = false; userTouched.end = false; }
       try {
         periodInfo = await apiGet('getPeriodInfo', { email: session.Email, year, month });
         if (!periodInfo || periodInfo.error) throw new Error('n/a');
-        sIn.value = periodInfo.expectedStart;
+        if (key !== rangeKey) return;                                  // ผู้ใช้เปลี่ยนเดือนไปแล้วระหว่างรอ
+        if (!userTouched.start || !sIn.value) sIn.value = periodInfo.expectedStart;
+        if (!userTouched.end   || !eIn.value) eIn.value = periodInfo.suggestedEnd;
         sIn.max = periodInfo.maxEnd;
         eIn.max = periodInfo.maxEnd;
-        eIn.value = periodInfo.suggestedEnd;
         hint.innerHTML = (periodInfo.hasSettled
             ? `รอบก่อนปิดถึง <b>${periodInfo.lastSettledTH}</b> — ระบบแนะนำให้เริ่ม ${periodInfo.expectedStartTH}`
             : `ยังไม่เคยปิดรอบ — เริ่มจากบิลเก่าสุดที่มี (${periodInfo.expectedStartTH})`) +
           `<br>วันตัดยอดตามค่ากลางคือ${periodInfo.cutoffLabel} · เลือกเองได้ทั้งสองช่อง`;
-        sIn.oninput = checkPeriodRange;
-        eIn.oninput = checkPeriodRange;
+        sIn.oninput = () => { userTouched.start = true; checkPeriodRange(); };
+        eIn.oninput = () => { userTouched.end = true;   checkPeriodRange(); };
+        sIn.onchange = sIn.oninput;
+        eIn.onchange = eIn.oninput;
         checkPeriodRange();
         wrap.style.display = 'block';
       } catch { wrap.style.display = 'none'; periodInfo = null; }
+    }
+
+    // นับสดๆ ว่าช่วงนี้ไฟล์จะมีกี่รายการ กี่บาท — ถามหลังบ้านช้าลงนิดหน่อยหลังพิมพ์เสร็จ
+    let previewTimer = null, previewSeq = 0;
+    function schedulePreview() {
+      const box = document.getElementById('rangePreview');
+      const s = document.getElementById('cutoffStart').value, e = document.getElementById('cutoffEnd').value;
+      if (!box) return;
+      if (!s || !e || new Date(e) < new Date(s)) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = `📄 ไฟล์จะใช้ช่วง <b>${fmtTH(s)} – ${fmtTH(e)}</b> · กำลังนับรายการ...`;
+      clearTimeout(previewTimer);
+      const seq = ++previewSeq;
+      previewTimer = setTimeout(async () => {
+        try {
+          const p = await apiGet('previewPeriod', { email: session.Email, start: s, end: e });
+          if (seq !== previewSeq) return;                                // พิมพ์ต่อไปแล้ว ผลนี้เก่า
+          if (!p || p.error) throw new Error((p && p.error) || 'n/a');
+          box.innerHTML = `📄 ไฟล์จะใช้ช่วง <b>${fmtTH(s)} – ${fmtTH(e)}</b><br>` +
+            `อนุมัติแล้ว <b>${p.count}</b> รายการ · <b>${Number(p.total || 0).toLocaleString()}</b> บาท` +
+            (p.warnings || []).filter(w => /รออนุมัติ/.test(w)).map(w => `<br>${w}`).join('');
+        } catch (err) {
+          if (seq === previewSeq) box.innerHTML = `📄 ไฟล์จะใช้ช่วง <b>${fmtTH(s)} – ${fmtTH(e)}</b>`;
+        }
+      }, 500);
     }
 
     // เตือนแบบสดๆ ถ้าทับรอบก่อนหรือมีวันหาย — คำนวณฝั่งหน้าเว็บ ไม่ต้องยิง server
@@ -178,6 +218,7 @@
       box.innerHTML = w.length
         ? w.map(x => `<div class="warn-box" style="margin:0 0 6px;font-size:12.5px;">${x}</div>`).join('')
         : '';
+      schedulePreview();
     }
 
     function refreshExportStatus() {
@@ -268,14 +309,21 @@
       showLoading('กำลังสร้างตัวอย่าง...');
       try {
         // ส่งช่วงวันที่เพิ่งเลือกไปด้วย ไม่งั้นตัวอย่างจะใช้เดือนปฏิทินแทน
-        const periodStart = (document.getElementById('cutoffStart') || {}).value || '';
-        const periodEnd   = (document.getElementById('cutoffEnd') || {}).value || '';
+        // ถ้าช่องวันที่ซ่อนอยู่ (ขอไปแล้ว) ไม่ส่ง — ให้หลังบ้านใช้ช่วงของคำขอที่ยื่นไว้
+        const pickable = (document.getElementById('cutoffWrap') || {}).style?.display !== 'none';
+        const periodStart = pickable ? ((document.getElementById('cutoffStart') || {}).value || '') : '';
+        const periodEnd   = pickable ? ((document.getElementById('cutoffEnd') || {}).value || '') : '';
         const r = await apiPost('downloadDraftExport', {
           staffEmail: session.Email, year, month, periodStart, periodEnd, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
         dl(r);
-        showToast(`ตัวอย่าง ${r.periodLabel || ''} · ${r.itemCount} รายการ · ${Number(r.totalAmount||0).toLocaleString()} บาท`, 'success');
+        // บอกชัดๆ ว่าไฟล์ที่ได้ใช้ช่วงไหน — ถ้าไม่ตรงกับที่กรอกจะรู้ทันที ไม่ต้องเปิดไฟล์
+        if (periodStart && r.periodStart && r.periodStart !== periodStart) {
+          showToast(`⚠️ ไฟล์ใช้ช่วง ${r.periodLabel} ไม่ใช่ ${fmtTH(periodStart)} — Code.gs บน Google อาจยังเป็นเวอร์ชันเก่า`, 'error');
+        } else {
+          showToast(`ตัวอย่าง ${r.periodLabel || ''} · ${r.itemCount} รายการ · ${Number(r.totalAmount||0).toLocaleString()} บาท`, 'success');
+        }
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 
