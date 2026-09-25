@@ -595,6 +595,35 @@ function closeImageViewer() {
  * @param {Function} fn  async (row) => result
  * @param {string} verb  'อนุมัติ' / 'ปฏิเสธ'
  */
+/**
+ * ⚡ v8.4 ตัดสินทั้งชุดด้วยคำสั่งเดียว + ไม่ให้จอค้าง
+ *   optimistic: เอาออกจากจอทันที → ยิงหลังบ้าน → พลาดค่อยคืนกลับมาพร้อมบอกเหตุผล
+ *   opts: { ids, decision, remark, approverEmail, signatureBase64, mode, verb, onRemove(ids), onRestore(ids) }
+ */
+async function decideBatch(opts) {
+  const ids = opts.ids || [];
+  if (!ids.length) return { ok: 0, failed: [] };
+  const verb = opts.verb || (opts.decision === 'Rejected' ? 'ปฏิเสธ' : 'อนุมัติ');
+  if (opts.onRemove) opts.onRemove(ids);
+  showToast('⏳ กำลัง' + verb + ' ' + ids.length + ' รายการ...', 'info');
+  let r;
+  try {
+    r = await decideMany({ ids, decision: opts.decision, remark: opts.remark || '',
+      approverEmail: opts.approverEmail, signatureBase64: opts.signatureBase64 || '', mode: opts.mode || 'auto' });
+    if (!r || r.error) throw new Error((r && r.error) || 'ไม่ได้รับคำตอบจากเซิร์ฟเวอร์');
+  } catch (err) {
+    if (opts.onRestore) opts.onRestore(ids);
+    showToast(verb + 'ไม่สำเร็จ — ' + err.message, 'error');
+    return { ok: 0, failed: ids.map(id => ({ id, msg: err.message })) };
+  }
+  const failed = (r.failed || []).map(f => ({ id: f.id, msg: f.error }));
+  if (failed.length && opts.onRestore) opts.onRestore(failed.map(f => f.id));
+  if (!failed.length) showToast(`✅ ${verb}ครบ ${(r.done || []).length} รายการ`, 'success');
+  else if ((r.done || []).length) showToast(`${verb}สำเร็จ ${r.done.length} · ไม่สำเร็จ ${failed.length} — ${failed[0].msg}`, 'error');
+  else showToast(`${verb}ไม่สำเร็จ — ${failed[0].msg}`, 'error');
+  return { ok: (r.done || []).length, failed };
+}
+
 async function runBatch(rows, fn, verb) {
   let ok = 0;
   const failed = [];

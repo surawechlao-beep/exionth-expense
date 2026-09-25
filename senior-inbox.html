@@ -254,17 +254,22 @@
       }
       if (decision === 'Rejected' && !remark) return showToast('ระบุเหตุผล', 'error');
       if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'Reject?')) return;
-      showLoading('กำลังบันทึก...');
-      try {
-        // ⚠️ ต้องใช้ approve (legacyApprove) ไม่ใช่ seniorApprove ตรงๆ
-        //    ใบ Pre-Approve ต้องเข้า managerApprove ไม่งั้น Status ถูกเขียนทับ ส่งบิลจริงไม่ได้อีกเลย
-        const result = await approveRequest({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
-        hideLoading();
-        if (result && result.error) throw new Error(result.error);
-        showToast(decision === 'Approved' ? '🎉 อนุมัติแล้ว!' : '❌ ไม่อนุมัติ', 'success');
-        closeModal();
-        load();
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+      // ⚡ ไม่ให้จอค้าง — ปิดกล่อง เอาใบออกทันที ยิงหลังบ้านเบื้องหลัง พลาดค่อยคืนกลับมา
+      //    mode:'auto' — ใบ Pre-Approve / ใบที่รอหัวหน้า จะเข้าเส้นทางหัวหน้าเอง ไม่เขียน Status ทับ
+      closeModal();
+      await decideBatch({ ids: [id], decision, remark, approverEmail: session.Email, signatureBase64, mode: 'auto',
+        onRemove: removeLocal, onRestore: restoreLocal });
+      load();
+    }
+
+    const _removed = {};
+    function removeLocal(ids) {
+      ids.forEach(id => { const i = pending.findIndex(r => r.ID === id); if (i >= 0) _removed[id] = pending.splice(i, 1)[0]; });
+      render();
+    }
+    function restoreLocal(ids) {
+      ids.forEach(id => { if (_removed[id]) { pending.push(_removed[id]); delete _removed[id]; } });
+      render();
     }
 
     window.approveBatch = async (bid) => {
@@ -272,9 +277,9 @@
       const total = items.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
       const who = items[0] ? (items[0].StaffName || '') : '';
       if (!confirm(`อนุมัติ ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท ?`)) return;
-      try {
-        await runBatch(items, r => approveRequest({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email }), 'อนุมัติ');
-      } finally { load(); }
+      await decideBatch({ ids: items.map(r => r.ID), decision: 'Approved', approverEmail: session.Email, mode: 'auto',
+        onRemove: removeLocal, onRestore: restoreLocal });
+      load();
     };
 
     function closeModal() { document.getElementById('modal').classList.remove('show'); }

@@ -198,6 +198,8 @@ async function submitBatch(payload) { return apiPost('submit', payload); }
 async function submitPreApprove(payload) { return apiPost('submitPreApprove', payload); }
 async function finalizeClaim(payload) { return apiPost('finalizeClaim', payload); }
 async function managerApprove(payload) { return apiPost('managerApprove', payload); }
+/** ⚡ ตัดสินหลายใบในคำสั่งเดียว — { ids, decision, remark, approverEmail, signatureBase64, mode } */
+async function decideMany(payload) { return apiPost('decideMany', payload); }
 async function seniorApprove(payload) { return apiPost('seniorApprove', payload); }
 async function fetchManagerInbox(email) { return apiGet('getManagerInbox', { email }); }
 async function fetchSeniorInbox(email) { return apiGet('getSeniorInbox', { email }); }
@@ -275,13 +277,48 @@ async function getMySignature(email) {
 }
 
 // --- File helpers ---
-function fileToBase64(file) {
+function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/*
+ * ⚡ v8.5 ย่อรูปใบเสร็จในเครื่องก่อนส่ง
+ *   รูปจากกล้องมือถือ 3–8 MB → ส่งขึ้น Apps Script ทั้งก้อน (บวก 33% จาก base64) → ช้าที่สุดในระบบ
+ *   ย่อเหลือกว้าง/สูงไม่เกิน 1,400px JPEG คุณภาพ 0.82 ≈ 150–300 KB — ตัวเลขในบิลยังอ่านชัด
+ *   PDF / ไฟล์ที่เล็กอยู่แล้ว / เบราว์เซอร์ที่ย่อไม่ได้ → ส่งต้นฉบับเหมือนเดิม
+ */
+const IMG_MAX_SIDE = 1400, IMG_QUALITY = 0.82, IMG_SKIP_UNDER = 350 * 1024;
+async function fileToBase64(file) {
+  try {
+    if (!file || !/^image\//.test(file.type || '') || file.size <= IMG_SKIP_UNDER) return await readFileAsDataURL(file);
+    if (typeof document === 'undefined' || typeof Image === 'undefined') return await readFileAsDataURL(file);
+    const src = await readFileAsDataURL(file);
+    // รูปที่เบราว์เซอร์ถอดไม่ได้ (เช่น HEIC บางเครื่อง) หรือถอดไม่เสร็จใน 8 วิ → ส่งต้นฉบับแทน ไม่ค้าง
+    const img = await new Promise((res, rej) => {
+      const i = new Image(); const t = setTimeout(() => rej(new Error('decode timeout')), 8000);
+      i.onload = () => { clearTimeout(t); res(i); }; i.onerror = () => { clearTimeout(t); rej(new Error('decode failed')); };
+      i.src = src;
+    });
+    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if (!w || !h) return src;
+    const scale = Math.min(1, IMG_MAX_SIDE / Math.max(w, h));
+    const cw = Math.round(w * scale), ch = Math.round(h * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return src;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);      // PNG โปร่งใส → พื้นขาว
+    ctx.drawImage(img, 0, 0, cw, ch);
+    const out = canvas.toDataURL('image/jpeg', IMG_QUALITY);
+    return (out && out.length < src.length) ? out : src;      // ย่อแล้วใหญ่กว่าเดิม (เกิดได้กับรูปเล็ก) → ใช้ต้นฉบับ
+  } catch (e) {
+    return readFileAsDataURL(file);
+  }
 }
 
 /* ── 💵 Petty Cash ── */

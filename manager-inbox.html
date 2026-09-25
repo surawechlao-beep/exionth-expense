@@ -317,15 +317,22 @@
       }
       if (decision === 'Rejected' && !remark) return showToast('ระบุเหตุผลที่ปฏิเสธ', 'error');
       if (!confirm(decision === 'Approved' ? 'ยืนยันอนุมัติ?' : 'ยืนยันปฏิเสธ?')) return;
-      showLoading(decision === 'Approved' ? 'กำลังอนุมัติ...' : 'กำลังปฏิเสธ...');
-      try {
-        const result = await managerApprove({ id, decision, remark, approverEmail: session.Email, signatureBase64 });
-        hideLoading();
-        if (result && result.error) throw new Error(result.error);
-        showToast(decision === 'Approved' ? '✅ อนุมัติแล้ว' : '❌ ปฏิเสธแล้ว', 'success');
-        closeModal();
-        load();
-      } catch (err) { hideLoading(); showToast(err.message, 'error'); }
+      // ⚡ ไม่ให้จอค้าง — ปิดกล่อง เอาใบออกจากรายการทันที แล้วค่อยยิงหลังบ้าน พลาดค่อยคืนกลับมา
+      closeModal();
+      await decideBatch({ ids: [id], decision, remark, approverEmail: session.Email, signatureBase64, mode: 'manager',
+        onRemove: removeLocal, onRestore: restoreLocal });
+      load();
+    }
+
+    // เอาออก/คืนกลับในจอโดยไม่รอเซิร์ฟเวอร์
+    const _removed = {};
+    function removeLocal(ids) {
+      ids.forEach(id => { const i = pending.findIndex(r => r.ID === id); if (i >= 0) _removed[id] = pending.splice(i, 1)[0]; });
+      render();
+    }
+    function restoreLocal(ids) {
+      ids.forEach(id => { if (_removed[id]) { pending.push(_removed[id]); delete _removed[id]; } });
+      render();
     }
 
     window.approveBatch = async (bid) => {
@@ -337,9 +344,10 @@
       const total = items.reduce((s,r) => s + (Number(r.Amount)||0), 0);
       const who = items[0] ? (items[0].StaffName || '') : '';
       if (!confirm(`อนุมัติทั้ง ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท ?`)) return;
-      try {
-        await runBatch(items, r => managerApprove({ id: r.ID, decision: 'Approved', remark: '', approverEmail: session.Email }), 'อนุมัติ');
-      } finally { load(); }
+      // ⚡ ยิงครั้งเดียวทั้งชุด (เดิมยิงทีละใบ 10 ใบ = 10 รอบ ≈ 1–2 นาที)
+      await decideBatch({ ids: items.map(r => r.ID), decision: 'Approved', approverEmail: session.Email, mode: 'manager',
+        onRemove: removeLocal, onRestore: restoreLocal });
+      load();
     };
 
     window.rejectBatch = async (bid) => {
@@ -350,9 +358,9 @@
       if (!remark || !remark.trim()) return;
       // ยืนยันอีกชั้น — ปฏิเสธแล้วย้อนไม่ได้ และอีเมลเด้งหาพนักงานทันที
       if (!confirm(`ไม่อนุมัติทั้ง ${items.length} รายการของ ${who}\nรวม ${Math.round(total).toLocaleString()} บาท\n\nเหตุผล: ${remark}\n\nยืนยัน? (ย้อนกลับไม่ได้)`)) return;
-      try {
-        await runBatch(items, r => managerApprove({ id: r.ID, decision: 'Rejected', remark, approverEmail: session.Email }), 'ปฏิเสธ');
-      } finally { load(); }
+      await decideBatch({ ids: items.map(r => r.ID), decision: 'Rejected', remark, approverEmail: session.Email, mode: 'manager',
+        onRemove: removeLocal, onRestore: restoreLocal });
+      load();
     };
 
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
