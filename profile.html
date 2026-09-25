@@ -180,8 +180,11 @@
           const p = await apiGet('previewPeriod', { email: session.Email, start: s, end: e });
           if (seq !== previewSeq) return;                                // พิมพ์ต่อไปแล้ว ผลนี้เก่า
           if (!p || p.error) throw new Error((p && p.error) || 'n/a');
+          const autoTxt = (p.autoAllowance || []).length
+            ? `<br>🚙📱 รวม allowance อัตโนมัติ ${p.autoAllowance.map(a => (catTH ? catTH(a.Category) : a.Category) + ' ' + Number(a.Amount).toLocaleString()).join(' · ')} บาท`
+            : '';
           box.innerHTML = `📄 ไฟล์จะใช้ช่วง <b>${fmtTH(s)} – ${fmtTH(e)}</b><br>` +
-            `อนุมัติแล้ว <b>${p.count}</b> รายการ · <b>${Number(p.total || 0).toLocaleString()}</b> บาท` +
+            `อนุมัติแล้ว <b>${p.count}</b> รายการ · <b>${Number(p.total || 0).toLocaleString()}</b> บาท` + autoTxt +
             (p.warnings || []).filter(w => /รออนุมัติ/.test(w)).map(w => `<br>${w}`).join('');
         } catch (err) {
           if (seq === previewSeq) box.innerHTML = `📄 ไฟล์จะใช้ช่วง <b>${fmtTH(s)} – ${fmtTH(e)}</b>`;

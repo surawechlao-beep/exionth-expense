@@ -128,8 +128,24 @@
 
     async function init() {
       try {
-        const all = await fetchCategories();
-        categories = (Array.isArray(all) ? all : []).filter(c => !HIDDEN.includes(c.Code));
+        // 🚙📱 คนที่มี allowance อัตโนมัติ → ไม่ต้องกดส่งค่ารถ/ค่าโทร/ค่าที่พักเอง ซ่อนประเภทไว้กันซ้ำ
+        const [all, allow] = await Promise.all([
+          fetchCategories(),
+          apiGet('getMyAllowance', { email: session.Email }).catch(() => ({ auto: false }))
+        ]);
+        const autoHide = [];
+        if (allow && allow.auto) { if (allow.CAR > 0) autoHide.push('CAR'); if (allow.MOBILE > 0) autoHide.push('MOBILE'); if (allow.APT > 0) autoHide.push('APT'); }
+        categories = (Array.isArray(all) ? all : []).filter(c => !HIDDEN.includes(c.Code) && !autoHide.includes(c.Code));
+        if (autoHide.length) {
+          const note = document.createElement('div');
+          note.className = 'info-box'; note.style.marginBottom = '10px';
+          note.innerHTML = '🚙📱 ค่ารถ' + (allow.CAR > 0 ? ' ' + Number(allow.CAR).toLocaleString() : '') +
+            (allow.MOBILE > 0 ? ' · ค่าโทรศัพท์ ' + Number(allow.MOBILE).toLocaleString() : '') +
+            (allow.APT > 0 ? ' · ค่าที่พัก ' + Number(allow.APT).toLocaleString() : '') +
+            ' บาท <b>ใส่ให้อัตโนมัติทุกรอบ</b> ไม่ต้องกดส่ง';
+          const box = document.getElementById('itemsContainer');
+          box.parentNode.insertBefore(note, box);
+        }
         if (!categories.length) throw new Error('ไม่มีประเภท');
       } catch (err) {
         document.getElementById('itemsContainer').innerHTML = `<div class="empty"><div class="icon-wrap">⚠️</div>

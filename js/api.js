@@ -49,6 +49,7 @@ const CC_ACTIONS = {
   getPendingApprovals: 45 * 1000,       // ป้ายตัวเลขบนเมนู — ไม่ต้องยิงใหม่ทุกครั้งที่เปลี่ยนหน้า
   getMyNotifications: 45 * 1000,        // กระดิ่ง
   getPeriodInfo: 5 * 60 * 1000,
+  getMyAllowance: 10 * 60 * 1000,        // allowance อัตโนมัติ — แทบไม่เปลี่ยน
   getMyTeam: 10 * 60 * 1000, getExportableStaff: 10 * 60 * 1000,
   getMyRole: 10 * 60 * 1000, getFuelRate: 10 * 60 * 1000, getCustomers: 10 * 60 * 1000,
   getCategories: 24 * 60 * 60 * 1000,   // แทบไม่เปลี่ยน
