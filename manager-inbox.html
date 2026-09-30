@@ -45,6 +45,12 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
+    /*
+     * 🪪 v8.7 ค่ารับรองใบเดียว — แถวเดียวกันเป็นได้ทั้ง "ใบขอวงเงิน" (รออนุมัติงบ) และ "บิลจริง" (ส่งบิลแล้ว)
+     *   เดิมดูแค่ว่ามี PreApproveBudget ไหม → บิลจริงถูกโชว์เป็นงบแทนยอดจริง
+     */
+    const isPreReq = r => String(r.PreApproveStatus || '') === 'Pending';
+    const amtOf = r => Number(isPreReq(r) ? r.PreApproveBudget : (r.Amount || r.PreApproveBudget)) || 0;
     let pending = [];
     let exportPending = [];
     let mySig = null;
@@ -122,7 +128,7 @@
       }
 
       const shown = getVisible();
-      const total = shown.reduce((s,r) => s + (Number(r.Amount) || Number(r.PreApproveBudget) || 0), 0);
+      const total = shown.reduce((s,r) => s + (amtOf(r)), 0);
 
       // ⚠️ ถ้าไม่มีคำขอรายรายการ แต่ยังมี Export ค้าง ต้องไม่ return ทิ้ง
       //    ไม่งั้นหัวหน้ามองไม่เห็นคำขอ Export เลย → พนักงานไม่ได้เงิน
@@ -139,9 +145,9 @@
       shown.forEach(r => {
         const idx = pending.indexOf(r);   // index ของรายการจริง ไม่ใช่ index หลังกรอง
         const bid = r.BatchID || r.ID;
-        if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, isPre: !!r.PreApproveBudget };
+        if (!batches[bid]) batches[bid] = { items: [], staff: r.StaffName, dept: r.Department, total: 0, isPre: isPreReq(r) };
         batches[bid].items.push({ ...r, _idx: idx });
-        batches[bid].total += Number(r.Amount) || Number(r.PreApproveBudget) || 0;
+        batches[bid].total += amtOf(r);
       });
 
       document.getElementById('stickyBar').innerHTML =
@@ -187,7 +193,7 @@
             <div class="amt">${Math.round(b.total).toLocaleString()}</div>
           </div>`;
         b.items.forEach(r => {
-          const amt = Number(r.Amount) || Number(r.PreApproveBudget) || 0;
+          const amt = amtOf(r);
           html += `<div class="request-item" onclick="showDetail(${r._idx})">
             <div class="cat-icon" style="background:#FEF3C7;color:#92400E;">${CAT_IC[r.Category] || '📦'}</div>
             <div class="info">
@@ -209,7 +215,7 @@
 
     function showDetail(idx) {
       const r = pending[idx];
-      const isPre = !!r.PreApproveBudget;
+      const isPre = isPreReq(r);
       document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + (CAT_TH[r.Category] || r.Category);
 
       const rows = [
@@ -225,11 +231,15 @@
       if (r.Customer) rows.push(['ลูกค้า', r.Customer + (r.CustomerContact ? ' (' + r.CustomerContact + ')' : '')]);
       if (r.Mileage_KM) rows.push(['ระยะทาง', r.Mileage_KM + ' กม.']);
 
-      const amount = r.PreApproveBudget || r.Amount;
+      const amount = amtOf(r);
+      // บิลจริงจากใบขอวงเงิน — โชว์งบที่เคยอนุมัติเทียบยอดจริง จะได้เห็นทันทีว่าเกินงบไหม
+      const budget = !isPre && r.PreApproveBudget ? Number(r.PreApproveBudget) : 0;
+      const over = budget && Number(r.Amount) > budget ? Number(r.Amount) - budget : 0;
       let html = `<div class="detail-row">
         <div class="key">${isPre ? 'งบประมาณ' : 'จำนวนเงิน'}</div>
         <div class="val big">${Math.round(Number(amount)).toLocaleString()} <span style="font-size:13px;color:var(--gray-500);font-weight:600;">THB</span></div>
-      </div>` + rows.map(([k,v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
+      </div>` + (budget ? `<div class="${over ? 'bad-box' : 'ok-box'}" style="margin:0 0 8px;font-size:12.5px;">📋 งบที่อนุมัติไว้ ${budget.toLocaleString()} THB ${over ? '— <b>เกินงบ ' + over.toLocaleString() + ' THB</b>' : '— อยู่ในงบ ✓'}</div>` : '')
+        + rows.map(([k,v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');
 
       // Receipts
       let urls = [];

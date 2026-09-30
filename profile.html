@@ -154,7 +154,7 @@
         hint.innerHTML = (periodInfo.hasSettled
             ? `รอบก่อนปิดถึง <b>${periodInfo.lastSettledTH}</b> — ระบบแนะนำให้เริ่ม ${periodInfo.expectedStartTH}`
             : `ยังไม่เคยปิดรอบ — เริ่มจากบิลเก่าสุดที่มี (${periodInfo.expectedStartTH})`) +
-          `<br>วันตัดยอดตามค่ากลางคือ${periodInfo.cutoffLabel} · เลือกเองได้ทั้งสองช่อง`;
+          `<br>เลือกช่วงวันเองได้ทั้งสองช่อง — ระบบไม่มีวันตัดรอบตายตัว`;
         sIn.oninput = () => { userTouched.start = true; checkPeriodRange(); };
         eIn.oninput = () => { userTouched.end = true;   checkPeriodRange(); };
         sIn.onchange = sIn.oninput;

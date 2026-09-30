@@ -399,7 +399,7 @@
         });
       }
 
-      return pool.filter(r => {
+      const rows = pool.filter(r => {
         /*
          * 🔴 ตัดแถว "ขอวงเงิน" ออกจากตารางค่าใช้จ่าย
          *    PreApprove = ใบขอวงเงิน ยังไม่ใช่เงินที่จ่ายจริง
@@ -418,7 +418,42 @@
         if (scope === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
         if (scope === '__all__') return true;
         return r.StaffName === scope;
-      }).sort((a,b) => new Date(a.ExpenseDate||a.Timestamp) - new Date(b.ExpenseDate||b.Timestamp));
+      });
+      return rows.concat(autoAllowanceRows(rows, use ? dTo : null, y))
+        .sort((a,b) => new Date(a.ExpenseDate||a.Timestamp) - new Date(b.ExpenseDate||b.Timestamp));
+    }
+
+    /*
+     * 🚙📱 allowance อัตโนมัติ (โอปอล/เจมส์/แพต …) — กฎเดียวกับ Excel:
+     *   คนที่ตั้งไว้ ถ้าในช่วงที่กำลังดู "ไม่มี" รายการค่ารถ/ค่าโทร/ค่าที่พักที่กดส่งเอง → เติมแถวให้ (ติดป้าย auto)
+     *   กดส่งเองมาแล้ว → ใช้ของที่กรอก ไม่เติมซ้ำ · คนที่ไม่ได้ตั้งไม่มีอะไรเปลี่ยน
+     */
+    const AUTO_CATS = ['CAR', 'MOBILE', 'APT'];
+    function autoAllowanceRows(rows, endYmd, year) {
+      const table = (raw && raw.autoAllowance) || {};
+      const emails = Object.keys(table);
+      if (!emails.length) return [];
+      if (fStatus && fStatus !== 'Approved') return [];              // ดูเฉพาะรออนุมัติ/ไม่อนุมัติ → ไม่เกี่ยว
+      // วันที่ของแถวสมมติ = วันสุดท้ายของช่วง (หรือวันตัดรอบของเดือน) — แค่ให้เรียง/ลงกราฟได้ ไม่มีผลกับยอด
+      const dateStr = endYmd || (year + '-' + String(selMonth).padStart(2, '0') + '-25');
+      const out = [];
+      emails.forEach(em => {
+        // อยู่ในขอบเขตที่กำลังดูไหม (ตัวเอง / ทีม / คนที่เลือก)
+        const nameOf = (raw.items.concat(extraItems || []).find(r => String(r.StaffEmail || '').toLowerCase() === em) || {}).StaffName;
+        if (scope === '__self__' && em !== session.Email.toLowerCase()) return;
+        if (scope !== '__self__' && scope !== '__all__' && nameOf !== scope) return;
+        if (!nameOf && scope !== '__self__') return;                 // ไม่มีชื่อในข้อมูลที่ดึงมา ข้าม
+        const present = {};
+        rows.forEach(r => { if (String(r.StaffEmail || '').toLowerCase() === em && AUTO_CATS.includes(r.Category)) present[r.Category] = true; });
+        AUTO_CATS.forEach(c => {
+          const amt = Number(table[em][c]) || 0;
+          if (present[c] || amt <= 0) return;
+          out.push({ ID: 'AUTO-' + em + '-' + c + '-' + dateStr, StaffEmail: em, StaffName: nameOf || session.Name,
+            Category: c, Amount: amt, ExpenseDate: dateStr, Timestamp: dateStr, Status: 'Approved', ApprovedBy: 'auto',
+            Venue: 'ใส่ให้อัตโนมัติ', Customer: '', CustomerContact: '', ReceiptURLs: '[]', auto: true });
+        });
+      });
+      return out;
     }
 
     function renderNow() {
@@ -594,6 +629,27 @@
       lastGroupBy = isAll;
       lastSub = `${scopeLbl} · ${MONTHS_FULL[selMonth-1]} ${y} · ${items.length} รายการ`;
 
+      /*
+       * 📥 v8.8 ปุ่ม Export อยู่นอกตาราง — เห็นทันทีไม่ต้องกด "ดูตารางทั้งหมด" ก่อน
+       *   (เดิมซ่อนอยู่ท้ายตารางที่พับไว้ คนหาไม่เจอ)
+       */
+      html += onePerson ? `<div class="card" id="exportCard">
+        <div class="card-head"><span class="ib ib-green">📥</span>
+          <div><div class="ch-title">ดาวน์โหลด Excel</div>
+          <div class="ch-sub">${scopeLbl} · <span id="xlsRange">${dFrom && dTo ? fmtTH(dFrom) + ' – ' + fmtTH(dTo) : MONTHS_FULL[selMonth-1] + ' ' + y}</span> · ${items.length} รายการ</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;">
+          <button type="button" class="btn btn-primary" id="xlsBtn"
+                  onclick="exportExcel()" style="margin:0;">📤 Export สำหรับขอเบิก</button>
+          <button type="button" class="btn btn-secondary" id="xlsAcctBtn"
+                  onclick="exportForAccounting()" style="margin:0;">🧾 Export สำหรับบัญชี</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px;">
+          <div class="hint" style="margin:0;text-align:center;">ฟอร์มบริษัท · เฉพาะที่อนุมัติแล้ว<br>ใช้ยื่นขอเบิกรอบเดือน</div>
+          <div class="hint" style="margin:0;text-align:center;">เลข Job · ลูกค้า · ผู้ติดต่อ · ผู้ร่วม<br>ยอดพรี · ยอดจริง · ให้บัญชีตรวจ</div>
+        </div>
+      </div>` : `<div class="card" id="exportCard"><div class="hint" style="margin:0;text-align:center;">📥 เลือกรายบุคคลด้านบน เพื่อดาวน์โหลด Excel</div></div>`;
+
       html += `<div class="card foldable" id="tblCard">
         <div class="card-head"><span class="ib ib-blue">📋</span>
           <div><div class="ch-title">ตารางข้อมูล (แบบ Excel)</div>
@@ -609,28 +665,17 @@
             <button onclick="openFs()">⛶ ดูเต็มจอ</button>
           </div>
           ${renderTable(items, isAll)}
-          ${onePerson ? `
-          <div class="sec-label" style="margin:16px 0 8px;">📥 ดาวน์โหลด Excel · <span id="xlsRange" style="font-weight:600;color:var(--gray-400);">${dFrom && dTo
-              ? fmtTH(dFrom) + ' – ' + fmtTH(dTo)
-              : MONTHS_FULL[selMonth-1] + ' ' + y}</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
-            <button type="button" class="btn btn-primary" id="xlsBtn"
-                    onclick="exportExcel()" style="margin:0;">📤 Export สำหรับขอเบิก</button>
-            <button type="button" class="btn btn-secondary" id="xlsAcctBtn"
-                    onclick="exportForAccounting()" style="margin:0;">🧾 Export สำหรับบัญชี</button>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px;">
-            <div class="hint" style="margin:0;text-align:center;">ฟอร์มบริษัท · เฉพาะที่อนุมัติแล้ว<br>ใช้ยื่นขอเบิกรอบเดือน</div>
-            <div class="hint" style="margin:0;text-align:center;">เลข Job · ลูกค้า · ผู้ติดต่อ · ผู้ร่วม<br>ยอดพรี · ยอดจริง · ให้บัญชีตรวจ</div>
-          </div>` : `
-          <div class="hint" style="margin-top:12px;text-align:center;">
-            เลือกรายบุคคลด้านบน เพื่อดาวน์โหลด Excel
-          </div>`}
         </div>
       </div>`;
 
       c.innerHTML = html;
       bindInteractions();
+      // มาจากปุ่ม "Export Excel" หน้าแรก → เลื่อนไปที่ปุ่มให้เลย
+      if (location.hash === '#export' && !window.__jumpedExport) {
+        window.__jumpedExport = true;
+        const ec = document.getElementById('exportCard');
+        if (ec && ec.scrollIntoView) setTimeout(() => ec.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+      }
     }
 
     function bindInteractions() {

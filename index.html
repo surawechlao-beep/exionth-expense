@@ -558,8 +558,10 @@
             <div><div class="lb">ขอวงเงินก่อน</div><div class="sb">รับรอง / กอล์ฟ${h.my && h.my.preApprove ? ' · รอ ' + h.my.preApprove : ''}</div></div></a>
           <a href="status.html" class="tile"><div class="ib ib-green">${icon('list')}</div>
             <div><div class="lb">คำขอของฉัน</div><div class="sb">ดู · แก้ไข · ลบ</div></div></a>
+          <a href="summary.html#export" class="tile"><div class="ib ib-green">📥</div>
+            <div><div class="lb">Export Excel</div><div class="sb">ขอเบิก · บัญชี</div></div></a>
           <a href="summary.html" class="tile"><div class="ib ib-purple">📊</div>
-            <div><div class="lb">สรุปยอด</div><div class="sb">Export ขอเบิก · Export บัญชี</div></div></a>
+            <div><div class="lb">สรุปยอด</div><div class="sb">กราฟ · ตาราง</div></div></a>
           <a href="profile.html" class="tile"><div class="ib ib-blue">📤</div>
             <div><div class="lb">ขอเบิกรอบเดือน</div><div class="sb">ส่งให้ GM เซ็น</div></div></a>
         </div>`;
@@ -593,6 +595,8 @@
             <div><div class="lb">ทีมของฉัน</div><div class="sb">${h.team ? h.team.count + ' ใบเดือนนี้' : 'Excel Reports'}</div></div></a>
           <a href="status.html" class="tile"><div class="ib ib-green">${icon('list')}</div>
             <div><div class="lb">คำขอของฉัน</div><div class="sb">ดู · แก้ไข</div></div></a>
+          <a href="summary.html#export" class="tile"><div class="ib ib-green">📥</div>
+            <div><div class="lb">Export Excel</div><div class="sb">ขอเบิก · บัญชี</div></div></a>
           <a href="profile.html" class="tile"><div class="ib ib-blue">📤</div>
             <div><div class="lb">ขอเบิกรอบเดือน</div><div class="sb">ส่งให้ GM เซ็น</div></div></a>
         </div>`;
@@ -680,21 +684,20 @@
             <div><div class="lb">ส่งบิลของฉัน</div><div class="sb">${h.my ? h.my.pending + ' รอ · ' + money(h.my.total) + ' บาท' : ''}</div></div></a>
           <a href="status.html" class="tile"><div class="ib ib-green">${icon('list')}</div>
             <div><div class="lb">คำขอของฉัน</div><div class="sb">ดู · แก้ไข</div></div></a>
+          <a href="summary.html#export" class="tile"><div class="ib ib-green">📥</div>
+            <div><div class="lb">Export Excel</div><div class="sb">ขอเบิก · บัญชี</div></div></a>
         </div>`;
       return out;
     }
 
     /* ── ชิ้นส่วนที่ใช้ร่วมกัน ── */
-    function cutoffBanner(h) {
-      if (!h.period || h.daysLeft === null || h.daysLeft === undefined) return '';
-      const d = h.daysLeft;
-      if (d < 0) return `<div class="cutoff past"><div class="d">!</div><div class="t"><b>เลยวันตัดรอบแล้ว</b>
-        <span>ตัดรอบ ${h.period.suggestedEndTH} · บิลที่ส่งตอนนี้ไปรอบหน้า</span></div></div>`;
-      const cls = d <= 3 ? 'soon' : '';
-      return `<div class="cutoff ${cls}"><div class="d">${d}</div><div class="t">
-        <b>${d === 0 ? 'วันนี้วันสุดท้าย' : 'เหลืออีก ' + d + ' วัน'}</b>
-        <span>ตัดรอบ ${h.period.suggestedEndTH} · ส่งบิลให้ทันก่อนหมดรอบ</span></div></div>`;
-    }
+    /*
+     * v8.8 ไม่มี "วันตัดรอบ" อีกแล้ว — รอบของแต่ละคนคือช่วงที่เลือกเองตอนขอ Export
+     *   เดิมนับถอยหลังถึงวันที่ 25 แล้วขึ้นแดง "เลยวันตัดรอบแล้ว · บิลไปรอบหน้า" ซึ่งไม่จริงสำหรับคนที่รอบไม่ตรง 25
+     *   ตอนนี้บอกแค่ข้อเท็จจริง: รอบก่อนปิดถึงวันไหน → บิลหลังจากนั้นรวมในรอบนี้ กดขอ Export เมื่อพร้อม
+     */
+    // v8.8 ไม่มีแถบวันตัดรอบเลย (ผู้ใช้ขอ) — รอบของแต่ละคนคือช่วงที่เลือกเองตอนขอ Export
+    function cutoffBanner() { return ''; }
     /* exportStage() อยู่ใน app.js แล้ว */
     const exportStage = h => exportStageHTML(h.latestExport);
     function recentRows(h) {

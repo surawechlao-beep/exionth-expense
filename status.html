@@ -110,7 +110,16 @@
       const st = document.getElementById('filterStatus').value;
       const q = document.getElementById('search').value.trim().toLowerCase();
 
+      /*
+       * 🪪 v8.7 การ์ดเดียว — ใบขอวงเงินแบบเก่าที่ "ส่งบิลแล้ว" (Finalized) และมีบิลจริงอยู่ในรายการแล้ว → ซ่อน
+       *   ให้เห็นแค่บิลจริงใบเดียว (มีป้ายบอกว่ามาจากใบขอวงเงิน) จะได้ไม่คิดว่าซ้ำแล้วกดลบ
+       *   ถ้า Finalized แต่ไม่มีบิลจริงเหลือ (เช่นเผลอลบไปแล้ว) ยังโชว์ไว้ให้เห็นว่าค้าง
+       */
+      const hasChild = {};
+      allReqs.forEach(r => { const b = String(r.BatchID || ''); if (b.indexOf('FINALIZE-') === 0 && String(r.ID) !== b.slice(9)) hasChild[b.slice(9)] = true; });
+
       filteredReqs = allReqs.filter(r => {
+        if (String(r.Status || '') === 'Finalized' && hasChild[r.ID]) return false;
         const d = r.ExpenseDate || r.Timestamp;
         if (!d) return false;
         const rd = new Date(d);
@@ -156,7 +165,9 @@
         return;
       }
 
-      const total = filteredReqs.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+      // ยอดรวม = เงินจริงเท่านั้น — ใบขอวงเงิน (PreApprove/Finalized) ไม่ใช่บิล ไม่นับ (เดิมนับ → ซ้ำกับบิลจริง)
+      const isMoney = r => r.Status !== 'PreApprove' && r.Status !== 'Finalized';
+      const total = filteredReqs.filter(isMoney).reduce((s,r) => s + (Number(r.Amount)||0), 0);
       const pending = filteredReqs.filter(r => r.Status === 'Pending').length;
       const approved = filteredReqs.filter(r => r.Status === 'Approved').length;
       const rejected = filteredReqs.filter(r => r.Status === 'Rejected').length;
@@ -177,7 +188,7 @@
 
       let html = '';
       Object.entries(byMonth).forEach(([month, reqs]) => {
-        const sub = reqs.reduce((s,r) => s + (Number(r.Amount)||0), 0);
+        const sub = reqs.filter(isMoney).reduce((s,r) => s + (Number(r.Amount)||0), 0);
         html += `<div class="sec-label" style="display:flex;justify-content:space-between;align-items:baseline;">
           <span>${month}</span><span style="color:var(--accent);font-weight:800;">${Math.round(sub).toLocaleString()} ฿</span></div>`;
         reqs.forEach(r => html += renderItem(r));
@@ -196,6 +207,8 @@
       const d = r.ExpenseDate ? new Date(r.ExpenseDate) : null;
       const date = d && !isNaN(d) ? d.toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
       const meta = [date, r.Venue, r.Customer].filter(Boolean).join(' • ');
+      const fromPre = String(r.BatchID || '').indexOf('FINALIZE-') === 0;
+      const budget = Number(r.PreApproveBudget) || 0;
       return `<div class="req-card ${cls}">
         <div class="ri-top">
           <span class="ri-cat">${catLabel(r.Category)}</span>
@@ -203,6 +216,7 @@
           <span class="ri-amt">${Number(r.Amount||0).toLocaleString()} ฿</span>
         </div>
         <div class="ri-meta">${meta}</div>
+        ${fromPre ? `<div class="ri-meta" style="color:var(--gray-400);">📋 บิลจริงจากใบขอวงเงิน${budget ? ' · งบ ' + budget.toLocaleString() + ' ฿' + (Number(r.Amount) > budget ? ' <span style="color:#b91c1c;">เกินงบ</span>' : '') : ''}</div>` : ''}
         ${cleanRemark(r.Remark) ? `<div class="ri-meta" style="color:var(--gray-400);">💬 ${cleanRemark(r.Remark)}</div>` : ''}
         <div class="btn-row" style="margin-top:10px;gap:8px;">
           <button class="btn btn-secondary btn-sm" style="flex:1.5;" onclick="viewDetail('${r.ID}')">👁 ดูรายละเอียด</button>
@@ -232,7 +246,7 @@
         </div>
         <div class="ri-meta">${meta}</div>
         ${done
-          ? `<div class="ri-meta" style="margin-top:8px;color:var(--gray-400);">✓ ส่งบิลใช้จริงไปแล้ว — ดูบิลได้ในรายการด้านล่าง</div>`
+          ? `<div class="warn-box" style="margin:8px 0 0;font-size:12.5px;">⚠️ ใบนี้ส่งบิลไปแล้ว แต่ไม่พบบิลจริงในรายการ (อาจถูกลบ) — ยอดจะไม่เข้าการเบิก กรุณาแจ้งแอดมิน</div>`
           : ready
           ? `<div class="ok-box" style="margin:9px 0 0;font-size:12.5px;">📤 อนุมัติงบแล้ว — เหลือกรอกยอดจริงพร้อม<b>แนบใบเสร็จ</b></div>
              <div class="btn-row" style="margin-top:9px;gap:8px;">
@@ -419,14 +433,18 @@
       const r = allReqs.find(x => x.ID === id);
       const d = r && r.ExpenseDate ? new Date(r.ExpenseDate).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '';
       const what = r ? `${catLabel(r.Category)} ${Number(r.Amount||0).toLocaleString()} ฿ (${d})` : 'คำขอนี้';
-      if (!confirm('ลบ ' + what + ' ?\n\nลบแล้วกู้คืนไม่ได้')) return;
+      const fromPre = r && String(r.BatchID || '').indexOf('FINALIZE-') === 0;
+      const msg = fromPre
+        ? '⚠️ นี่คือ "บิลจริง" ที่ส่งจากใบขอวงเงิน ไม่ใช่รายการซ้ำ\n\n' + what + '\n\nถ้าลบ ยอดนี้จะหายจากการเบิก และใบขอวงเงินจะกลับไปเป็น "รอส่งบิล" ให้ส่งใหม่\n\nยืนยันลบ?'
+        : 'ลบ ' + what + ' ?\n\nลบแล้วกู้คืนไม่ได้';
+      if (!confirm(msg)) return;
       closeDetail();
       showLoading('กำลังลบ...');
       try {
         const r = await apiPost('deleteRequest', { id, requesterEmail: session.Email });
         hideLoading();
         if (r.error) throw new Error(r.error);
-        showToast('ลบแล้ว', 'success'); load();
+        showToast(r.reset ? 'ถอนบิลแล้ว — ใบขอวงเงินกลับเป็นรอส่งบิล' : 'ลบแล้ว', 'success'); load();
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     };
 

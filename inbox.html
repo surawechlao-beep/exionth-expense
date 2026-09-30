@@ -42,6 +42,12 @@
   <script src="js/app.js"></script>
   <script>
     const session = requireLogin();
+    /*
+     * 🪪 v8.7 ค่ารับรองใบเดียว — แถวเดียวกันเป็นได้ทั้ง "ใบขอวงเงิน" (รออนุมัติงบ) และ "บิลจริง" (ส่งบิลแล้ว)
+     *   เดิมดูแค่ว่ามี PreApproveBudget ไหม → บิลจริงถูกโชว์เป็นงบแทนยอดจริง
+     */
+    const isPreReq = r => String(r.PreApproveStatus || '') === 'Pending';
+    const amtOf = r => Number(isPreReq(r) ? r.PreApproveBudget : (r.Amount || r.PreApproveBudget)) || 0;
     let pending = [];
     let exportPending = [];
     let mySig = { hasSignature: false };
@@ -131,7 +137,7 @@
         return;
       }
 
-      const total = shown.reduce((s,r)=>s+(Number(r.Amount)||Number(r.PreApproveBudget)||0),0);
+      const total = shown.reduce((s,r)=>s+amtOf(r),0);
       const mgrStage = shown.filter(r => r._stage === 'manager');
       const snrStage = shown.filter(r => r._stage === 'senior');
 
@@ -172,7 +178,7 @@
         let h = `<div class="sec-label">${emoji} ${title} · ${items.length} รายการ</div>`;
         items.forEach(r => {
           const idx = pending.indexOf(r);
-          const amt = Number(r.Amount) || Number(r.PreApproveBudget) || 0;
+          const amt = amtOf(r);
           h += `<div class="request-item" onclick="showDetail(${idx})">
             <div class="cat-icon" style="background:#FEF3C7;color:#92400E;">${CAT_IC[r.Category]||'📦'}</div>
             <div class="info">
@@ -198,7 +204,7 @@
 
     function showDetail(idx) {
       const r = pending[idx];
-      const isPre = !!r.PreApproveBudget;
+      const isPre = isPreReq(r);
       document.getElementById('modalTitle').textContent = r.StaffName + ' — ' + (CAT_TH[r.Category]||r.Category);
 
       const rows = [
@@ -209,7 +215,7 @@
       if (r.Customer) rows.push(['ลูกค้า', r.Customer]);
       if (r.ManagerEmail) rows.push(['Manager', r.ManagerEmail + (r.ManagerStatus === 'Approved' ? ' ✓' : '')]);
 
-      const amount = r.PreApproveBudget || r.Amount;
+      const amount = amtOf(r);
       let html = `<div class="detail-row"><div class="key">${isPre?'งบประมาณ':'จำนวนเงิน'}</div>
         <div class="val big">${Math.round(Number(amount)).toLocaleString()} <span style="font-size:13px;color:var(--gray-500);font-weight:600;">THB</span></div></div>`
         + rows.map(([k,v]) => `<div class="detail-row"><div class="key">${k}</div><div class="val">${v}</div></div>`).join('');

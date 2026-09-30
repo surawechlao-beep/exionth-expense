@@ -49,8 +49,9 @@
         }
 
         const pending = pres.filter(r => r.PreApproveStatus === 'Pending');
-        const ready   = pres.filter(r => r.PreApproveStatus === 'Approved' && r.Status !== 'Finalized');
-        const done    = pres.filter(r => r.Status === 'Finalized' || r.PreApproveStatus === 'Rejected');
+        // v8.7 ใบเดียว: ส่งบิลแล้ว = Status ไม่ใช่ PreApprove อีกต่อไป (Pending/Approved) หรือ Finalized แบบเก่า
+        const ready   = pres.filter(r => r.PreApproveStatus === 'Approved' && r.Status === 'PreApprove');
+        const done    = pres.filter(r => (r.PreApproveStatus === 'Approved' && r.Status !== 'PreApprove') || r.PreApproveStatus === 'Rejected');
         const budgetTotal = ready.reduce((s,r) => s + (Number(r.PreApproveBudget)||0), 0);
 
         document.getElementById('kpiZone').innerHTML = `<div class="kpi-grid">
@@ -85,7 +86,8 @@
       const cls = state === 'ready' ? 'ok' : state === 'pending' ? 'warn' : '';
       const badge = state === 'pending' ? '<span class="pill warn">⏳ รอหัวหน้า</span>'
         : state === 'ready' ? '<span class="pill ok">✅ พร้อมส่งบิล</span>'
-        : r.Status === 'Finalized' ? '<span class="pill ok">✓ ส่งบิลแล้ว</span>'
+        : (r.Status === 'Finalized' || (r.PreApproveStatus === 'Approved' && r.Status !== 'PreApprove'))
+          ? '<span class="pill ok">✓ ส่งบิลแล้ว' + (r.Status === 'Approved' ? ' · อนุมัติแล้ว' : r.Status === 'Pending' ? ' · รอหัวหน้า' : '') + '</span>'
         : '<span class="pill bad">❌ ไม่อนุมัติ</span>';
       const custRaw = String(r.Customer || '-');
       const m = custRaw.match(/^\[(.+?)\]\s*(.*)$/);
