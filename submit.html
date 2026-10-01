@@ -53,6 +53,7 @@
     // ─── กันข้อมูลหาย: เซฟร่างลงเครื่องทุกครั้งที่แก้ ───
     // ไม่เซฟไฟล์แนบ (base64 ใหญ่เกิน localStorage) — เก็บแค่ชื่อไว้เตือน
     let currentBatchId = null;   // รหัสชุดของการกดส่งครั้งนี้ — ใช้ซ้ำถ้าต้องยิงใหม่
+    let forceSubmit = false;     // ผู้ใช้ยืนยันแล้วว่าไม่ซ้ำ → ส่งทั้งหมด
     const DRAFT_KEY = 'exion_draft_' + String(session.Email || '').toLowerCase();
 
     function saveDraft() {
@@ -445,9 +446,10 @@
       }
 
       try {
-        const result = await submitBatch({
+        const payload = {
           staffEmail: session.Email,
           batchId: currentBatchId,
+          force: !!forceSubmit,
           items: items.map(it => ({
             category: it.category, expenseDate: it.expenseDate, venue: it.venue,
             occasion: it.occasion, attendees: it.attendees, amount: it.amount,
@@ -455,9 +457,26 @@
             customer: it.customer, customerContact: it.customerContact,
             jobNo: it.jobNo, receipts: it.receipts
           }))
-        });
+        };
+        const result = await submitBatch(payload);
         hideLoading();
         if (result.error) throw new Error(result.error);
+        /*
+         * ⚠️ v9.3 หลังบ้านเจอรายการที่น่าจะซ้ำ (วัน+หมวด+ยอดเท่ากับที่ส่งไปแล้ว) → ยังไม่บันทึก ถามก่อน
+         *    ยืนยัน = ส่งใหม่ด้วย force:true (รหัสชุดเดิม) · ไม่ยืนยัน = กลับไปแก้ ร่างยังอยู่ครบ
+         */
+        if (result.duplicate && result.duplicate.length) {
+          const lines = result.duplicate.map(dp => '• รายการ ' + (dp.idx + 1) + ' — ' + (CAT_NAME_TH[dp.category] || dp.category) + ' ' +
+            (dp.date ? new Date(dp.date).toLocaleDateString('th-TH', { day:'numeric', month:'short' }) : '') + ' ' + (dp.km ? dp.km + ' กม.' : Number(dp.amount).toLocaleString() + ' บาท') +
+            ' (ส่งไปแล้ว' + (dp.status === 'Pending' ? ' รออนุมัติ' : dp.status === 'Approved' ? ' อนุมัติแล้ว' : '') + ')');
+          const yes = confirm('มีรายการแบบเดียวกันอยู่ในระบบแล้ว:\n\n' + lines.join('\n') +
+            '\n\nถ้าเป็นคนละบิลจริง (เช่น ทางด่วนไป-กลับ) กด "ตกลง" เพื่อส่งทั้งหมด\nถ้าเผลอส่งซ้ำ กด "ยกเลิก" แล้วลบรายการที่ซ้ำออกก่อน');
+          btn.disabled = false;
+          if (yes) { forceSubmit = true; return onSubmit(); }
+          { const dp = result.duplicate[0], it = items[dp.idx]; if (it) flagError(it.id, dp.km ? 'mileageKm' : 'amount', 'รายการนี้มีอยู่แล้ว — ลบออกหรือยืนยันส่งซ้ำ', dp.idx + 1); }
+          return;
+        }
+        forceSubmit = false;
         clearDraft();
         currentBatchId = null;                     // ส่งสำเร็จแล้ว รอบหน้าใช้รหัสใหม่
 

@@ -657,7 +657,7 @@
                 <button class="ok" data-paid="${esc(x.ID)}" data-name="${esc(x.StaffName)}" data-amt="${x.TotalAmount}">✓ จ่ายแล้ว</button>
               </div>
             </div>`).join('') +
-          `<a href="accounting.html" class="more">เปิดคิวทั้งหมด →</a></div>`;
+          `<a href="accounting.html" class="more">เปิดบอร์ดเบิกจ่าย →</a></div>`;
       } else {
         out += `<a href="accounting.html" class="cta soft"><div class="ci">✅</div>
           <div class="ct"><b>ไม่มีใบรอโอน</b><span>โอนครบทุกใบแล้ว</span></div><div class="ar">›</div></a>`;
@@ -670,7 +670,7 @@
       out += `<div class="sec-label">งานบัญชี</div>
         <div class="tiles">
           <a href="accounting.html" class="tile"><div class="ib ib-green">🧾</div>
-            <div><div class="lb">คิวโอนเงิน</div><div class="sb">รอโอน · โอนแล้ว · ประวัติ</div></div></a>
+            <div><div class="lb">บอร์ดเบิกจ่าย</div><div class="sb">ทุกคน ทุกแผนก · ใครถึงขั้นไหน</div></div></a>
           <a href="pc-msbc.html" class="tile"><div class="ib ib-red">📋</div>
             <div><div class="lb">ตาราง MSBC</div><div class="sb">ก๊อปเข้าระบบบัญชี</div></div></a>
           <a href="all-requests.html" class="tile"><div class="ib ib-blue">${icon('list')}</div>

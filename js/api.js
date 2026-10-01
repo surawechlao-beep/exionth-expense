@@ -43,7 +43,7 @@ const CC_MAX_BYTES = 250 * 1024;
 const CC_ACTIONS = {
   // ค่า = อายุที่ "ไม่ต้องยิงใหม่เลย" (ms) · 0 = โชว์ของเก่าแต่ยิงของสดทุกครั้ง
   getHomeData: 0, getMyRequests: 0, getPettyHome: 0, getPettyLedger: 0, getPettyInbox: 0,
-  getAccountingQueue: 0, getManagerInbox: 0, getSeniorInbox: 0, getExportApprovalInbox: 0,
+  getAccountingQueue: 0, getAccountingBoard: 0, getManagerInbox: 0, getSeniorInbox: 0, getExportApprovalInbox: 0,
   getVisibleRequests: 0, getMyTeamRequests: 0, getAllRequests: 0, getMyExportRequests: 0,
   getPettyMSBC: 0, getPettyBalance: 0,
   getPendingApprovals: 45 * 1000,       // ป้ายตัวเลขบนเมนู — ไม่ต้องยิงใหม่ทุกครั้งที่เปลี่ยนหน้า
@@ -111,13 +111,31 @@ function ccIndicator(on) {
 /* ตอนวาดซ้ำจากสัญญาณ 'exion:fresh' ห้ามยิงเน็ตซ้อนอีกรอบ */
 let _ccReplay = false;
 
+/*
+ * 🛡 v8.8 Google ตอบเป็น "หน้าเว็บ" แทน JSON (Unexpected token '<' … <!DOCTYPE)
+ *   เกิดตอนกำลัง New version / Google สะดุด / สคริปต์ล้มก่อนตอบ → ลองซ้ำเอง 1 ครั้ง ถ้ายังไม่ได้บอกเป็นภาษาคน
+ */
+async function parseJsonOrRetry(doFetch) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await doFetch();
+    const text = await response.text();
+    try { return JSON.parse(text); }
+    catch (e) {
+      const looksHtml = /^\s*</.test(text);
+      if (attempt === 0 && looksHtml) { await new Promise(r => setTimeout(r, 2000)); continue; }
+      throw new Error(looksHtml
+        ? 'เซิร์ฟเวอร์กำลังอัปเดตหรือขัดข้องชั่วคราว — ลองใหม่อีกครั้งใน 1 นาที (ถ้ายังไม่หายทุกคน แจ้งแอดมิน: Code.gs อาจรันไม่ได้)'
+        : 'ข้อมูลจากเซิร์ฟเวอร์อ่านไม่ได้ — ลองใหม่อีกครั้ง');
+    }
+  }
+}
+
 async function apiGetRaw(action, params = {}) {
   const url = new URL(CONFIG.API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('secret', CONFIG.SECRET);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const response = await fetchWithTimeout(url.toString(), { method: 'GET', redirect: 'follow' });
-  return await response.json();
+  return parseJsonOrRetry(() => fetchWithTimeout(url.toString(), { method: 'GET', redirect: 'follow' }));
 }
 
 async function apiGet(action, params = {}) {
@@ -174,15 +192,23 @@ async function apiPost(action, body = {}) {
   // → use text/plain to avoid preflight, parse JSON on backend
   // อัปโหลดรูปหลายใบใช้เวลานาน → ให้เวลามากกว่าปกติ
   const heavy = !!(body.items || body.receipts || body.signatureBase64);
+  // ⚠️ คำสั่ง "เขียน" ไม่ยิงซ้ำอัตโนมัติ (กันส่งบิล/อนุมัติซ้ำ) — แค่แปลข้อความให้อ่านรู้เรื่อง
   const response = await fetchWithTimeout(CONFIG.API_URL, {
     method: 'POST',
     redirect: 'follow',
     body: JSON.stringify({ action, secret: CONFIG.SECRET, ...body }),
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
   }, heavy ? 120000 : API_TIMEOUT_MS);
-  const out = await response.json();
+  const rawText = await response.text();
+  let out;
+  try { out = JSON.parse(rawText); }
+  catch (e) {
+    throw new Error(/^\s*</.test(rawText)
+      ? 'เซิร์ฟเวอร์กำลังอัปเดตหรือขัดข้องชั่วคราว — รอ 1 นาทีแล้วลองใหม่ (ยังไม่ได้บันทึก)'
+      : 'ข้อมูลจากเซิร์ฟเวอร์อ่านไม่ได้ — ลองใหม่อีกครั้ง');
+  }
   // 🔒 เขียนอะไรก็ตามสำเร็จ → ล้างแคชในเครื่องทิ้ง ผู้ใช้จะได้ไม่เห็นยอดเงินเก่า
-  const READ_ONLY = { getReceiptImage: 1, exportStaffReport: 1, exportRequestList: 1, exportPettyMSBC: 1,
+  const READ_ONLY = { getReceiptImage: 1, exportStaffReport: 1, exportRequestList: 1, exportStaffSummary: 1, exportPettyMSBC: 1,
                       previewPeriod: 1, login: 1, downloadDraftExport: 1, downloadFinalExport: 1 };
   if (!READ_ONLY[action] && out && !out.error) ccClear();
   return out;
@@ -346,7 +372,9 @@ async function clearPettyBills(payload)        { return apiPost('clearPettyBills
 /* ── 🏠 หน้าแรกแยกบทบาท (v8.0) ── */
 async function fetchHomeData(email)            { return apiGet('getHomeData', { email }); }
 async function fetchAccountingQueue(email)     { return apiGet('getAccountingQueue', { email }); }
+async function fetchAccountingBoard(email, ym) { return apiGet('getAccountingBoard', { email, ym }); }
 
 /* ── 📋 Export รายการคำขอเป็น Excel ── */
 async function fetchExportableStaff(email) { return apiGet('getExportableStaff', { email }); }
 async function exportRequestList(payload)  { return apiPost('exportRequestList', payload); }
+async function exportStaffSummary(payload) { return apiPost('exportStaffSummary', payload); }

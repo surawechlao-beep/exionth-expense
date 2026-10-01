@@ -412,7 +412,10 @@
         const d = new Date(r.ExpenseDate || r.Timestamp);
         if (isNaN(d)) return false;
         if (use) {
-          if (d < ps || d > pe) return false;              // กฎเดียว — อยู่ในช่วงที่เลือกเท่านั้น
+          // 🚙📱 v9.0 เหมาจ่ายรายเดือน (ค่ารถ/โทร/ที่พัก) นับตาม "เดือนที่รอบจบ" ไม่ใช่วันที่ — กฎเดียวกับ Excel
+          if (AUTO_CATS.includes(r.Category)) {
+            if (d.getFullYear() !== pe.getFullYear() || d.getMonth() !== pe.getMonth()) return false;
+          } else if (d < ps || d > pe) return false;       // รายการอื่น — อยู่ในช่วงที่เลือกเท่านั้น
         } else if (d.getFullYear() !== y || d.getMonth() + 1 !== selMonth) return false;
         if (fStatus && r.Status !== fStatus) return false;
         if (scope === '__self__') return String(r.StaffEmail||'').toLowerCase() === session.Email.toLowerCase();
