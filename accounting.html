@@ -266,6 +266,7 @@
         (x.days >= 3 ? ` · <span class="late">รอโอน ${x.days} วัน</span>` : '');
       else if (x.stage === 'paid') note = `โอนแล้ว ${thD(x.PaidAt)}${x.PaidBy ? ' โดย ' + esc(x.PaidBy) : ''} · รอบ ${thD(x.PeriodStart)} – ${thD(x.PeriodEnd)}`;
       else note = x.pendingCount || x.unclaimedCount ? '' : 'ยังไม่มีรายการในรอบนี้';
+      if (x.olderCount) note += (note ? '<br>' : '') + `<span style="color:#92400E;">⏮ ค้างจากเดือนก่อน ${x.olderCount} ใบ · ${money(x.olderAmount)} บาท (ยังไม่เคยขอ Export)</span>`;
       const acts = x.stage === 'ready' || x.stage === 'paid' ? `
         <div class="acts">
           <button class="xl" data-dl="${esc(x.exportId)}" data-name="${esc(x.Name)}">📥 Export ขอเบิก</button>
