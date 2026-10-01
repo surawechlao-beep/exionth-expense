@@ -327,6 +327,10 @@ async function renderBottomNav(active) {
   if (session.isAccountant || role === 'accountant') {
     items.push({ key: 'acct', href: 'accounting.html', label: 'โอนเงิน', emoji: '💵' });
   }
+  // 👑 v9.4 CEO — อนุมัติสรุปเบิกจ่ายอย่างเดียว
+  if (session.isCEO || role === 'ceo') {
+    items.push({ key: 'ceo', href: 'ceo-approve.html', label: 'อนุมัติสรุป', emoji: '👑' });
+  }
   items.push({ key: 'profile', href: 'profile.html', label: 'โปรไฟล์', icon: 'user' });
 
   nav.innerHTML = items.map(it => `

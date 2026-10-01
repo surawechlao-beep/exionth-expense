@@ -43,7 +43,7 @@ const CC_MAX_BYTES = 250 * 1024;
 const CC_ACTIONS = {
   // ค่า = อายุที่ "ไม่ต้องยิงใหม่เลย" (ms) · 0 = โชว์ของเก่าแต่ยิงของสดทุกครั้ง
   getHomeData: 0, getMyRequests: 0, getPettyHome: 0, getPettyLedger: 0, getPettyInbox: 0,
-  getAccountingQueue: 0, getAccountingBoard: 0, getManagerInbox: 0, getSeniorInbox: 0, getExportApprovalInbox: 0,
+  getAccountingQueue: 0, getAccountingBoard: 0, getStaffClaimItems: 0, getSummaryApprovals: 0, getManagerInbox: 0, getSeniorInbox: 0, getExportApprovalInbox: 0,
   getVisibleRequests: 0, getMyTeamRequests: 0, getAllRequests: 0, getMyExportRequests: 0,
   getPettyMSBC: 0, getPettyBalance: 0,
   getPendingApprovals: 45 * 1000,       // ป้ายตัวเลขบนเมนู — ไม่ต้องยิงใหม่ทุกครั้งที่เปลี่ยนหน้า
@@ -373,6 +373,10 @@ async function clearPettyBills(payload)        { return apiPost('clearPettyBills
 async function fetchHomeData(email)            { return apiGet('getHomeData', { email }); }
 async function fetchAccountingQueue(email)     { return apiGet('getAccountingQueue', { email }); }
 async function fetchAccountingBoard(email, ym) { return apiGet('getAccountingBoard', { email, ym }); }
+async function fetchStaffClaimItems(email, staffEmail, ym) { return apiGet('getStaffClaimItems', { email, staffEmail, ym }); }
+async function fetchSummaryApprovals(email) { return apiGet('getSummaryApprovals', { email }); }
+async function submitSummaryForCEO(payload) { return apiPost('submitSummaryForCEO', payload); }
+async function decideSummary(payload) { return apiPost('decideSummary', payload); }
 
 /* ── 📋 Export รายการคำขอเป็น Excel ── */
 async function fetchExportableStaff(email) { return apiGet('getExportableStaff', { email }); }

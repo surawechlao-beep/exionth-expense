@@ -64,16 +64,28 @@
     .late { color: #B91C1C; font-weight: 800; }
     .card-p .top { cursor: pointer; }
     .card-p .hint { font-size: 11px; color: var(--gray-400); margin-top: 6px; }
-    .bill { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--gray-100); }
+    .msub { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--gray-500); margin: -4px 0 10px; }
+    .msub .chip { font-size: 11px; }
+    .bill { display: grid; grid-template-columns: 34px 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--gray-100); align-items: center; }
     .bill:last-child { border-bottom: none; }
-    .bill .bi { width: 34px; height: 34px; border-radius: 10px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-    .bill .bt { flex: 1; min-width: 0; }
-    .bill .b1 { font-size: 13.5px; font-weight: 700; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .bill .b2 { font-size: 11.5px; color: var(--gray-500); margin-top: 1px; }
-    .bill .ba { font-size: 14px; font-weight: 800; white-space: nowrap; }
-    .bill .rc { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1.5px solid #86EFAC; background: #F0FDF4; color: #166534; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; flex-shrink: 0; }
+    .bill.auto { background: #F8FAFC; margin: 0 -6px; padding: 10px 6px; border-radius: 10px; }
+    .bill.pend .ba { color: #92400E; }
+    .bill .bi { grid-row: 1 / span 2; width: 34px; height: 34px; border-radius: 10px; background: var(--gray-100); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .bill .b1 { font-size: 13.5px; font-weight: 700; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bill .b2 { font-size: 11.5px; color: var(--gray-500); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
+    .bill .ba { font-size: 14.5px; font-weight: 800; white-space: nowrap; text-align: right; }
+    .bill .rc { grid-column: 3; justify-self: end; min-height: 30px; padding: 0 10px; border-radius: 9px; border: 1.5px solid #86EFAC; background: #F0FDF4; color: #166534; font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
     .bill .rc.none { border-color: var(--gray-200); background: white; color: var(--gray-400); cursor: default; }
-    .modal-sum { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; padding: 10px 0 4px; border-top: 2px solid var(--gray-200); margin-top: 4px; }
+    .st-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 3px; vertical-align: 1px; }
+    .st-dot.ok { background: #16A34A; } .st-dot.warn { background: #F59E0B; } .st-dot.bad { background: #DC2626; }
+    .modal-sum { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 800; padding: 10px 0 2px; border-top: 2px solid var(--gray-200); margin-top: 6px; }
+    .modal-sum.sub { font-size: 12px; font-weight: 600; color: var(--gray-500); border: 0; padding-top: 2px; }
+    .modal-sum.ok { color: #166534; }
+    .ceo-bar { display: flex; align-items: center; gap: 8px; background: white; border: 1.5px solid var(--gray-200); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; }
+    .ceo-bar b { flex: 1; min-width: 0; }
+    .ceo-bar button { min-height: 38px; padding: 0 12px; border-radius: 10px; border: 0; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; background: #111827; color: white; white-space: nowrap; }
+    .ceo-bar button:disabled { opacity: .5; cursor: default; }
+    .ceo-bar .chip { white-space: nowrap; }
     .count { font-size: 12px; color: var(--gray-500); margin: 2px 2px 8px; }
   </style>
 </head>
@@ -99,7 +111,8 @@
       </select>
       <input type="search" id="fQ" placeholder="ค้นชื่อ / อีเมล" aria-label="ค้นหา">
     </div>
-    <button type="button" id="sumBtn" class="btn btn-secondary" style="width:100%;margin:0 0 10px;min-height:44px;font-weight:800;">📊 สรุปทุกคน Excel (เดือนที่เลือก)</button>
+    <button type="button" id="sumBtn" class="btn btn-secondary" style="width:100%;margin:0 0 10px;min-height:44px;font-weight:800;">📊 สรุปทุกคน Excel (เดือน + แผนกที่เลือก)</button>
+    <div class="ceo-bar" id="ceoBar" style="display:none;"></div>
     <div class="count" id="count"></div>
     <div id="content" class="loading"><div class="spinner"></div></div>
   </div>
@@ -203,7 +216,41 @@
         return;
       }
       c.innerHTML = `<div class="cards">` + list.map(card).join('') + `</div>`;
-      wire();
+      wire(); renderCeoBar();
+    }
+
+    /* ═══ 👑 v9.4 ส่งสรุปเดือนนี้ (ตามแผนกที่เลือก) ให้ CEO อนุมัติ ═══ */
+    function ceoSummaryFor(dept) {
+      const want = dept || '*';
+      return (B.summaries || []).filter(x => x.dept === want).sort((a, b) => new Date(b.RequestedAt) - new Date(a.RequestedAt))[0] || null;
+    }
+    function renderCeoBar() {
+      const bar = document.getElementById('ceoBar');
+      if (!B) { bar.style.display = 'none'; return; }
+      const sm = ceoSummaryFor(F.dept);
+      const scope = ymLabel(B.ym) + (F.dept ? ' · ' + F.dept : ' · ทุกแผนก');
+      let html = '';
+      if (sm && sm.Status === 'Pending') html = `<span class="chip warn">⏳ รอ CEO</span><b>${scope} — ส่งแล้ว ${thD(sm.RequestedAt)} · ${sm.StaffCount} คน · ${money(sm.Total)} บาท</b>`;
+      else if (sm && sm.Status === 'Approved') html = `<span class="chip ok">👑 CEO อนุมัติ</span><b>${scope} — ${thD(sm.CEOAt)} · ${sm.StaffCount} คน · ${money(sm.Total)} บาท</b>`;
+      else {
+        if (sm && sm.Status === 'Rejected') html = `<span class="chip bad">❌ CEO ไม่อนุมัติ</span><b>${esc(sm.CEORemark || '')}</b>`;
+        else html = `<span class="chip info">👑 CEO</span><b>${scope} — ยังไม่ส่งขออนุมัติ</b>`;
+        html += `<button id="ceoBtn" ${B.ceoConfigured ? '' : 'disabled title="ยังไม่ได้ตั้ง CEO_EMAIL ในชีท Settings"'}>📨 ส่งขออนุมัติ CEO</button>`;
+      }
+      bar.innerHTML = html; bar.style.display = 'flex';
+      const b = document.getElementById('ceoBtn');
+      if (b) b.addEventListener('click', async () => {
+        if (!confirm('ส่งสรุป ' + scope + ' ให้ CEO อนุมัติ?\n\nระบบจะเก็บตัวเลข ณ ตอนนี้ไว้ และแจ้ง CEO ทันที')) return;
+        b.disabled = true; showLoading('กำลังส่ง...');
+        try {
+          const r = await submitSummaryForCEO({ requesterEmail: session.Email, ym: F.ym, dept: F.dept || '*' });
+          hideLoading();
+          if (r.error) throw new Error(r.error);
+          showToast('📨 ส่งแล้ว · ' + r.count + ' คน · ' + money(r.total) + ' บาท — แจ้ง CEO แล้ว', 'success');
+          B.summaries = (B.summaries || []).concat([{ ID: r.id, ym: F.ym, dept: F.dept || '*', Status: 'Pending', RequestedAt: new Date().toISOString(), StaffCount: r.count, Total: r.total }]);
+          renderCeoBar(); setTimeout(load, 1200);
+        } catch (e) { hideLoading(); b.disabled = false; showToast(e.message, 'error'); }
+      });
     }
 
     function card(x) {
@@ -254,73 +301,62 @@
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
     }
 
-    /* ═══ 🧾 รายการบิลของคนนั้นในรอบนั้น + ดูใบเสร็จ — ในหน้าเดียว ไม่ต้องไปหน้าอื่น ═══ */
-    let ALLREQ = null;                       // โหลดครั้งเดียวต่อการเปิดหน้า (ของสดมาเมื่อเปิดการ์ดถัดไป)
-    async function allRequests() {
-      if (ALLREQ) return ALLREQ;
-      const r = await fetchAllRequests(session.Email);
-      if (r.error) throw new Error(r.error);
-      ALLREQ = Array.isArray(r) ? r : (r.items || []);
-      return ALLREQ;
-    }
-    const ymdOf = v => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : ''; };
+    /* ═══ 🧾 v9.4 รายการบิลของคนนั้น — ชุดเดียวกับที่คิดยอดใบ Export/Excel (หลังบ้าน getStaffClaimItems) ═══ */
+    const money2 = n => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     async function openDetail(email) {
       const x = (B.cards || []).find(c => c.StaffEmail === email);
       if (!x) return;
       showLoading('กำลังโหลดรายการ...');
-      let rows;
-      try { rows = await allRequests(); hideLoading(); }
+      let r;
+      try { r = await fetchStaffClaimItems(session.Email, email, B.ym); hideLoading(); if (r.error) throw new Error(r.error); }
       catch (e) { hideLoading(); return showToast(e.message, 'error'); }
-      // ช่วงวัน: มีใบ Export → ใช้ช่วงของใบ · ไม่มี → ทั้งเดือนที่เลือก
-      let from = x.PeriodStart, to = x.PeriodEnd, label;
-      if (from && to) label = 'รอบ ' + thD(from) + ' – ' + thD(to);
-      else { from = B.ym + '-01'; to = B.ym + '-31'; label = ymLabel(B.ym) + ' (ยังไม่มีใบ Export — โชว์ทั้งเดือน)'; }
-      const mine = rows.filter(r => String(r.StaffEmail || '').toLowerCase() === email && r.Status !== 'PreApprove')
-        .filter(r => { const d = ymdOf(r.ExpenseDate || r.Timestamp); return d && d >= from && d <= to; })
-        .sort((a, b) => new Date(a.ExpenseDate || a.Timestamp) - new Date(b.ExpenseDate || b.Timestamp));
-      const money2 = n => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const total = mine.filter(r => r.Status === 'Approved').reduce((t, r) => t + (Number(r.Amount) || 0), 0);
-      document.getElementById('modalTitle').textContent = (x.FullName || x.Name) + ' · ' + mine.length + ' รายการ';
+      const items = r.items || [];
+      const label = r.source === 'export'
+        ? 'รอบ ' + thD(r.periodStart) + ' – ' + thD(r.periodEnd) + (r.exportStatus === 'Approved' ? ' · อนุมัติ Export แล้ว' : ' · รออนุมัติ Export')
+        : ymLabel(B.ym) + ' · ยังไม่มีใบ Export — โชว์ทั้งเดือน';
+      document.getElementById('modalTitle').textContent = (x.FullName || x.Name) + (x.FullName && x.FullName !== x.Name ? ' (' + x.Name + ')' : '');
+      const nApproved = items.filter(i => i.Status === 'Approved').length, nPend = items.filter(i => i.Status === 'Pending').length;
+      const rows = items.map(i => {
+        const desc = i.Venue || i.Occasion || (i.Origin && i.Destination ? i.Origin + ' → ' + i.Destination : '') || '';
+        const st = i.Status === 'Approved' ? ['ok', 'อนุมัติแล้ว'] : i.Status === 'Pending' ? ['warn', 'รอหัวหน้า'] : ['bad', statusTH(i.Status)];
+        return `<div class="bill ${i.auto ? 'auto' : ''} ${i.Status === 'Pending' ? 'pend' : ''}">
+          <div class="bi">${(typeof CAT_ICON_TH !== 'undefined' && CAT_ICON_TH[i.Category]) || '🧾'}</div>
+          <div class="b1">${esc((typeof CAT_NAME_TH !== 'undefined' && CAT_NAME_TH[i.Category]) || i.Category)}${desc ? ' · ' + esc(desc) : ''}</div>
+          <div class="ba">${money2(i.Amount)}</div>
+          <div class="b2">${i.auto ? '<span>เหมาจ่ายรายเดือน (ระบบใส่ให้)</span>' : `<span>${thD(i.ExpenseDate)}</span>${i.Mileage_KM ? `<span>${i.Mileage_KM} กม.</span>` : ''}${i.JobNo ? `<span>Job ${esc(i.JobNo)}</span>` : ''}<span><i class="st-dot ${st[0]}"></i>${st[1]}</span>`}</div>
+          ${i.auto ? '' : i.files ? `<button class="rc" data-rc="${esc(i.ID)}" data-n="${i.files}">📎 ${i.files > 1 ? i.files + ' ไฟล์' : 'ใบเสร็จ'}</button>` : `<span class="rc none">ไม่มีไฟล์</span>`}
+        </div>`; }).join('');
+      let sums = `<div class="modal-sum ok"><span>รวมที่อนุมัติแล้ว${r.source === 'export' ? ' (= ยอดใบ Export)' : ''}</span><span>${money2(r.approvedTotal)} บาท</span></div>`;
+      if (r.source === 'export' && Math.abs((r.exportTotal || 0) - r.approvedTotal) > 0.5)
+        sums += `<div class="modal-sum sub" style="color:#B91C1C;"><span>⚠️ ใบ Export บันทึกไว้ ${money2(r.exportTotal)} — ตัวเลขเปลี่ยนหลังขอ</span><span></span></div>`;
+      if (nPend) sums += `<div class="modal-sum sub"><span>รอหัวหน้าอนุมัติ ${nPend} ใบ (ยังไม่นับ)</span><span>${money2(r.pendingTotal)} บาท</span></div>`;
       document.getElementById('modalContent').innerHTML =
-        `<div style="font-size:12px;color:var(--gray-500);margin-bottom:6px;">${esc(label)}</div>` +
-        (mine.length ? mine.map(r => {
-          let urls = []; try { urls = JSON.parse(r.ReceiptURLs || '[]'); } catch (e) {}
-          if (!urls.length && r.ReceiptURL) urls = [r.ReceiptURL];
-          const desc = r.Venue || r.Occasion || (r.Origin && r.Destination ? r.Origin + ' → ' + r.Destination : '') || '';
-          const stCls = r.Status === 'Approved' ? 'ok' : r.Status === 'Pending' ? 'warn' : r.Status === 'Rejected' ? 'bad' : 'info';
-          return `<div class="bill">
-            <div class="bi">${(typeof CAT_ICON_TH !== 'undefined' && CAT_ICON_TH[r.Category]) || '🧾'}</div>
-            <div class="bt">
-              <div class="b1">${esc((typeof CAT_NAME_TH !== 'undefined' && CAT_NAME_TH[r.Category]) || r.Category)}${desc ? ' · ' + esc(desc) : ''}${r.JobNo ? ' · Job ' + esc(r.JobNo) : ''}</div>
-              <div class="b2">${thD(r.ExpenseDate || r.Timestamp)}${r.Mileage_KM ? ' · ' + r.Mileage_KM + ' กม.' : ''} · <span class="chip ${stCls}">${esc(statusTH(r.Status))}</span></div>
-            </div>
-            <div class="ba">${money2(r.Amount)}</div>
-            ${urls.length ? `<button class="rc" data-rc="${esc(r.ID)}" data-n="${urls.length}">📎 ${urls.length > 1 ? urls.length + ' ไฟล์' : 'ใบเสร็จ'}</button>` : `<span class="rc none">ไม่มีไฟล์</span>`}
-          </div>`; }).join('') : '<div class="empty" style="padding:18px 0;"><div class="title">ไม่มีรายการในช่วงนี้</div></div>') +
-        `<div class="modal-sum"><span>รวมที่อนุมัติแล้ว</span><span>${money2(total)} บาท</span></div>` +
-        `<img id="rcptImg" class="preview-img" alt="ใบเสร็จ" style="display:none;">
-         <div id="rcptNav" style="display:none;gap:6px;margin-top:8px;"></div>`;
+        `<div class="msub"><span>${esc(label)}</span><span class="chip ok">${nApproved} ใบ</span>${nPend ? `<span class="chip warn">รอ ${nPend}</span>` : ''}</div>` +
+        (items.length ? rows : '<div class="empty" style="padding:18px 0;"><div class="title">ไม่มีรายการในช่วงนี้</div></div>') + sums;
       document.getElementById('modal').classList.add('show');
+      document.getElementById('modal').querySelector('.modal-content').scrollTop = 0;
       document.querySelectorAll('[data-rc]').forEach(b => b.addEventListener('click', () => showReceipt(b.dataset.rc, 0, Number(b.dataset.n) || 1)));
     }
+    /* ใบเสร็จ: เปิดเต็มจอทันที (เดิมไปโผล่ล่างสุดของรายการ มองไม่เห็น) · หลายไฟล์ → กดถัดไปในตัวดูรูป */
     async function showReceipt(id, idx, n) {
-      showLoading('โหลดใบเสร็จ...');
+      showLoading('โหลดใบเสร็จ' + (n > 1 ? ' ' + (idx + 1) + '/' + n : '') + '...');
       try {
         const r = await fetchReceiptImage(id, session.Email, idx);
         hideLoading();
         if (r.error) throw new Error(r.error);
-        if (!r.dataUrl) throw new Error('ไม่พบไฟล์ใบเสร็จ');
-        const img = document.getElementById('rcptImg');
-        img.src = r.dataUrl; img.style.display = 'block';
-        img.onclick = () => openImageViewer(r.dataUrl, 'แตะ 2 ครั้งเพื่อซูม');
-        const nav = document.getElementById('rcptNav');
-        const total = r.totalFiles || n || 1;
-        if (total > 1) {
-          nav.style.display = 'flex';
-          nav.innerHTML = Array.from({ length: total }, (_, i) => `<button class="rc ${i === idx ? '' : 'none'}" data-i="${i}">ไฟล์ ${i + 1}</button>`).join('');
-          nav.querySelectorAll('button').forEach(b => b.addEventListener('click', () => showReceipt(id, Number(b.dataset.i), total)));
-        } else nav.style.display = 'none';
-        img.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (!r.dataUrl) throw new Error('ไม่พบไฟล์ใบเสร็จ (อาจถูกลบจาก Drive)');
+        const total = Math.max(Number(r.totalFiles) || 0, n || 1);
+        openImageViewer(r.dataUrl, total > 1 ? 'ไฟล์ ' + (idx + 1) + '/' + total + ' · แตะ 2 ครั้งเพื่อซูม' : 'แตะ 2 ครั้งเพื่อซูม');
+        if (total > 1 && idx + 1 < total) {
+          const nb = document.createElement('button');
+          nb.textContent = 'ไฟล์ถัดไป ›'; nb.className = 'rc'; nb.id = 'rcNext';
+          nb.style.cssText = 'position:fixed;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:10000;min-height:40px;padding:0 14px;border-radius:12px;border:0;background:#16A34A;color:white;font:inherit;font-weight:800;';
+          document.body.appendChild(nb);
+          const clean = () => { nb.remove(); document.removeEventListener('click', onAny, true); };
+          const onAny = e => { if (e.target !== nb) setTimeout(() => { if (!document.querySelector('.img-viewer, #imgViewer, .lightbox')) clean(); }, 50); };
+          nb.addEventListener('click', e => { e.stopPropagation(); clean(); showReceipt(id, idx + 1, total); });
+          document.addEventListener('click', onAny, true);
+        }
       } catch (err) { hideLoading(); showToast(err.message, 'error'); }
     }
     function closeModal() { document.getElementById('modal').classList.remove('show'); }
@@ -333,7 +369,11 @@
         el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(el.dataset.open); } });
       });
       document.querySelectorAll('[data-paid]').forEach(b => b.addEventListener('click', async () => {
-        if (!confirm('ยืนยันว่าโอนเงินให้ ' + b.dataset.name + ' ' + money(b.dataset.amt) + ' บาทแล้ว?\n\nระบบจะแจ้ง ' + b.dataset.name + ' ทันที และย้อนกลับไม่ได้')) return;
+        const c0 = B.cards.find(x => x.exportId === b.dataset.paid);
+        const smAll = ceoSummaryFor(''), smDept = c0 ? ceoSummaryFor(c0.Department) : null;
+        const ceoOK = (smAll && smAll.Status === 'Approved') || (smDept && smDept.Status === 'Approved');
+        const warn = ceoOK ? '' : '\n\n⚠️ CEO ยังไม่ได้อนุมัติสรุปเดือนนี้';
+        if (!confirm('ยืนยันว่าโอนเงินให้ ' + b.dataset.name + ' ' + money(b.dataset.amt) + ' บาทแล้ว?' + warn + '\n\nระบบจะแจ้ง ' + b.dataset.name + ' ทันที และย้อนกลับไม่ได้')) return;
         b.disabled = true; showLoading('กำลังบันทึก...');
         try {
           const r = await markExportPaid(session.Email, b.dataset.paid);
@@ -374,9 +414,9 @@
     // 📊 สรุปทุกคน 1 แถวต่อคน — ฟอร์ม Staff Expense Summary Report
     document.getElementById('sumBtn').addEventListener('click', async () => {
       const btn = document.getElementById('sumBtn');
-      btn.disabled = true; showLoading('กำลังสร้างสรุป ' + ymLabel(F.ym) + '...');
+      btn.disabled = true; showLoading('กำลังสร้างสรุป ' + ymLabel(F.ym) + (F.dept ? ' · ' + F.dept : '') + '...');
       try {
-        const r = await exportStaffSummary({ requesterEmail: session.Email, ym: F.ym });
+        const r = await exportStaffSummary({ requesterEmail: session.Email, ym: F.ym, dept: F.dept || '*' });
         hideLoading();
         if (r.error) throw new Error(r.error);
         saveXlsx(r, 'summary.xlsx');
@@ -386,7 +426,7 @@
     });
 
     document.getElementById('fMonth').addEventListener('change', e => { if (!e.target.value) return; F.ym = e.target.value; B = null; load(); });
-    document.getElementById('fDept').addEventListener('change', e => { F.dept = e.target.value; render(); });
+    document.getElementById('fDept').addEventListener('change', e => { F.dept = e.target.value; render(); });   // render() วาด ceoBar ด้วย
     document.getElementById('fStage').addEventListener('change', e => { F.stage = e.target.value; renderHero(); render(); });
     let qt; document.getElementById('fQ').addEventListener('input', e => { F.q = e.target.value; clearTimeout(qt); qt = setTimeout(render, 120); });
 

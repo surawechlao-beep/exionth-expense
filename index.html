@@ -392,7 +392,7 @@
         if (login.error) throw new Error(login.error);
         const role = await getMyRole(currentEmail);
         Object.assign(login, { role: role.role, isManager: role.isManager, isSenior: role.isSenior, isGM: role.isGM,
-                               isAccountant: !!role.isAccountant, isViewer: !!role.isViewer });
+                               isAccountant: !!role.isAccountant, isViewer: !!role.isViewer, isCEO: !!role.isCEO });
         setSession(login);
         hideLoading();
         showToast('ตั้งรหัสสำเร็จ!', 'success');
@@ -409,7 +409,7 @@
         if (login.error) throw new Error(login.error);
         const role = await getMyRole(currentEmail);
         Object.assign(login, { role: role.role, isManager: role.isManager, isSenior: role.isSenior, isGM: role.isGM,
-                               isAccountant: !!role.isAccountant, isViewer: !!role.isViewer });
+                               isAccountant: !!role.isAccountant, isViewer: !!role.isViewer, isCEO: !!role.isCEO });
         setSession(login);
         hideLoading();
         askApp(login);
@@ -435,6 +435,7 @@
 
     const ROLE = {
       gm:     { emoji:'👔', label:'General Manager' },
+      ceo:    { emoji:'👑', label:'CEO' },
       senior: { emoji:'👑', label:'Senior Approver' },
       manager:{ emoji:'👨‍💼', label:'Manager' },
       accountant: { emoji:'🧾', label:'ฝ่ายบัญชี' },
@@ -496,18 +497,18 @@
         // sync สิทธิ์ล่าสุดเข้า session — คนที่ล็อกอินค้างไว้ก่อนอัปเดตจะได้ไม่ต้องล็อกอินใหม่
         if (home.role) {
           Object.assign(session, { role: home.role.role, isManager: !!home.role.isManager, isSenior: !!home.role.isSenior,
-            isGM: !!home.role.isGM, isAccountant: !!home.role.isAccountant, isViewer: !!home.role.isViewer });
+            isGM: !!home.role.isGM, isAccountant: !!home.role.isAccountant, isViewer: !!home.role.isViewer, isCEO: !!home.role.isCEO });
           setSession(session);
           const rr = ROLE[session.role] || ROLE.staff;
           view.querySelector('.hero-badge').textContent = rr.label;
           view.querySelector('.hero-greet').textContent = greetTime() + ' ' + rr.emoji;
         }
-        const kind = home.role.isAccountant ? 'acct' : home.role.isGM ? 'gm'
+        const kind = home.role.role === 'ceo' ? 'ceo' : home.role.isAccountant ? 'acct' : home.role.isGM ? 'gm'
                    : (home.role.isManager || home.role.isSenior) ? 'mgr' : 'staff';
         document.getElementById('heroStats').innerHTML = heroStats(home, kind);
         const body = document.getElementById('homeBody');
         body.classList.remove('loading');
-        body.innerHTML = ({ acct: renderAcct, gm: renderGM, mgr: renderMgr, staff: renderStaff })[kind](home, session)
+        body.innerHTML = ({ acct: renderAcct, gm: renderGM, mgr: renderMgr, staff: renderStaff, ceo: renderCEO })[kind](home, session)
           + commonMenus(session) + footer();
         wireHome(session);
         // โหลดของที่หน้าถัดไปน่าจะใช้ รอไว้ล่วงหน้า — กด "คำขอ" หรือ "ส่งบิล" แล้วไม่ต้องหมุน
@@ -523,6 +524,10 @@
     /* ── ตัวเลข 3 ช่องบนหัว — คนละชุดตามบทบาท ── */
     function heroStats(h, kind) {
       const hs = (v, l) => `<div class="hs"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+      if (kind === 'ceo') {
+        const c = h.ceo || {};
+        return hs(c.pending || 0, 'รออนุมัติ') + hs(money(c.pendingTotal), 'บาท') + hs('—', '');
+      }
       if (kind === 'acct') {
         const a = h.accounting || {};
         return hs(a.unpaidCount || 0, 'รอโอน') + hs(money(a.unpaidAmount), 'บาท') +
@@ -641,6 +646,28 @@
     }
 
     /* ── ฝ่ายบัญชี ── */
+    /* 👑 v9.4 CEO — หน้าเดียว: สรุปเบิกจ่ายรออนุมัติ */
+    function renderCEO(h, session) {
+      const c = h.ceo || { pending: 0, pendingTotal: 0 };
+      let out = '';
+      if (c.pending > 0) out += `
+        <a href="ceo-approve.html" class="cta"><div class="ci">👑</div>
+          <div class="ct"><b>สรุปเบิกจ่ายรออนุมัติ ${c.pending} รายการ</b><span>รวม ${money(c.pendingTotal)} บาท — แตะเพื่อดูและอนุมัติ</span></div><div class="ar">›</div></a>`;
+      else out += `
+        <a href="ceo-approve.html" class="cta soft"><div class="ci">✅</div>
+          <div class="ct"><b>ไม่มีสรุปรออนุมัติ</b><span>บัญชีจะส่งสรุปรายเดือนมาให้อนุมัติที่นี่</span></div><div class="ar">›</div></a>`;
+      out += `<div class="sec-label">เมนู</div>
+        <div class="tiles">
+          <a href="ceo-approve.html" class="tile"><div class="ib ib-green">👑</div>
+            <div><div class="lb">อนุมัติสรุปเบิกจ่าย</div><div class="sb">รายเดือน · ทุกแผนก</div></div></a>
+          <a href="summary.html" class="tile"><div class="ib ib-purple">📊</div>
+            <div><div class="lb">สรุปทั้งบริษัท</div><div class="sb">แยกแผนก · แยกคน</div></div></a>
+          <a href="all-requests.html" class="tile"><div class="ib ib-blue">${icon('list')}</div>
+            <div><div class="lb">คำขอทั้งบริษัท</div><div class="sb">ดูรายการ · ใบเสร็จ</div></div></a>
+        </div>`;
+      return out;
+    }
+
     function renderAcct(h, session) {
       const a = h.accounting || { unpaidCount: 0, top: [] };
       let out = '';
