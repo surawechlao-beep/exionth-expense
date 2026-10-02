@@ -7,6 +7,26 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#B7081D">
+  <style>
+    /* ═══ 🎯 v9.6 แถบ 4 ขั้นของรอบเบิก — เห็นชัดว่าอยู่ขั้นไหน สีเปลี่ยนตามขั้น ═══ */
+    .xsteps { display: flex; gap: 6px; margin: 0 0 10px; }
+    .xsteps .st { flex: 1; text-align: center; font-size: 11px; font-weight: 700; color: var(--gray-400); }
+    .xsteps .st i { display: block; height: 6px; border-radius: 3px; background: var(--gray-200); margin-bottom: 5px; }
+    .xsteps .st.done { color: #166534; } .xsteps .st.done i { background: #16A34A; }
+    .xsteps .st.cur { color: var(--gray-900); } .xsteps .st.cur i { background: #F59E0B; }
+    .xsteps .st.cur.blue { color: #1E3A8A; } .xsteps .st.cur.blue i { background: #2563EB; }
+    .xsteps .st.cur.green { color: #166534; } .xsteps .st.cur.green i { background: #16A34A; }
+    .xbox { border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; border: 1.5px solid; }
+    .xbox .h { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .xbox .d { font-size: 12.5px; margin-top: 4px; line-height: 1.5; }
+    .xbox.gray { background: var(--gray-50); border-color: var(--gray-200); color: var(--gray-700); }
+    .xbox.amber { background: linear-gradient(180deg,#FFFBEB,#FEF3C7); border-color: #F59E0B; color: #78350F; }
+    .xbox.blue { background: linear-gradient(180deg,#EFF6FF,#DBEAFE); border-color: #2563EB; color: #1E3A8A; }
+    .xbox.green { background: linear-gradient(180deg,#F0FDF4,#DCFCE7); border-color: #16A34A; color: #14532D; }
+    .xbox.red { background: #FEF2F2; border-color: #DC2626; color: #7F1D1D; }
+    .xbox .pulse { width: 10px; height: 10px; border-radius: 50%; background: currentColor; animation: xp 1.2s ease-in-out infinite; }
+    @keyframes xp { 0%,100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+  </style>
 </head>
 <body>
   <div class="header">
@@ -236,37 +256,39 @@
       const canPickCutoff = !ex || ex.OverallStatus === 'Rejected';
       if (canPickCutoff) loadPeriodInfo(); else cw.style.display = 'none';
 
-      if (!ex || ex.OverallStatus === 'Rejected') {
-        box.innerHTML = ex
-          ? `<div class="bad-box"><b>❌ ไม่อนุมัติ</b><br><span style="font-weight:400;">${ex.GMRemark || ex.ManagerRemark || ex.SeniorRemark || 'ไม่ได้ระบุเหตุผล'}</span></div>`
-          : `<div class="info-box">📋 ยังไม่ได้ขออนุมัติสำหรับ <b>${MONTHS[month-1]} ${year}</b></div>`;
+      // ขั้นปัจจุบัน: 0 ตรวจยอด · 1 รออนุมัติ · 2 อนุมัติแล้ว รอบัญชี · 3 โอนแล้ว
+      const stage = !ex || ex.OverallStatus === 'Rejected' ? 0 : ex.OverallStatus === 'Approved' ? (ex.PaidAt ? 3 : 2) : 1;
+      const curCls = stage === 1 ? 'cur' : stage === 2 ? 'cur blue' : stage === 3 ? 'cur green' : 'cur';
+      const steps = ['1 ตรวจยอด', '2 รออนุมัติ', '3 บัญชีตรวจ/โอน', '4 โอนแล้ว']
+        .map((t, i) => `<div class="st ${i < stage ? 'done' : i === stage ? curCls : ''}"><i></i>${t}</div>`).join('');
+      const strip = `<div class="xsteps">${steps}</div>`;
+      const money = n => Number(n || 0).toLocaleString();
+
+      if (stage === 0) {
+        box.innerHTML = strip + (ex
+          ? `<div class="xbox red"><div class="h">❌ ไม่อนุมัติ</div><div class="d">${ex.GMRemark || ex.ManagerRemark || ex.SeniorRemark || 'ไม่ได้ระบุเหตุผล'} — แก้แล้วขอใหม่ได้</div></div>`
+          : `<div class="xbox gray"><div class="h">📋 ยังไม่ได้ขออนุมัติ ${MONTHS[month-1]} ${year}</div>
+               <div class="d">กด "ดูตัวอย่าง" เช็คว่ายอดตรง แล้วกด "ขออนุมัติเพื่อ Export" — ไม่ต้องปริ้นส่ง บัญชีจัดการต่อให้</div></div>`);
         act.innerHTML = `
           <button class="btn btn-primary" onclick="requestApproval()">✅ ขออนุมัติเพื่อ Export</button>
           <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่างก่อน (ยังใช้เบิกไม่ได้)</button>`;
 
-      } else if (ex.OverallStatus === 'Approved') {
-        // ✨ v6.0 ปิดลูป — บอกด้วยว่าบัญชีจ่ายเงินแล้วหรือยัง
-        const paid = !!ex.PaidAt;
-        box.innerHTML = `
-          <div class="ok-box"><b>✅ อนุมัติแล้ว</b><br>
-            <span style="font-weight:400;">${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span>
-            ${periodTxt(ex)}</div>
-          ${paid
-            ? `<div class="ok-box" style="background:#ECFDF5;border-color:#6EE7B7;">
-                 💵 <b>บัญชีโอนเงินแล้ว</b><br>
-                 <span style="font-weight:400;font-size:12px;">${new Date(ex.PaidAt).toLocaleDateString('th-TH',{day:'numeric',month:'long',year:'numeric'})}</span>
-               </div>`
-            : `<div class="info-box" style="margin-bottom:0;">⏳ รอฝ่ายบัญชีโอนเงิน</div>`}`;
-        act.innerHTML = `
-          <button class="btn btn-primary" onclick="downloadFinal('${ex.ID}')">📥 ดาวน์โหลด Excel ตัวจริง</button>
-          <button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง</button>`;
+      } else if (stage === 1) {
+        const who = String(ex.GMEmail || ex.SeniorEmail || ex.ManagerEmail || '').split('@')[0];
+        box.innerHTML = strip + `<div class="xbox amber"><div class="h"><span class="pulse"></span>⏳ รออนุมัติ</div>
+          <div class="d">ส่งถึง <b>${who || 'ผู้อนุมัติ'}</b> แล้ว · ${ex.ItemCount} รายการ · ${money(ex.TotalAmount)} บาท${periodTxt(ex)}<br>อนุมัติแล้วจะแจ้งเตือนที่กระดิ่ง ไม่ต้องทำอะไรเพิ่ม</div></div>`;
+        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่าง</button>`;
+
+      } else if (stage === 2) {
+        box.innerHTML = strip + `<div class="xbox blue"><div class="h"><span class="pulse"></span>✅ อนุมัติแล้ว — รอบัญชีตรวจและโอน</div>
+          <div class="d">${ex.ItemCount} รายการ · <b>${money(ex.TotalAmount)} บาท</b>${periodTxt(ex)}<br><b>ไม่ต้องปริ้นส่ง</b> บัญชีเห็นใบนี้บนบอร์ดแล้ว โอนเสร็จจะแจ้งเตือนทันที</div></div>`;
+        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadFinal('${ex.ID}')">📥 ดู Excel ที่อนุมัติแล้ว (ไม่ต้องปริ้น)</button>`;
 
       } else {
-        const who = String(ex.GMEmail || ex.SeniorEmail || ex.ManagerEmail || '').split('@')[0];
-        box.innerHTML = `<div class="warn-box"><b>⏳ รออนุมัติ</b><br>
-          <span style="font-weight:400;font-size:12.5px;">อยู่ที่ ${who || 'ผู้อนุมัติ'} · ${ex.ItemCount} รายการ · ${Number(ex.TotalAmount||0).toLocaleString()} บาท</span>
-          ${periodTxt(ex)}</div>`;
-        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadDraft()">👀 ดูตัวอย่างก่อน (ยังใช้เบิกไม่ได้)</button>`;
+        const paidD = new Date(ex.PaidAt).toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
+        box.innerHTML = strip + `<div class="xbox green"><div class="h">💵 โอนเงินแล้ว</div>
+          <div class="d">${money(ex.TotalAmount)} บาท · บัญชีโอนเมื่อ ${paidD}${periodTxt(ex)}</div></div>`;
+        act.innerHTML = `<button class="btn btn-secondary" onclick="downloadFinal('${ex.ID}')">📥 ดู Excel ที่อนุมัติแล้ว</button>`;
       }
     }
 
